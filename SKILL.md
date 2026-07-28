@@ -46,6 +46,16 @@ JB721TiersHookProjectDeployer.launchProjectFor(
 
 If the deployer explicitly chooses multiple chains, JuiceScan's omnichain `launchProjectFor` path produces one txlink per chain. Do not collapse multiple chain deploys into one JSON-RPC request.
 
+## Local Validation
+
+When this repo's scripts are available, run the dry-run validation before pinning metadata or building calldata:
+
+```sh
+node scripts/validate-fpl-shop-draft.mjs "https://fantasy.premierleague.com/en/leagues/143466/standings/c" "0x..."
+```
+
+This script fetches the league through FC-Footy, applies the same draft mutations, and fails if project metadata still contains placeholders, if token issuance is enabled, if either required NFT tier is missing, or if any NFT tier allows credit purchases.
+
 ## Source Draft
 
 Use `assets/fpl-insert-league-name-shop.jb` as the source of truth for deploy settings. Treat it as a JuiceScan create-flow draft that must be converted into a wallet-signable txlink.
