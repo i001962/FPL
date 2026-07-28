@@ -54,11 +54,19 @@ When this repo's scripts are available, run the dry-run validation before pinnin
 node scripts/validate-fpl-shop-draft.mjs "https://fantasy.premierleague.com/en/leagues/143466/standings/c" "0x..."
 ```
 
+For one-off tier price edits, validate the temporary deploy-state override without editing the bundled asset:
+
+```sh
+node scripts/validate-fpl-shop-draft.mjs "https://fantasy.premierleague.com/en/leagues/143466/standings/c" "0x..." --tier-price "Game Week 1=1"
+```
+
 This script fetches the league through FC-Footy, applies the same draft mutations, and fails if project metadata still contains placeholders, if token issuance is enabled, if either required NFT tier is missing, or if any NFT tier allows credit purchases.
 
 ## Source Draft
 
 Use `assets/fpl-insert-league-name-shop.jb` as the source of truth for deploy settings. Treat it as a JuiceScan create-flow draft that must be converted into a wallet-signable txlink.
+
+For an individual deploy request, do not edit `assets/fpl-insert-league-name-shop.jb` unless the user explicitly asks to change the default skill/template in the repo. Load the draft into memory, clone it into a temporary deploy state, apply league/wallet/chain/tier edits to that deploy state, then build metadata and calldata from the mutated deploy state. If a review artifact is useful, write a generated draft under `drafts/` or `/tmp`, not back into `assets/`.
 
 The draft is intentionally opinionated:
 
@@ -89,6 +97,8 @@ Optional edits:
 - League display name.
 - NFT tier name, description, price, supply, image, or split recipients.
 - Project tagline or description.
+
+Apply optional edits to the temporary deploy state only. Example: if the user says “change the price of Game Week 1 NFT to $1 and build me the txlink,” set only the deploy state's `nfts[]` item with `name === "Game Week 1"` to `price = "1"` before validation/pinning/calldata. Do not modify the bundled asset or commit a template change for that one-off deploy.
 
 ## Workflow
 

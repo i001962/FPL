@@ -3,11 +3,34 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const [, , leagueUrl, wallet] = process.argv;
+const [, , leagueUrl, wallet, ...optionArgs] = process.argv;
 
 if (!leagueUrl || !wallet) {
-  console.error('Usage: node scripts/validate-fpl-shop-draft.mjs <fpl-league-url> <deployer-wallet>');
+  console.error('Usage: node scripts/validate-fpl-shop-draft.mjs <fpl-league-url> <deployer-wallet> [--tier-price "Tier Name=Price"]');
   process.exit(2);
+}
+
+const tierPriceOverrides = new Map();
+for (let index = 0; index < optionArgs.length; index += 1) {
+  const arg = optionArgs[index];
+  if (arg !== '--tier-price') {
+    console.error(`Unknown option: ${arg}`);
+    process.exit(2);
+  }
+  const value = optionArgs[index + 1];
+  index += 1;
+  if (!value || !value.includes('=')) {
+    console.error('--tier-price must be formatted as "Tier Name=Price"');
+    process.exit(2);
+  }
+  const separatorIndex = value.lastIndexOf('=');
+  const tierName = value.slice(0, separatorIndex).trim();
+  const price = value.slice(separatorIndex + 1).trim();
+  if (!tierName || !/^\d+(\.\d+)?$/.test(price)) {
+    console.error('--tier-price must include a tier name and non-negative numeric price');
+    process.exit(2);
+  }
+  tierPriceOverrides.set(tierName, price);
 }
 
 const leagueIdMatch = String(leagueUrl).match(/\/leagues\/(\d+)\/standings\/c\b/);
@@ -78,6 +101,15 @@ for (const nft of state.nfts || []) {
   nft.imageUri = state.details.logoUri;
 }
 
+for (const [tierName, price] of tierPriceOverrides) {
+  const tier = (state.nfts || []).find((nft) => nft.name === tierName);
+  if (!tier) {
+    console.error(`Cannot apply tier price override; tier not found: ${tierName}`);
+    process.exit(1);
+  }
+  tier.price = price;
+}
+
 const projectMetadata = {
   name: state.details.name,
   description: state.details.description,
@@ -138,6 +170,7 @@ console.log(JSON.stringify({
   metadata: projectMetadata,
   owner: state.details.owner,
   operator: state.revOperator,
+  appliedTierPriceOverrides: Object.fromEntries(tierPriceOverrides),
   nfts: state.nfts.map((nft) => ({
     name: nft.name,
     price: nft.price,
