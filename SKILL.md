@@ -46,6 +46,26 @@ JB721TiersHookProjectDeployer.launchProjectFor(
 
 If the deployer explicitly chooses multiple chains, JuiceScan's omnichain `launchProjectFor` path produces one txlink per chain. Do not collapse multiple chain deploys into one JSON-RPC request.
 
+## Metadata Pinning
+
+Unique project and NFT tier JSON metadata must be pinned for each league shop because names/descriptions include the league and tier details. Reuse the default pinned image URI already in the `.jb` draft for `image`/`logoUri`, but still create fresh JSON metadata for:
+
+- project metadata
+- `Full Season` tier metadata
+- `Game Week 1` tier metadata
+
+Choose the pinning path explicitly:
+
+1. If `PINATA_JWT` or an equivalent Pinata API credential is available, use JuiceScan's `pinJson(obj, name)` flow.
+2. If the acting agent has a wallet/payment capability for Base USDC, it may use Pinata's x402 public pinning flow, such as `https://402.pinata.cloud/v1/pin/public`, with `@x402/fetch`/`@x402/axios` or equivalent x402 client code.
+3. If the acting agent does not have a wallet/payment capability, do not assume it can use x402 directly. Create a user handoff instead:
+   - write or display the exact JSON metadata payloads that need pinning
+   - identify the required Pinata x402 endpoint and payment network/token
+   - use a txlink handoff for any EVM payment transaction only when the x402/payment flow exposes a concrete `{to,data,value,chainId}` transaction payload
+   - otherwise stop before deploy txlink generation and ask the user to run the x402 pinning step in a wallet-capable environment or provide the resulting IPFS URIs
+
+Do not output a deploy txlink until all three metadata URIs are known and the NFT tier metadata URI has been converted with `encodeIpfsUriToBytes32(uri)`.
+
 ## Local Validation
 
 When this repo's scripts are available, run the dry-run validation before pinning metadata or building calldata:
@@ -133,7 +153,7 @@ Apply optional edits to the temporary deploy state only. Example: if the user sa
    - every NFT tier metadata `name` and `description`
 10. Let the deployer review or edit the final draft only as a pre-transaction review step.
 11. Build a fresh Juicebox V6 launch transaction using the JuiceScan create-flow logic listed in **Builder Source**. Do not reuse calldata from an already mined deployment and do not use a Juicebox SDK.
-12. Use a fresh deploy salt, current `JBProjects.creationFee()`, and freshly pinned or explicitly supplied project/NFT metadata.
+12. Use a fresh deploy salt, current `JBProjects.creationFee()`, and freshly pinned or explicitly supplied project/NFT metadata. Follow **Metadata Pinning**; do not assume the agent has a wallet for x402.
 13. Simulate the transaction with `eth_call` from the deployer wallet. If simulation fails, do not output a txlink as signer-ready.
 14. Produce a `txlink.stupidtech.net` URL for `eth_sendTransaction`. This is the primary output.
 15. Produce the post-deploy static shop URL pattern:
