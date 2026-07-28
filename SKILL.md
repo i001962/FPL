@@ -7,7 +7,16 @@ description: Create a reviewable txlink.stupidtech.net URL for deploying or main
 
 Use this skill to prepare reviewable `txlink.stupidtech.net` URLs for FPL league NFT shop deploys and existing-shop NFT tier maintenance. The shop itself is a static site; this skill does not create a backend and does not generate or design a frontend during deploy work.
 
-The deliverable is the txlink URL the deployer can open with their wallet. The `.jb` draft is only an internal source of deploy settings and an optional review artifact; do not stop by handing the user a `.jb` file when an exact txlink can be built.
+The deliverable is either a completed wallet transaction sent by the acting agent from an authorized wallet, or a txlink URL the deployer/operator can open with their own wallet. The `.jb` draft is only an internal source of deploy settings and an optional review artifact; do not stop by handing the user a `.jb` file when an exact txlink can be built.
+
+## Signing And Handoff
+
+For deploys and existing-shop maintenance, always choose one of these paths before building calldata:
+
+- **Agent wallet path**: if the acting agent has an authorized wallet for the target chain and the user explicitly wants the agent to send the transaction, prepare, simulate, show the decoded transaction for review, then send it from that wallet only after approval.
+- **Operator txlink path**: if the acting agent does not have a wallet, should not custody/sign, or the user/deployer/operator should sign, prepare and simulate the exact transaction and return a `txlink.stupidtech.net` URL for the operator wallet.
+
+Do not leave the user with only instructions, ABI fragments, metadata JSON, or a `.jb` file when a concrete transaction can be sent or represented as a txlink.
 
 ## Frontend Template
 
@@ -157,29 +166,34 @@ This script fetches the league through FC-Footy, applies the same draft mutation
 
 Use this workflow when the operator wants to remove an NFT tier from an existing shop or add a new NFT tier after deploy. The output is one or more wallet-signable txlinks that call the existing shop's `JB721TiersHook.adjustTiers(tiersToAdd, tierIdsToRemove)`.
 
+Default to the existing-shop path for requests like "add Game Week 3" unless the operator explicitly says the shop has not been deployed yet or asks to change the initial deploy transaction. Keep the operator prompt short: once the project/shop can be inferred, ask only for the new tier's price, description, and image choice. Use the defaults below for everything else and show them in the review step.
+
 1. Resolve the exact shop hook before building calldata:
    - read `JBDirectory.controllerOf(projectId)`
    - read `currentRulesetOf(projectId)` from the controller
    - use the active pay data hook or omnichain tiered hook resolution described in the static template
    - confirm the final `to` address is the project's `JB721TiersHook`, not a project controller, terminal, or unrelated contract
 2. For tier removals, ask the operator for the tier IDs to remove and show the tier names/metadata before encoding. Do not remove a tier unless the operator confirms the exact IDs. If a tier has `cantBeRemoved = true`, report that it cannot be removed and do not include it in `tierIdsToRemove`.
-3. For each new NFT tier, ask the operator to review and confirm:
-   - tier name
-   - description
+3. For each new NFT tier, infer the tier name from the request when possible, such as `Game Week 3` from "add Game Week 3". Ask the operator only for values that cannot be inferred:
    - price
-   - initial supply
-   - image
-   - split recipient/beneficiary and split percent
-4. Image handling for new tiers:
+   - description; offer a default like `Game Week 3 buy-in is eligible for gameweek rewards split.`
+   - image choice: reuse an existing/default image, provide an `ipfs://...` image URI or file, or have the agent generate and pin one
+   Do not ask for supply, split recipient, or split percent unless existing shop data cannot be read or the operator explicitly wants to change them.
+4. Defaults for added tiers:
+   - Treat the request as an existing deployed shop `adjustTiers` change, not an initial deploy edit.
+   - Use unlimited sale supply by default: `initialSupply = 999999999`.
+   - Use the existing shop/default tier split configuration by default. Read a comparable existing tier or shop settings and reuse its split recipient, split percent, project ID, `preferAddToBalance`, `lockedUntil`, and hook. If no existing split can be read, ask for the split beneficiary before continuing.
+   - Use `votingUnits = 0`, `reserveFrequency = 0`, `reserveBeneficiary = 0x0000000000000000000000000000000000000000`, `category = 0`, and `discountPercent = 0` unless explicitly requested otherwise.
+5. Image handling for new tiers:
    - If the operator provides an image URI or file, use it after confirming it renders.
    - If no image is provided, offer to generate one, then get operator approval before pinning.
    - Pin image assets first when needed, then pin the tier JSON metadata with `name`, `description`, and `image`.
    - Convert the final tier metadata `ipfs://...` URI to `encodedIpfsUri` with JuiceScan's `encodeIpfsUriToBytes32(uri)` path.
-5. Price handling:
+6. Price handling:
    - Do not invent a price. Ask for one if missing.
    - Confirm the displayed human price and the encoded `uint104 price` units before txlink generation.
    - If the shop prices tiers in USD with 6 decimals, `1` USDC-like dollar is encoded as `1000000`; otherwise read the hook's pricing context and use that unit system.
-6. New tier flags must prevent credit claims:
+7. New tier flags must prevent credit claims:
    - `allowOwnerMint = false` unless explicitly requested
    - `useReserveBeneficiaryAsDefault = false`
    - `transfersPausable = false` unless explicitly requested
@@ -187,11 +201,11 @@ Use this workflow when the operator wants to remove an NFT tier from an existing
    - `cantBeRemoved = false` unless the operator intentionally wants the tier permanent
    - `cantIncreaseDiscountPercent = true`
    - `cantBuyWithCredits = true`
-7. Splits:
+8. Splits:
    - Show every split recipient address, percent, project ID, `preferAddToBalance`, `lockedUntil`, and hook.
    - Do not default a fund recipient silently. If the split beneficiary is missing, ask for it.
    - A single 100% payout split is encoded with `percent = 1000000000`.
-8. Build `adjustTiers` calldata with:
+9. Build `adjustTiers` calldata with:
    ```text
    adjustTiers(
      tiersToAdd: JB721TierConfig[],
@@ -199,13 +213,13 @@ Use this workflow when the operator wants to remove an NFT tier from an existing
    )
    ```
    Each `JB721TierConfig` must include `price`, `initialSupply`, `votingUnits`, `reserveFrequency`, `reserveBeneficiary`, `encodedIpfsUri`, `category`, `discountPercent`, `flags`, `splitPercent`, and `splits`.
-9. Preflight before returning txlinks:
+10. Preflight before returning txlinks:
    - Decode the calldata and show the operator the exact add/remove changes.
    - Confirm `cantBuyWithCredits = true` for every added tier.
    - Confirm native `value = 0x0`.
    - Simulate the transaction with `eth_call` from the operator wallet.
    - If simulation fails, do not output the txlink as signer-ready.
-10. Txlink output for tier adjustments:
+11. Txlink output for tier adjustments:
     - `to` is the resolved `JB721TiersHook` address.
     - `data` is the encoded `adjustTiers` call.
     - `value` is `0x0`.
