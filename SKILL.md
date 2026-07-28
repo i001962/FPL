@@ -87,7 +87,7 @@ Optional edits:
    - `https://fc-footy.vercel.app/api/fpl-league?leagueId={leagueId}`
 3. If the league fetch fails, returns a non-2xx response, returns malformed JSON, or does not contain usable league standings/name data, stop. Do not deploy and do not output a txlink.
 4. Show the deployer the league name, manager count, and target chain before building the transaction.
-5. Load the bundled `.jb` draft and replace placeholders before pinning metadata or building calldata:
+5. Load the bundled `.jb` draft and replace placeholders before building project metadata, pinning metadata, or building calldata:
    - `details.name`: `FPL {leagueName} Shop`
    - Replace the literal placeholder name `FPL [insert league name] Shop`; do not leave bracketed placeholder text in metadata or calldata.
    - `details.description`: `This shop is a companion to Fantasy Premier League team #{leagueId} - {leagueName}.`
@@ -103,12 +103,19 @@ Optional edits:
 7. Set chain/network:
    - `base`: `network = "mainnet"`, `chainIds = [8453]`
    - `basesep`: `network = "testnet"`, `chainIds = [84532]`
-8. Let the deployer review or edit the final draft only as a pre-transaction review step.
-9. Build a fresh Juicebox V6 launch transaction using the JuiceScan create-flow logic listed in **Builder Source**. Do not reuse calldata from an already mined deployment and do not use a Juicebox SDK.
-10. Use a fresh deploy salt, current `JBProjects.creationFee()`, and freshly pinned or explicitly supplied project/NFT metadata.
-11. Simulate the transaction with `eth_call` from the deployer wallet. If simulation fails, do not output a txlink as signer-ready.
-12. Produce a `txlink.stupidtech.net` URL for `eth_sendTransaction`. This is the primary output.
-13. Produce the post-deploy static shop URL pattern:
+8. Build project metadata only from the mutated draft state. In JuiceScan terms, call `buildMetadata(state.details, state.storeCategories)` after replacement, not before.
+9. Preflight the draft and metadata. If any of these strings contain `[`, `]`, `insert`, `placeholder`, or the raw template values, stop and report the failed field. Do not pin metadata, build calldata, or output a txlink:
+   - `state.details.name`
+   - `state.details.description`
+   - built project metadata `name`
+   - built project metadata `description`
+   - every NFT tier metadata `name` and `description`
+10. Let the deployer review or edit the final draft only as a pre-transaction review step.
+11. Build a fresh Juicebox V6 launch transaction using the JuiceScan create-flow logic listed in **Builder Source**. Do not reuse calldata from an already mined deployment and do not use a Juicebox SDK.
+12. Use a fresh deploy salt, current `JBProjects.creationFee()`, and freshly pinned or explicitly supplied project/NFT metadata.
+13. Simulate the transaction with `eth_call` from the deployer wallet. If simulation fails, do not output a txlink as signer-ready.
+14. Produce a `txlink.stupidtech.net` URL for `eth_sendTransaction`. This is the primary output.
+15. Produce the post-deploy static shop URL pattern:
    - `#base:{projectId}/fpl/{leagueId}`
 
 Do not finish with only `.jb` JSON. If exact calldata is ready, output the txlink. If exact calldata is not ready, report the specific blocker that prevents txlink generation.
@@ -173,13 +180,15 @@ When the user provides a successful transaction hash or decoded JuiceScan/Juiceb
 4. Replace project strings with the resolved league:
    - `FPL {leagueName} Shop`
    - `This shop is a companion to Fantasy Premier League team #{leagueId} - {leagueName}.`
-5. Replace every owner/operator/beneficiary field that is meant to belong to the deployer wallet. Do this through decoded ABI arguments or JuiceScan builder state, not by hex string search/replace.
-6. Preserve intentional split recipients unless the user asks to change them.
-7. Generate a new salt or use JuiceScan's current launch builder so deterministic deployment inputs are fresh.
-8. Read the current creation fee from the selected chain.
-9. Encode fresh calldata for the same launch function.
-10. Simulate the fresh transaction with `eth_call` from the deployer wallet.
-11. Only then output the txlink.
+5. Rebuild and repin project metadata from the resolved league values. Do not reuse a template `projectUri` if its metadata still says `FPL [insert league name] Shop`.
+6. Preflight decoded/rebuilt metadata. If any project or NFT metadata field contains `[`, `]`, `insert`, `placeholder`, or the raw template values, stop and report the failed field.
+7. Replace every owner/operator/beneficiary field that is meant to belong to the deployer wallet. Do this through decoded ABI arguments or JuiceScan builder state, not by hex string search/replace.
+8. Preserve intentional split recipients unless the user asks to change them.
+9. Generate a new salt or use JuiceScan's current launch builder so deterministic deployment inputs are fresh.
+10. Read the current creation fee from the selected chain.
+11. Encode fresh calldata for the same launch function.
+12. Simulate the fresh transaction with `eth_call` from the deployer wallet.
+13. Only then output the txlink.
 
 If you cannot decode the transaction or cannot rebuild fresh calldata, say that explicitly. Do not hand back a txlink built from replayed calldata.
 
