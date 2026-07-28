@@ -9,6 +9,43 @@ Use this skill to prepare a single reviewable `txlink.stupidtech.net` URL for an
 
 The deliverable is the txlink URL the deployer can open with their wallet. The `.jb` draft is only an internal source of deploy settings and an optional review artifact; do not stop by handing the user a `.jb` file when an exact txlink can be built.
 
+## Builder Source
+
+Use JuiceScan as the transaction builder reference. Do not look for, install, or depend on a Juicebox SDK. The needed deploy calls are already implemented in JuiceScan with plain `viem` ABI encoding.
+
+Use these JuiceScan files and functions:
+
+- `src/create-flow.js`
+  - `buildLaunchArgs(state, chainId, owner, projectUri, salt, deployStart)`
+  - `build721Config(state, projectUri, chainId)`
+  - `buildMetadata(details, storeCategories)`
+  - `deploySalt(...)`
+  - `creationFeeOf(chainId)` if available locally; otherwise mirror the small `JBProjects.creationFee()` read from this file.
+  - test export `__test` exposes most pure builder helpers.
+- `src/component-base.js`
+  - `buildTxLinkEntries(payload)` shows the canonical txlink shape.
+- `src/ipfs-pin.js`
+  - `pinJson(obj, name)`
+  - `encodeIpfsUriToBytes32(uri)`
+- `src/nft721-build.js`
+  - `build721TierMetadata(...)`
+
+If JuiceScan is not already local, clone `https://github.com/mejango/juicescan` or fetch the unminified static bundle and inspect those files. Installing JuiceScan's own dependencies is acceptable only to run its existing builder/tests. Do not install a separate Juicebox SDK or generate calldata from third-party abstractions.
+
+For this FPL shop, the expected deploy path is the single-chain NFT shop path:
+
+```text
+JB721TiersHookProjectDeployer.launchProjectFor(
+  owner,
+  build721Config(state, projectUri, chainId),
+  { projectUri, rulesetConfigurations, terminalConfigurations, memo: "" },
+  JBController address,
+  fresh salt
+)
+```
+
+If the deployer explicitly chooses multiple chains, JuiceScan's omnichain `launchProjectFor` path produces one txlink per chain. Do not collapse multiple chain deploys into one JSON-RPC request.
+
 ## Source Draft
 
 Use `assets/fpl-insert-league-name-shop.jb` as the source of truth for deploy settings. Treat it as a JuiceScan create-flow draft that must be converted into a wallet-signable txlink.
@@ -67,7 +104,7 @@ Optional edits:
    - `base`: `network = "mainnet"`, `chainIds = [8453]`
    - `basesep`: `network = "testnet"`, `chainIds = [84532]`
 8. Let the deployer review or edit the final draft only as a pre-transaction review step.
-9. Build a fresh Juicebox V6 launch transaction using the JuiceScan create-flow logic. Do not reuse calldata from an already mined deployment.
+9. Build a fresh Juicebox V6 launch transaction using the JuiceScan create-flow logic listed in **Builder Source**. Do not reuse calldata from an already mined deployment and do not use a Juicebox SDK.
 10. Use a fresh deploy salt, current `JBProjects.creationFee()`, and freshly pinned or explicitly supplied project/NFT metadata.
 11. Simulate the transaction with `eth_call` from the deployer wallet. If simulation fails, do not output a txlink as signer-ready.
 12. Produce a `txlink.stupidtech.net` URL for `eth_sendTransaction`. This is the primary output.
@@ -85,6 +122,29 @@ Follow JuiceScan's txlink convention:
 - Set `chainId` to the chosen chain ID.
 - Set `params` to JSON with `to`, `data`, and `value`.
 - Do not include `from`; txlink should use the wallet that opens it.
+
+Build the deploy txlink from a JuiceScan launch plan:
+
+```js
+const plan = buildLaunchArgs(state, chainId, owner, projectUri, salt, deployStart);
+plan.value = await creationFeeOf(chainId);
+const data = encodeFunctionData({
+  abi: plan.abi,
+  functionName: plan.functionName || 'launchProjectFor',
+  args: plan.args,
+});
+const params = {
+  to: plan.address,
+  data,
+  value: '0x' + BigInt(plan.value).toString(16),
+};
+const url = new URL('https://txlink.stupidtech.net/');
+url.searchParams.set('method', 'eth_sendTransaction');
+url.searchParams.set('chainId', String(chainId));
+url.searchParams.set('params', JSON.stringify(params));
+```
+
+Before returning the URL, simulate the same `{ to, data, value }` with `eth_call` or JuiceScan's `simulateTransaction` path from the deployer wallet. A warning such as "This transaction is likely to fail" means the URL is not done.
 
 The txlink represents the exact deploy transaction. The deployer can review it with their LLM or inspect the decoded transaction before signing, but the final artifact remains a URL, not a `.jb` file.
 
