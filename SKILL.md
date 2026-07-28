@@ -1,15 +1,17 @@
 ---
 name: fpl-league-nft-shop-deployer
-description: Create a reviewable Juicebox V6 txlink for deploying a minimal Fantasy Premier League league NFT shop from an FPL league URL and deployer wallet. Use when a user wants an agent to deploy or prepare an FPL league NFT shop, use a .jb Juicebox draft, set the project owner/operator to the deployer's wallet, default to Base, generate a static shop URL, or produce a txlink.stupidtech.net transaction for wallet signing.
+description: Create a reviewable txlink.stupidtech.net URL for deploying a minimal Fantasy Premier League league NFT shop from an FPL league URL and deployer wallet. Use when a user wants an agent to prepare a wallet-signable Juicebox V6 deploy txlink, use a .jb Juicebox draft only as internal deploy settings, set the project owner/operator to the deployer's wallet, default to Base, or generate the resulting static shop URL.
 ---
 
 # FPL League NFT Shop Deployer
 
-Use this skill to prepare a single reviewable Juicebox deploy transaction for an FPL league NFT shop. The shop itself is a static site; this skill does not create a backend and does not design a deployment UI.
+Use this skill to prepare a single reviewable `txlink.stupidtech.net` URL for an FPL league NFT shop deploy. The shop itself is a static site; this skill does not create a backend and does not design a deployment UI.
+
+The deliverable is the txlink URL the deployer can open with their wallet. The `.jb` draft is only an internal source of deploy settings and an optional review artifact; do not stop by handing the user a `.jb` file when an exact txlink can be built.
 
 ## Source Draft
 
-Use `assets/fpl-insert-league-name-shop.jb` as the source of truth for deploy settings. Treat it as a JuiceScan create-flow draft.
+Use `assets/fpl-insert-league-name-shop.jb` as the source of truth for deploy settings. Treat it as a JuiceScan create-flow draft that must be converted into a wallet-signable txlink.
 
 The draft is intentionally opinionated:
 
@@ -50,11 +52,13 @@ Optional edits:
 5. Set chain/network:
    - `base`: `network = "mainnet"`, `chainIds = [8453]`
    - `basesep`: `network = "testnet"`, `chainIds = [84532]`
-6. Let the deployer review or edit the final draft. Keep the `.jb` JSON editable.
+6. Let the deployer review or edit the final draft only as a pre-transaction review step.
 7. Build the exact Juicebox V6 launch transaction using the JuiceScan create-flow logic.
-8. Produce a `txlink.stupidtech.net` URL for `eth_sendTransaction`.
+8. Produce a `txlink.stupidtech.net` URL for `eth_sendTransaction`. This is the primary output.
 9. Produce the post-deploy static shop URL pattern:
    - `#base:{projectId}/fpl/{leagueId}`
+
+Do not finish with only `.jb` JSON. If exact calldata is ready, output the txlink. If exact calldata is not ready, report the specific blocker that prevents txlink generation.
 
 ## Txlink Rules
 
@@ -66,6 +70,8 @@ Follow JuiceScan's txlink convention:
 - Set `params` to JSON with `to`, `data`, and `value`.
 - Do not include `from`; txlink should use the wallet that opens it.
 
+The txlink represents the exact deploy transaction. The deployer can review it with their LLM or inspect the decoded transaction before signing, but the final artifact remains a URL, not a `.jb` file.
+
 The exact txlink cannot be produced from the raw `.jb` draft alone. First produce or resolve:
 
 - final deployer wallet owner/operator fields
@@ -75,7 +81,7 @@ The exact txlink cannot be produced from the raw `.jb` draft alone. First produc
 - current `JBProjects.creationFee()`
 - final contract address and calldata from the JuiceScan builder
 
-If metadata still needs pinning, stop before txlink generation and report what must be pinned.
+If metadata still needs pinning, stop before txlink generation and report what must be pinned. Once pinned, resume and generate the txlink.
 
 ## Static Shop Rules
 
@@ -109,9 +115,10 @@ Return:
 - league ID and league name used
 - deployer wallet used as owner/operator
 - target chain
-- any final `.jb` edits made
-- txlink URL, if exact calldata is ready
+- txlink URL for the exact deploy transaction
 - static shop URL pattern
-- blockers, if metadata pinning, chain reads, or creation fee lookup are incomplete
+- blockers only if metadata pinning, chain reads, or creation fee lookup prevent txlink generation
+
+Do not provide a `.jb` file as the main result. Mention any `.jb` edits only as supporting context for the txlink.
 
 Do not imply that the FPL manager to wallet link is verified. State that it is memo-based and weak.
