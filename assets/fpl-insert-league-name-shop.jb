@@ -48,8 +48,8 @@
       "scheduleOn": false,
       "baseCurrency": 2,
       "payoutCurrency": 2,
-      "tokenMode": "custom",
-      "weight": "10000",
+      "tokenMode": "none",
+      "weight": "0",
       "reservedPercent": 0,
       "weightCutPercent": 0,
       "issuanceCutOn": false,
@@ -98,6 +98,51 @@
       "advOpen": true,
       "name": "Full Season",
       "description": "Full season buy-in is eligible for end of season rewards split.",
+      "imageUri": "ipfs://bafkreib3a2bk2ufpr2dwolmwzxb7zkgvgcry65qmyicvqmnnbvtwhifjri",
+      "mediaType": "image/png",
+      "metaUri": "",
+      "encodedIpfsUri": "",
+      "price": "5",
+      "limited": false,
+      "supply": "",
+      "splitOn": true,
+      "splitRecipients": [
+        {
+          "pct": "1",
+          "recip": "0x8b80755C441d355405CA7571443Bb9247B77Ec16",
+          "benef": "",
+          "resolvedFor": null,
+          "resolvedAddress": null
+        },
+        {
+          "pct": "",
+          "recip": "11",
+          "benef": "0x8b80755C441d355405CA7571443Bb9247B77Ec16",
+          "resolvedFor": null,
+          "resolvedAddress": null
+        }
+      ],
+      "discountOn": false,
+      "discountPct": "",
+      "category": 0,
+      "reserveOn": false,
+      "reserveFrequency": "",
+      "reserveBeneficiary": "",
+      "votingOn": false,
+      "votingUnits": "",
+      "flags": {
+        "allowOwnerMint": false,
+        "transfersPausable": false,
+        "cantBeRemoved": false,
+        "allowCredits": false,
+        "ownerCanEditDiscount": false
+      }
+    },
+    {
+      "expanded": true,
+      "advOpen": true,
+      "name": "Game Week 1",
+      "description": "Game Week 1 buy-in is eligible for gameweek rewards split.",
       "imageUri": "ipfs://bafkreib3a2bk2ufpr2dwolmwzxb7zkgvgcry65qmyicvqmnnbvtwhifjri",
       "mediaType": "image/png",
       "metaUri": "",

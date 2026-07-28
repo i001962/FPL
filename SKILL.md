@@ -18,10 +18,15 @@ The draft is intentionally opinionated:
 - Custom Juicebox project, not a revnet.
 - Base is the production default; Base Sepolia is acceptable for tests.
 - Accepts USDC.
-- Uses project credits only; do not deploy or require a fungible token.
-- Includes one initial NFT tier: `Full Season`, priced at `5`.
+- Accepts payments but does not issue project tokens when paid.
+- Does not deploy or require a fungible project token.
+- Includes two initial NFT tiers:
+  - `Full Season`, priced at `5`.
+  - `Game Week 1`, priced at `5`.
+- NFT tiers must not be buyable with credits. Set every tier's `flags.allowCredits` to `false`.
 - Cash outs are disabled.
 - Owner/operator should be the deployer wallet.
+- Use the same image URI for the project logo and every NFT tier image unless the deployer explicitly provides replacements.
 - The generated shop links FPL managers to buyers only through the Juicebox payment memo.
 
 ## Required Inputs
@@ -43,21 +48,30 @@ Optional edits:
 1. Parse the FPL classic league ID from `/leagues/{leagueId}/standings/c`.
 2. Fetch the league through the FC-Footy proxy to verify it exists:
    - `https://fc-footy.vercel.app/api/fpl-league?leagueId={leagueId}`
-3. Show the deployer the league name, manager count, and target chain before building the transaction.
-4. Load the bundled `.jb` draft and replace placeholders:
+3. If the league fetch fails, returns a non-2xx response, returns malformed JSON, or does not contain usable league standings/name data, stop. Do not deploy and do not output a txlink.
+4. Show the deployer the league name, manager count, and target chain before building the transaction.
+5. Load the bundled `.jb` draft and replace placeholders before pinning metadata or building calldata:
    - `details.name`: `FPL {leagueName} Shop`
-   - `details.description`: `This shop is a companion to Fantasy Premier League league #{leagueId} - {leagueName}.`
+   - Replace the literal placeholder name `FPL [insert league name] Shop`; do not leave bracketed placeholder text in metadata or calldata.
+   - `details.description`: `This shop is a companion to Fantasy Premier League team #{leagueId} - {leagueName}.`
+   - Replace the literal placeholder description `This shop is a companion to Fantasy Premier League team #[insert] - [insert name]`.
    - `details.owner`: deployer wallet
    - `revOperator`: deployer wallet, even though the project type is custom
-5. Set chain/network:
+6. Enforce payment/token/NFT defaults:
+   - `stages[*].tokenMode = "none"`
+   - `stages[*].weight = "0"`
+   - `collection.issueTokensForSplits = false`
+   - every NFT tier has `flags.allowCredits = false`
+   - the project logo URI and every NFT tier image URI match unless explicitly overridden
+7. Set chain/network:
    - `base`: `network = "mainnet"`, `chainIds = [8453]`
    - `basesep`: `network = "testnet"`, `chainIds = [84532]`
-6. Let the deployer review or edit the final draft only as a pre-transaction review step.
-7. Build a fresh Juicebox V6 launch transaction using the JuiceScan create-flow logic. Do not reuse calldata from an already mined deployment.
-8. Use a fresh deploy salt, current `JBProjects.creationFee()`, and freshly pinned or explicitly supplied project/NFT metadata.
-9. Simulate the transaction with `eth_call` from the deployer wallet. If simulation fails, do not output a txlink as signer-ready.
-10. Produce a `txlink.stupidtech.net` URL for `eth_sendTransaction`. This is the primary output.
-11. Produce the post-deploy static shop URL pattern:
+8. Let the deployer review or edit the final draft only as a pre-transaction review step.
+9. Build a fresh Juicebox V6 launch transaction using the JuiceScan create-flow logic. Do not reuse calldata from an already mined deployment.
+10. Use a fresh deploy salt, current `JBProjects.creationFee()`, and freshly pinned or explicitly supplied project/NFT metadata.
+11. Simulate the transaction with `eth_call` from the deployer wallet. If simulation fails, do not output a txlink as signer-ready.
+12. Produce a `txlink.stupidtech.net` URL for `eth_sendTransaction`. This is the primary output.
+13. Produce the post-deploy static shop URL pattern:
    - `#base:{projectId}/fpl/{leagueId}`
 
 Do not finish with only `.jb` JSON. If exact calldata is ready, output the txlink. If exact calldata is not ready, report the specific blocker that prevents txlink generation.
@@ -98,7 +112,7 @@ When the user provides a successful transaction hash or decoded JuiceScan/Juiceb
 3. Parse the FPL league URL and fetch the league through FC-Footy.
 4. Replace project strings with the resolved league:
    - `FPL {leagueName} Shop`
-   - `This shop is a companion to Fantasy Premier League league #{leagueId} - {leagueName}.`
+   - `This shop is a companion to Fantasy Premier League team #{leagueId} - {leagueName}.`
 5. Replace every owner/operator/beneficiary field that is meant to belong to the deployer wallet. Do this through decoded ABI arguments or JuiceScan builder state, not by hex string search/replace.
 6. Preserve intentional split recipients unless the user asks to change them.
 7. Generate a new salt or use JuiceScan's current launch builder so deterministic deployment inputs are fresh.
