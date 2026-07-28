@@ -53,9 +53,11 @@ Optional edits:
    - `base`: `network = "mainnet"`, `chainIds = [8453]`
    - `basesep`: `network = "testnet"`, `chainIds = [84532]`
 6. Let the deployer review or edit the final draft only as a pre-transaction review step.
-7. Build the exact Juicebox V6 launch transaction using the JuiceScan create-flow logic.
-8. Produce a `txlink.stupidtech.net` URL for `eth_sendTransaction`. This is the primary output.
-9. Produce the post-deploy static shop URL pattern:
+7. Build a fresh Juicebox V6 launch transaction using the JuiceScan create-flow logic. Do not reuse calldata from an already mined deployment.
+8. Use a fresh deploy salt, current `JBProjects.creationFee()`, and freshly pinned or explicitly supplied project/NFT metadata.
+9. Simulate the transaction with `eth_call` from the deployer wallet. If simulation fails, do not output a txlink as signer-ready.
+10. Produce a `txlink.stupidtech.net` URL for `eth_sendTransaction`. This is the primary output.
+11. Produce the post-deploy static shop URL pattern:
    - `#base:{projectId}/fpl/{leagueId}`
 
 Do not finish with only `.jb` JSON. If exact calldata is ready, output the txlink. If exact calldata is not ready, report the specific blocker that prevents txlink generation.
@@ -82,6 +84,53 @@ The exact txlink cannot be produced from the raw `.jb` draft alone. First produc
 - final contract address and calldata from the JuiceScan builder
 
 If metadata still needs pinning, stop before txlink generation and report what must be pinned. Once pinned, resume and generate the txlink.
+
+## Transaction Template Rules
+
+A previously successful deploy transaction can be useful as a template, but it is not itself the txlink.
+
+Never create a deploy txlink by copying the raw calldata from a mined deploy transaction. A Juicebox deploy can include one-time deploy parameters such as salts, project/accounting state, fee values, signatures, or deterministic contract deployment inputs. Replaying that calldata is likely to revert.
+
+When the user provides a successful transaction hash or decoded JuiceScan/Juicebox transaction example:
+
+1. Fetch and decode the transaction.
+2. Treat the decoded call shape, target contract, and known metadata values as canonical inputs.
+3. Parse the FPL league URL and fetch the league through FC-Footy.
+4. Replace project strings with the resolved league:
+   - `FPL {leagueName} Shop`
+   - `This shop is a companion to Fantasy Premier League league #{leagueId} - {leagueName}.`
+5. Replace every owner/operator/beneficiary field that is meant to belong to the deployer wallet. Do this through decoded ABI arguments or JuiceScan builder state, not by hex string search/replace.
+6. Preserve intentional split recipients unless the user asks to change them.
+7. Generate a new salt or use JuiceScan's current launch builder so deterministic deployment inputs are fresh.
+8. Read the current creation fee from the selected chain.
+9. Encode fresh calldata for the same launch function.
+10. Simulate the fresh transaction with `eth_call` from the deployer wallet.
+11. Only then output the txlink.
+
+If you cannot decode the transaction or cannot rebuild fresh calldata, say that explicitly. Do not hand back a txlink built from replayed calldata.
+
+## Decoded Transaction Examples
+
+If the user provides a decoded JuiceScan/Juicebox transaction example, treat it as canonical transaction-building input. Do not block on `PINATA_JWT` or empty `.jb` metadata fields when the example already includes:
+
+- target chain and chain ID
+- deploy contract address
+- `launchProjectFor` arguments
+- `projectUri` / `contractUri`
+- NFT `encodedIpfsUri`
+- `JBProjects.creationFee()` / transaction value
+- controller address and salt
+- example calldata
+
+In this case:
+
+1. Extract the decoded transaction fields from the example.
+2. Update only the requested fields, typically owner/operator wallet and project/shop display strings.
+3. Encode fresh calldata for the same `launchProjectFor` overload.
+4. Verify the generated placeholder calldata matches the provided example before applying substitutions when an example calldata field is available.
+5. Build the txlink from `{to, data, value}` and `chainId`.
+
+Do not tell the user there is no valid txlink solely because the `.jb` draft has `nfts[0].metaUri` or `nfts[0].encodedIpfsUri` empty if the decoded transaction example already supplies the final metadata URI and encoded IPFS URI.
 
 ## Static Shop Rules
 
