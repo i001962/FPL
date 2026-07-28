@@ -33,6 +33,12 @@ for (let index = 0; index < optionArgs.length; index += 1) {
   tierPriceOverrides.set(tierName, price);
 }
 
+function shopNameForLeague(name) {
+  const trimmed = String(name || '').trim();
+  const withoutShop = trimmed.replace(/\s+shop$/i, '').trim();
+  return /^fpl\b/i.test(withoutShop) ? `${withoutShop} Shop` : `FPL ${withoutShop} Shop`;
+}
+
 const leagueIdMatch = String(leagueUrl).match(/\/leagues\/(\d+)\/standings\/c\b/);
 if (!leagueIdMatch) {
   console.error(`Could not parse classic league ID from URL: ${leagueUrl}`);
@@ -82,7 +88,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const draftPath = path.join(__dirname, '..', 'assets', 'fpl-insert-league-name-shop.jb');
 const state = JSON.parse(fs.readFileSync(draftPath, 'utf8'));
 
-state.details.name = `FPL ${leagueName} Shop`;
+state.details.name = shopNameForLeague(leagueName);
 state.details.description = `This shop is a companion to Fantasy Premier League team #${leagueId} - ${leagueName}.`;
 state.details.owner = wallet;
 state.revOperator = wallet;
@@ -112,8 +118,13 @@ for (const [tierName, price] of tierPriceOverrides) {
 
 const projectMetadata = {
   name: state.details.name,
+  projectTagline: state.details.tagline || '',
   description: state.details.description,
   logoUri: state.details.logoUri,
+  infoUri: state.details.website || '',
+  twitter: state.details.twitter || '',
+  discord: state.details.discord || '',
+  telegram: state.details.telegram || '',
   fpl: {
     leagueId: String(leagueId),
   },
@@ -129,7 +140,12 @@ const fields = [
   ['state.details.name', state.details.name],
   ['state.details.description', state.details.description],
   ['projectMetadata.name', projectMetadata.name],
+  ['projectMetadata.projectTagline', projectMetadata.projectTagline],
   ['projectMetadata.description', projectMetadata.description],
+  ['projectMetadata.infoUri', projectMetadata.infoUri],
+  ['projectMetadata.twitter', projectMetadata.twitter],
+  ['projectMetadata.discord', projectMetadata.discord],
+  ['projectMetadata.telegram', projectMetadata.telegram],
   ['projectMetadata.fpl.leagueId', projectMetadata.fpl.leagueId],
   ...nftMetadata.flatMap((metadata, index) => [
     [`nfts[${index}].metadata.name`, metadata.name],

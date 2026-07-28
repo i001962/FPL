@@ -112,7 +112,13 @@ Choose the pinning path explicitly:
      "name": "fpl-143466-project.json",
      "json": {
        "name": "FPL Farcaster Fantasy League Shop",
+       "projectTagline": "Buy in for more fun",
        "description": "This shop is a companion to Fantasy Premier League team #143466 - Farcaster Fantasy League.",
+       "logoUri": "ipfs://...",
+       "infoUri": "",
+       "twitter": "",
+       "discord": "",
+       "telegram": "",
        "fpl": {
          "leagueId": "143466"
        }
@@ -182,6 +188,7 @@ Optional edits:
 - League display name.
 - NFT tier name, description, price, supply, image, or split recipients.
 - Project tagline or description.
+- Project metadata links/socials: `infoUri`, `twitter`, `discord`, `telegram`. Ask for these when preparing metadata, but do not require them. Include all four keys in project metadata even when the values are blank strings.
 
 Apply optional edits to the temporary deploy state only. Example: if the user says “change the price of Game Week 1 NFT to $1 and build me the txlink,” set only the deploy state's `nfts[]` item with `name === "Game Week 1"` to `price = "1"` before validation/pinning/calldata. Do not modify the bundled asset or commit a template change for that one-off deploy.
 
@@ -193,13 +200,18 @@ Apply optional edits to the temporary deploy state only. Example: if the user sa
 3. If the league fetch fails, returns a non-2xx response, returns malformed JSON, or does not contain usable league standings/name data, stop. Do not deploy and do not output a txlink.
 4. Show the deployer the league name, manager count, and target chain before building the transaction.
 5. Load the bundled `.jb` draft and replace placeholders before building project metadata, pinning metadata, or building calldata:
-   - `details.name`: `FPL {leagueName} Shop`
+   - `details.name`: `{normalizedLeagueName} Shop`, where `{normalizedLeagueName}` is `{leagueName}` if it already starts with `FPL`, otherwise `FPL {leagueName}`. Do not produce doubled names such as `FPL FPL Community on Clubhouse Shop`.
    - Replace the literal placeholder name `FPL [insert league name] Shop`; do not leave bracketed placeholder text in metadata or calldata.
    - `details.description`: `This shop is a companion to Fantasy Premier League team #{leagueId} - {leagueName}.`
    - Replace the literal placeholder description `This shop is a companion to Fantasy Premier League team #[insert] - [insert name]`.
+   - Ask the deployer for optional project metadata `infoUri`, `twitter`, `discord`, and `telegram`. If omitted, set each to `""`; do not omit the keys from metadata.
    - Project metadata must include canonical machine-readable FPL context:
      ```json
      {
+       "infoUri": "",
+       "twitter": "",
+       "discord": "",
+       "telegram": "",
        "fpl": {
          "leagueId": "{leagueId}"
        }
@@ -224,6 +236,7 @@ Apply optional edits to the temporary deploy state only. Example: if the user sa
    - `state.details.description`
    - built project metadata `name`
    - built project metadata `description`
+   - built project metadata includes `infoUri`, `twitter`, `discord`, and `telegram` keys, with blank strings when unset
    - built project metadata `fpl.leagueId` exactly matches the resolved numeric league ID as a string
    - every NFT tier metadata `name` and `description`
 10. Let the deployer review or edit the final draft only as a pre-transaction review step.
@@ -294,7 +307,7 @@ When the user provides a successful transaction hash or decoded JuiceScan/Juiceb
 2. Treat the decoded call shape, target contract, and known metadata values as canonical inputs.
 3. Parse the FPL league URL and fetch the league through FC-Footy.
 4. Replace project strings with the resolved league:
-   - `FPL {leagueName} Shop`
+   - `{normalizedLeagueName} Shop`, where `{normalizedLeagueName}` is `{leagueName}` if it already starts with `FPL`, otherwise `FPL {leagueName}`
    - `This shop is a companion to Fantasy Premier League team #{leagueId} - {leagueName}.`
 5. Rebuild and repin project metadata from the resolved league values. Do not reuse a template `projectUri` if its metadata still says `FPL [insert league name] Shop`.
 6. Preflight decoded/rebuilt metadata. If any project or NFT metadata field contains `[`, `]`, `insert`, `placeholder`, or the raw template values, stop and report the failed field.
