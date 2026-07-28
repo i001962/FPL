@@ -114,6 +114,9 @@ const projectMetadata = {
   name: state.details.name,
   description: state.details.description,
   logoUri: state.details.logoUri,
+  fpl: {
+    leagueId: String(leagueId),
+  },
 };
 
 const nftMetadata = (state.nfts || []).map((nft) => ({
@@ -127,6 +130,7 @@ const fields = [
   ['state.details.description', state.details.description],
   ['projectMetadata.name', projectMetadata.name],
   ['projectMetadata.description', projectMetadata.description],
+  ['projectMetadata.fpl.leagueId', projectMetadata.fpl.leagueId],
   ...nftMetadata.flatMap((metadata, index) => [
     [`nfts[${index}].metadata.name`, metadata.name],
     [`nfts[${index}].metadata.description`, metadata.description],

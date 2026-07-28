@@ -5,13 +5,54 @@ description: Create a reviewable txlink.stupidtech.net URL for deploying a minim
 
 # FPL League NFT Shop Deployer
 
-Use this skill to prepare a single reviewable `txlink.stupidtech.net` URL for an FPL league NFT shop deploy. The shop itself is a static site; this skill does not create a backend and does not design a deployment UI.
+Use this skill to prepare a single reviewable `txlink.stupidtech.net` URL for an FPL league NFT shop deploy. The shop itself is a static site; this skill does not create a backend and does not generate or design a frontend during deploy work.
 
 The deliverable is the txlink URL the deployer can open with their wallet. The `.jb` draft is only an internal source of deploy settings and an optional review artifact; do not stop by handing the user a `.jb` file when an exact txlink can be built.
+
+## Frontend Template
+
+Do not create frontend code as part of this skill's txlink workflow. A copyable static frontend template is maintained separately in this repo at:
+
+```text
+static-shop-template/index.html
+```
+
+The template is intended to be uploaded once to QStorage and reused by league deployers who want a starter buyer page. After the template is uploaded, record the public app URL here:
+
+```text
+https://qstorage.quilibrium.com/footy/static-shop-template/index.html
+```
+
+Until the QStorage URL is filled in, reference the local `static-shop-template/index.html` artifact as the source to upload or copy. The deploy skill should still return the post-deploy route pattern:
+
+```text
+#<chainSlug>:<projectId>
+```
+
+Example copied onto the pinned template:
+
+```text
+https://qstorage.quilibrium.com/footy/static-shop-template/index.html#basesep:19
+```
+
+The template is a starter UI only. It resolves known test project IDs locally, loads the FPL leaderboard through FC-Footy, requires a manager and tier selection, derives `fpl:league={leagueId};entry={entryId}`, and points the buyer to the Juicebox project page. It does not replace the signer-reviewed deploy txlink, and it does not make the FPL manager-to-wallet link strong.
+
+The league data endpoint used by the template must allow browser reads from the QStorage origin. If FC-Footy is used, `GET /api/fpl-league` must send `Access-Control-Allow-Origin: *`. The template also accepts an `apiBase` query parameter for another CORS-capable endpoint.
 
 ## Builder Source
 
 Use JuiceScan as the transaction builder reference. Do not look for, install, or depend on a Juicebox SDK. The needed deploy calls are already implemented in JuiceScan with plain `viem` ABI encoding.
+
+Assume the acting agent may have access to a browser and can use the Juicebox/JuiceScan deployer webapp as the primary builder when local builder files are unavailable or slower than using the app directly. Prefer the webapp when it can produce or expose the exact deploy transaction for wallet review/signing. Browser-driven use is acceptable if the agent can inspect the resulting transaction request, decoded call, metadata URIs, target contract, value, chain ID, and any simulation or wallet warning before producing a txlink.
+
+When using the deployer webapp:
+
+- Open the create/deploy flow in the browser and populate it from the mutated FPL draft state, not from unresolved placeholders.
+- Use the browser's devtools/network/app state, exported draft, wallet transaction preview, or txlink/share output to capture the exact `{to,data,value,chainId}` request.
+- Confirm the deployer wallet is owner/operator and that the selected chain matches the requested target.
+- Confirm project metadata and every NFT tier metadata URI reflect the resolved league and tier values.
+- Confirm the app simulation/wallet preview does not warn that the transaction is likely to fail.
+- If the webapp only prepares an unsigned wallet prompt and does not expose transaction data or txlink parameters, stop and report that browser access alone was insufficient.
 
 Use these JuiceScan files and functions:
 
@@ -56,9 +97,33 @@ Unique project and NFT tier JSON metadata must be pinned for each league shop be
 
 Choose the pinning path explicitly:
 
-1. If `PINATA_JWT` or an equivalent Pinata API credential is available, use JuiceScan's `pinJson(obj, name)` flow.
-2. If the acting agent has a wallet/payment capability for Base USDC, it may use Pinata's x402 public pinning flow, such as `https://402.pinata.cloud/v1/pin/public`, with `@x402/fetch`/`@x402/axios` or equivalent x402 client code.
-3. If the acting agent does not have a wallet/payment capability, do not assume it can use x402 directly. Create a user handoff instead:
+1. Prefer the Footy app pinning endpoint when reachable:
+
+   ```http
+   POST https://fc-footy.vercel.app/api/ipfs/pin-json
+   Authorization: Bearer madeskills
+   Content-Type: application/json
+   ```
+
+   Request body:
+
+   ```json
+   {
+     "name": "fpl-143466-project.json",
+     "json": {
+       "name": "FPL Farcaster Fantasy League Shop",
+       "description": "This shop is a companion to Fantasy Premier League team #143466 - Farcaster Fantasy League.",
+       "fpl": {
+         "leagueId": "143466"
+       }
+     }
+   }
+   ```
+
+   Use the returned `uri` field as the `ipfs://...` metadata URI. The endpoint handles Pinata auth server-side; do not send `PINATA_JWT` to it.
+2. If `PINATA_JWT` or an equivalent Pinata API credential is available locally, use JuiceScan's `pinJson(obj, name)` flow.
+3. If the acting agent has a wallet/payment capability for Base USDC, it may use Pinata's x402 public pinning flow, such as `https://402.pinata.cloud/v1/pin/public`, with `@x402/fetch`/`@x402/axios` or equivalent x402 client code.
+4. If the acting agent does not have a wallet/payment capability, do not assume it can use x402 directly. Create a user handoff instead:
    - write or display the exact JSON metadata payloads that need pinning
    - identify the required Pinata x402 endpoint and payment network/token
    - use a txlink handoff for any EVM payment transaction only when the x402/payment flow exposes a concrete `{to,data,value,chainId}` transaction payload
@@ -132,6 +197,15 @@ Apply optional edits to the temporary deploy state only. Example: if the user sa
    - Replace the literal placeholder name `FPL [insert league name] Shop`; do not leave bracketed placeholder text in metadata or calldata.
    - `details.description`: `This shop is a companion to Fantasy Premier League team #{leagueId} - {leagueName}.`
    - Replace the literal placeholder description `This shop is a companion to Fantasy Premier League team #[insert] - [insert name]`.
+   - Project metadata must include canonical machine-readable FPL context:
+     ```json
+     {
+       "fpl": {
+         "leagueId": "{leagueId}"
+       }
+     }
+     ```
+     Keep the description human-readable, but do not rely on parsing the description for the league ID.
    - `details.owner`: deployer wallet
    - `revOperator`: deployer wallet, even though the project type is custom
 6. Enforce payment/token/NFT defaults:
@@ -150,6 +224,7 @@ Apply optional edits to the temporary deploy state only. Example: if the user sa
    - `state.details.description`
    - built project metadata `name`
    - built project metadata `description`
+   - built project metadata `fpl.leagueId` exactly matches the resolved numeric league ID as a string
    - every NFT tier metadata `name` and `description`
 10. Let the deployer review or edit the final draft only as a pre-transaction review step.
 11. Build a fresh Juicebox V6 launch transaction using the JuiceScan create-flow logic listed in **Builder Source**. Do not reuse calldata from an already mined deployment and do not use a Juicebox SDK.
@@ -157,7 +232,7 @@ Apply optional edits to the temporary deploy state only. Example: if the user sa
 13. Simulate the transaction with `eth_call` from the deployer wallet. If simulation fails, do not output a txlink as signer-ready.
 14. Produce a `txlink.stupidtech.net` URL for `eth_sendTransaction`. This is the primary output.
 15. Produce the post-deploy static shop URL pattern:
-   - `#base:{projectId}/fpl/{leagueId}`
+   - `#base:{projectId}`
 
 Do not finish with only `.jb` JSON. If exact calldata is ready, output the txlink. If exact calldata is not ready, report the specific blocker that prevents txlink generation.
 
@@ -261,14 +336,16 @@ Do not tell the user there is no valid txlink solely because the `.jb` draft has
 The generated shop is a single static app route:
 
 ```text
-#<chainSlug>:<projectId>/fpl/<leagueId>
+#<chainSlug>:<projectId>
 ```
 
 Example:
 
 ```text
-#base:123/fpl/143466
+#basesep:19
 ```
+
+For testing, the static template maps `basesep:19` to FPL league `143466` locally. Production shops must include `fpl.leagueId` in project metadata so static buyer pages can resolve the FPL league from a shared `#<chainSlug>:<projectId>` URL. For Juicebox V6, read project metadata from the active controller via `JBDirectory.controllerOf(projectId)` then `IJBProjectUriRegistry.uriOf(projectId)`; `JBProjects.tokenURI(projectId)` may be empty.
 
 Buyer flow:
 
