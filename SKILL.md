@@ -81,7 +81,7 @@ The draft is intentionally opinionated:
 - NFT tiers must not be buyable with credits. Set every tier's `flags.allowCredits` to `false`.
 - Cash outs are disabled.
 - Owner/operator should be the deployer wallet.
-- Use the same image URI for the project logo and every NFT tier image unless the deployer explicitly provides replacements.
+- Use the same default pinned image URI for the project logo and every NFT tier image unless the deployer explicitly provides replacements. This URI is already in the `.jb` draft and can be reused; do not block txlink creation just to pin new image files.
 - The generated shop links FPL managers to buyers only through the Juicebox payment memo.
 
 ## Required Inputs
@@ -119,7 +119,8 @@ Apply optional edits to the temporary deploy state only. Example: if the user sa
    - `stages[*].weight = "0"`
    - `collection.issueTokensForSplits = false`
    - every NFT tier has `flags.allowCredits = false`
-   - the project logo URI and every NFT tier image URI match unless explicitly overridden
+   - every NFT tier uses `state.details.logoUri` as `imageUri` unless explicitly overridden
+   - if the default image URI is used, tell the deployer the project and NFT images can be changed later in Juicebox/Juicebox Money
 7. Set chain/network:
    - `base`: `network = "mainnet"`, `chainIds = [8453]`
    - `basesep`: `network = "testnet"`, `chainIds = [84532]`
@@ -180,7 +181,7 @@ The exact txlink cannot be produced from the raw `.jb` draft alone. First produc
 - final deployer wallet owner/operator fields
 - final chain
 - project metadata URI
-- NFT tier metadata URI and encoded IPFS URI
+- NFT tier metadata URI and encoded IPFS URI. Use the existing pinned default image URI inside newly built tier metadata when no custom image was supplied; only the small JSON metadata needs to be pinned for the league/tier names and descriptions.
 - current `JBProjects.creationFee()`
 - final contract address and calldata from the JuiceScan builder
 
