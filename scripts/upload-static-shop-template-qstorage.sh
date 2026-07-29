@@ -5,7 +5,8 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 BUCKET="${QSTORAGE_BUCKET:-${1:-}}"
 PREFIX="${QSTORAGE_PREFIX:-static-shop-template}"
 ENDPOINT="${QSTORAGE_ENDPOINT:-https://qstorage.quilibrium.com}"
-REGION="${QSTORAGE_REGION:-us-east-1}"
+ENDPOINT="${ENDPOINT%/}"
+REGION="${QSTORAGE_REGION:-q-world-1}"
 PUBLIC_BASE="${QSTORAGE_PUBLIC_BASE:-$ENDPOINT/$BUCKET}"
 
 if [[ -z "$BUCKET" ]]; then

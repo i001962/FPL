@@ -57,7 +57,7 @@ When changing the reusable static buyer app or its QStorage upload script, relea
 3. Let `.github/workflows/deploy-static-shop-template.yml` publish the template. Configure these repository Actions secrets before the first release:
    - `QSTORAGE_ACCESS_KEY_ID`
    - `QSTORAGE_SECRET_ACCESS_KEY`
-   The workflow uses path-style S3 requests and runs `aws s3 sync --delete` from `static-shop-template/` to `s3://footy/static-shop-template/`. It uploads the full folder tree and deletes only stale files inside that prefix. Never sync to `s3://footy/`, which could delete unrelated bucket contents.
+   The workflow uses path-style S3 requests, QStorage's documented `q-world-1` signing region, and runs `aws s3 sync --delete` from `static-shop-template/` to `s3://footy/static-shop-template/`. It uploads the full folder tree and deletes only stale files inside that prefix. Never sync to `s3://footy/`, which could delete unrelated bucket contents.
 4. Confirm the GitHub Actions run succeeds and the public app URL returns HTTP 200:
    ```text
    https://qstorage.quilibrium.com/footy/static-shop-template/index.html

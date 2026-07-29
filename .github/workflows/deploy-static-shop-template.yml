@@ -22,7 +22,7 @@ jobs:
     env:
       QSTORAGE_ENDPOINT: https://qstorage.quilibrium.com
       QSTORAGE_BUCKET: footy
-      QSTORAGE_REGION: us-east-1
+      QSTORAGE_REGION: q-world-1
       QSTORAGE_PREFIX: static-shop-template
       QSTORAGE_ACCESS_KEY_ID: ${{ secrets.QSTORAGE_ACCESS_KEY_ID }}
       QSTORAGE_SECRET_ACCESS_KEY: ${{ secrets.QSTORAGE_SECRET_ACCESS_KEY }}
