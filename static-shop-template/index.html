@@ -1008,6 +1008,53 @@
       text-decoration: none;
     }
 
+    .project-deployments {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      min-height: 22px;
+    }
+
+    .project-chain-link {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      transition: opacity 120ms ease, transform 120ms ease;
+    }
+
+    .project-chain-link:hover {
+      opacity: 0.72;
+      transform: translateY(-1px);
+    }
+
+    .project-chain-logo {
+      display: block;
+      width: 18px;
+      height: 18px;
+    }
+
+    .project-chain-logo svg {
+      display: block;
+      width: 18px;
+      height: 18px;
+    }
+
+    .project-chain-fallback {
+      display: inline-flex;
+      width: 18px;
+      height: 18px;
+      align-items: center;
+      justify-content: center;
+      border-radius: 50%;
+      background: var(--line);
+      color: var(--muted);
+      font-size: 0.7rem;
+      font-weight: 800;
+    }
+
     .league-directory-link:hover {
       text-decoration: underline;
     }
@@ -1791,7 +1838,7 @@
     function showDiscovery() {
       document.body.classList.add('discovery-mode');
       els.title.textContent = 'Give the fantasy league something to play for.';
-      els.subtitle.textContent = 'Collect payments, sell collectibles, fund prizes, and issue rewards—all through transparent rules your league can help shape.';
+      els.subtitle.textContent = 'Collect payments, accept tips, sell collectibles, fund prizes, and issue rewards—all through transparent rules your league can help shape.';
       els.directoryLink.hidden = true;
       els.openClaude.href = `https://claude.ai/new?q=${encodeURIComponent(DEPLOY_AGENT_PROMPT)}`;
       els.openChatgpt.href = `https://chatgpt.com/?q=${encodeURIComponent(DEPLOY_AGENT_PROMPT)}`;
@@ -1804,7 +1851,52 @@
     }
 
     function chainLabelFromId(chainId) {
-      return Number(chainId) === 8453 ? 'Base' : Number(chainId) === 84532 ? 'Base Sepolia' : `Chain ${chainId}`;
+      const labels = {
+        1: 'Ethereum',
+        10: 'Optimism',
+        8453: 'Base',
+        42161: 'Arbitrum',
+        11155111: 'Ethereum Sepolia',
+        11155420: 'Optimism Sepolia',
+        84532: 'Base Sepolia',
+        421614: 'Arbitrum Sepolia'
+      };
+      return labels[Number(chainId)] || `Chain ${chainId}`;
+    }
+
+    // Mirrors JuiceScan's compact chain marks. Testnets use their parent chain mark.
+    const CHAIN_LOGO_SVG = {
+      eth: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="12" fill="#627EEA"/><path d="M12 4v5.9l5 2.25z" fill="#fff" fill-opacity=".6"/><path d="M12 4L7 12.15l5-2.25z" fill="#fff"/><path d="M12 16v3.99l5-6.92z" fill="#fff" fill-opacity=".6"/><path d="M12 19.99V16l-5-3.07z" fill="#fff"/><path d="M12 15.07l5-2.92-5-2.24z" fill="#fff" fill-opacity=".2"/><path d="M7 12.15l5 2.92v-5.16z" fill="#fff" fill-opacity=".6"/></svg>',
+      op: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="12" fill="#FF0420"/><text x="12" y="15.6" font-size="8.5" font-weight="700" fill="#fff" text-anchor="middle" font-family="Helvetica,Arial,sans-serif">OP</text></svg>',
+      base: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="12" fill="#0052FF"/><path d="M12 6.2A5.8 5.8 0 0 0 12 17.8V6.2z" fill="#fff"/></svg>',
+      arb: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="12" fill="#2D374B"/><path d="M12 6l4.8 11h-2.4L12 11.2 9.6 17H7.2z" fill="#28A0F0"/><path d="M12 6l-1.05 2.45L12 11.2l1.05-2.75z" fill="#fff"/></svg>'
+    };
+
+    function chainLogoFamily(chainId) {
+      const id = Number(chainId);
+      if (id === 1 || id === 11155111) return 'eth';
+      if (id === 10 || id === 11155420) return 'op';
+      if (id === 8453 || id === 84532) return 'base';
+      if (id === 42161 || id === 421614) return 'arb';
+      return '';
+    }
+
+    function projectDeployments(shop) {
+      const deployments = Array.isArray(shop.deployments) && shop.deployments.length
+        ? shop.deployments
+        : [{ chainId: shop.chainId, projectId: shop.projectId, route: shop.route }];
+      return deployments.map((deployment) => {
+        const route = String(deployment.route || '').replace(/^#/, '');
+        const label = `${chainLabelFromId(deployment.chainId)} project ${deployment.projectId}`;
+        const family = chainLogoFamily(deployment.chainId);
+        const icon = family
+          ? `<span class="project-chain-logo">${CHAIN_LOGO_SVG[family]}</span>`
+          : `<span class="project-chain-fallback">?</span>`;
+        const content = icon;
+        return route
+          ? `<a class="project-chain-link" href="https://juicebox.money/v6/${escapeHtml(route)}" target="_blank" rel="noopener" aria-label="${escapeHtml(label)}" title="${escapeHtml(label)}">${content}</a>`
+          : `<span class="project-chain-link" role="img" aria-label="${escapeHtml(label)}" title="${escapeHtml(label)}">${content}</span>`;
+      }).join('');
     }
 
     function leagueStandingsUrl(leagueId) {
@@ -1827,14 +1919,10 @@
         const leagueLink = leagueId
           ? `<a class="league-directory-link" href="${escapeHtml(leagueStandingsUrl(leagueId))}" target="_blank" rel="noopener">FPL league ${escapeHtml(leagueId)}</a>`
           : 'League not specified';
-        const projectRoute = String(shop.route || '').replace(/^#/, '');
-        const projectLabel = `${chainLabelFromId(shop.chainId)}:${shop.projectId}`;
-        const projectLink = projectRoute
-          ? `<a class="league-directory-link" href="https://juicebox.money/v6/${escapeHtml(projectRoute)}" target="_blank" rel="noopener">${escapeHtml(projectLabel)}</a>`
-          : escapeHtml(projectLabel);
-        return `<tr><td>${leagueLink}</td><td><span class="league-directory-name">${escapeHtml(title)}</span></td><td><span class="league-directory-description">${escapeHtml(description)}</span></td><td>${projectLink}</td><td><a class="button primary" href="${escapeHtml(shop.route)}">See items</a></td></tr>`;
+        const deployments = projectDeployments(shop);
+        return `<tr><td>${leagueLink}</td><td><span class="league-directory-name">${escapeHtml(title)}</span></td><td><span class="league-directory-description">${escapeHtml(description)}</span></td><td><span class="project-deployments">${deployments}</span></td><td><a class="button primary" href="${escapeHtml(shop.route)}">See items</a></td></tr>`;
       }).join('');
-      els.leagueDirectory.innerHTML = `<div class="league-directory-table-wrap"><table class="league-directory-table"><thead><tr><th>League</th><th>Shop</th><th>Description</th><th>JB project</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>`;
+      els.leagueDirectory.innerHTML = `<div class="league-directory-table-wrap"><table class="league-directory-table"><thead><tr><th>League</th><th>Shop</th><th>Description</th><th>Project</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>`;
     }
 
     function filterLeagueDirectory() {
@@ -1850,7 +1938,8 @@
         shop.name,
         shop.description,
         shop.projectTagline,
-        shop.chainId
+        shop.chainId,
+        ...(shop.deployments || []).flatMap((deployment) => [deployment.chainId, deployment.projectId])
       ].some((value) => plainProjectText(value).toLowerCase().includes(query)));
       renderLeagueDirectory(filtered);
     }

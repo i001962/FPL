@@ -105,9 +105,40 @@ function uniqueShops(projects, leagueId = "") {
   projects.forEach((project) => {
     if (leagueId && !matchesLeague(project, leagueId)) return;
     const shop = shopForProject(project);
-    if (shop) unique.set(shop.route, shop);
+    if (!shop) return;
+
+    // Bendystraw indexes each chain separately. A shared metadata URI identifies
+    // one FPL shop deployed to more than one chain.
+    const key = shop.metadataUri
+      ? `metadata:${shop.leagueId}:${shop.metadataUri}`
+      : `project:${shop.leagueId}:${shop.projectId}`;
+    const deployment = {
+      chainId: shop.chainId,
+      projectId: shop.projectId,
+      route: shop.route,
+    };
+    const existing = unique.get(key);
+    if (!existing) {
+      unique.set(key, { ...shop, deployments: [deployment] });
+      return;
+    }
+
+    if (!existing.deployments.some((item) => item.route === deployment.route)) {
+      existing.deployments.push(deployment);
+    }
+
+    // Prefer a mainnet deployment for the primary title, description, and shop link.
+    if (Number(shop.chainId) === 8453 && Number(existing.chainId) !== 8453) {
+      Object.assign(existing, shop, { deployments: existing.deployments });
+    }
   });
-  return [...unique.values()].sort((a, b) => {
+  return [...unique.values()].map((shop) => ({
+    ...shop,
+    deployments: shop.deployments.sort((a, b) => {
+      const mainnetFirst = Number(Number(b.chainId) === 8453) - Number(Number(a.chainId) === 8453);
+      return mainnetFirst || Number(a.chainId) - Number(b.chainId);
+    }),
+  })).sort((a, b) => {
     const mainnetFirst = Number(Number(b.chainId) === 8453) - Number(Number(a.chainId) === 8453);
     return mainnetFirst || Number(b.createdAt || 0) - Number(a.createdAt || 0);
   });
