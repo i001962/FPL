@@ -903,6 +903,91 @@
       line-height: 1.45;
     }
 
+    .league-directory {
+      margin-top: 42px;
+      padding-top: 26px;
+      border-top: 1px solid var(--line);
+    }
+
+    .league-directory-header {
+      display: flex;
+      justify-content: space-between;
+      gap: 18px;
+      align-items: end;
+      margin-bottom: 16px;
+    }
+
+    .league-directory h2 {
+      margin: 0;
+      font-size: 1.35rem;
+    }
+
+    .league-directory-header p,
+    .league-directory-message {
+      margin: 6px 0 0;
+      color: var(--muted);
+      line-height: 1.45;
+    }
+
+    .league-directory-table-wrap {
+      overflow-x: auto;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.72);
+    }
+
+    .league-directory-table {
+      width: 100%;
+      min-width: 720px;
+      border-collapse: collapse;
+      text-align: left;
+    }
+
+    .league-directory-table th,
+    .league-directory-table td {
+      padding: 14px;
+      border-bottom: 1px solid var(--line);
+      vertical-align: top;
+    }
+
+    .league-directory-table tr:last-child td {
+      border-bottom: 0;
+    }
+
+    .league-directory-table th {
+      color: var(--muted);
+      font-size: 0.74rem;
+      font-weight: 800;
+      text-transform: uppercase;
+    }
+
+    .league-directory-table td {
+      font-size: 0.9rem;
+    }
+
+    .league-directory-name {
+      display: block;
+      max-width: 280px;
+      color: var(--ink);
+      font-weight: 750;
+    }
+
+    .league-directory-description {
+      max-width: 340px;
+      color: var(--muted);
+      line-height: 1.4;
+    }
+
+    .league-directory-link {
+      color: var(--accent-dark);
+      font-weight: 750;
+      text-decoration: none;
+    }
+
+    .league-directory-link:hover {
+      text-decoration: underline;
+    }
+
     body.discovery-mode .discovery-view {
       display: block;
     }
@@ -967,6 +1052,10 @@
 
       .agent-copy {
         grid-column: auto;
+      }
+
+      .league-directory-header {
+        display: block;
       }
 
       .shop-result .button {
@@ -1039,6 +1128,16 @@
           </div>
         </article>
       </div>
+
+      <section class="league-directory" aria-labelledby="leagueDirectoryTitle">
+        <div class="league-directory-header">
+          <div>
+            <h2 id="leagueDirectoryTitle">Explore league shops</h2>
+            <p>Browse FPL projects indexed from public Juicebox data, then open a shop or check your own league above.</p>
+          </div>
+        </div>
+        <div id="leagueDirectory" aria-live="polite"><p class="league-directory-message">Loading indexed league shops...</p></div>
+      </section>
     </section>
 
     <div class="layout shop-view" id="shopView">
@@ -1450,6 +1549,7 @@
       discoveryForm: document.querySelector('#discoveryForm'),
       discoveryInput: document.querySelector('#discoveryInput'),
       discoveryResult: document.querySelector('#discoveryResult'),
+      leagueDirectory: document.querySelector('#leagueDirectory'),
       openClaude: document.querySelector('#openClaude'),
       openChatgpt: document.querySelector('#openChatgpt'),
       copyDeployPrompt: document.querySelector('#copyDeployPrompt')
@@ -1664,6 +1764,38 @@
         return `<article class="shop-result">${visual}<div><h3>${escapeHtml(title)}</h3><p>${escapeHtml(chainLabelFromId(shop.chainId))} project ${escapeHtml(shop.projectId)} · ${Number(shop.contributorsCount || 0)} customers</p></div><a class="button primary" href="${escapeHtml(shop.route)}">Open shop</a></article>`;
       }).join('');
       els.discoveryResult.innerHTML = `<p class="discovery-message">Found ${shops.length} shop${shops.length === 1 ? '' : 's'} for <strong>${escapeHtml(leagueName)}</strong>.</p>${cards}`;
+    }
+
+    function leagueStandingsUrl(leagueId) {
+      return `https://fantasy.premierleague.com/en/leagues/${encodeURIComponent(leagueId)}/standings/c`;
+    }
+
+    function renderLeagueDirectory(shops) {
+      if (!shops.length) {
+        els.leagueDirectory.innerHTML = '<p class="league-directory-message">No indexed FPL shops are available yet.</p>';
+        return;
+      }
+      const rows = shops.map((shop) => {
+        const title = shop.name || `FPL project ${shop.projectId}`;
+        const description = shop.description || shop.projectTagline || 'No project description published.';
+        const leagueId = shop.leagueId || shop.metadata?.fpl?.leagueId || '';
+        const leagueLink = leagueId
+          ? `<a class="league-directory-link" href="${escapeHtml(leagueStandingsUrl(leagueId))}" target="_blank" rel="noopener">FPL league ${escapeHtml(leagueId)}</a>`
+          : 'League not specified';
+        return `<tr><td>${leagueLink}</td><td><span class="league-directory-name">${escapeHtml(title)}</span></td><td><span class="league-directory-description">${escapeHtml(description)}</span></td><td>${escapeHtml(chainLabelFromId(shop.chainId))}</td><td><a class="button primary" href="${escapeHtml(shop.route)}">Open shop</a></td></tr>`;
+      }).join('');
+      els.leagueDirectory.innerHTML = `<div class="league-directory-table-wrap"><table class="league-directory-table"><thead><tr><th>League</th><th>Shop</th><th>Description</th><th>Network</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>`;
+    }
+
+    async function loadLeagueDirectory() {
+      try {
+        const response = await fetch(DISCOVERY_API_PATH);
+        if (!response.ok) throw new Error(`Directory request failed: ${response.status}`);
+        const data = await response.json();
+        renderLeagueDirectory(Array.isArray(data?.shops) ? data.shops : []);
+      } catch (_) {
+        els.leagueDirectory.innerHTML = '<p class="league-directory-message">Could not load indexed league shops right now. You can still check a specific league above.</p>';
+      }
     }
 
     async function findLeagueShop(value) {
@@ -2726,6 +2858,7 @@
     parseRoute();
     if (state.isDiscovery) {
       showDiscovery();
+      loadLeagueDirectory();
     } else {
       document.body.classList.remove('discovery-mode');
       els.directoryLink.hidden = false;

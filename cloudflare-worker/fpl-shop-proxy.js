@@ -42,8 +42,19 @@ function routeForProject(project) {
 }
 
 function matchesLeague(project, leagueId) {
+  return fplLeagueId(project) === leagueId;
+}
+
+function fplLeagueId(project) {
   const metadata = project?.metadata && typeof project.metadata === "object" ? project.metadata : {};
-  return String(metadata?.fpl?.leagueId || metadata?.leagueId || "") === leagueId;
+  const leagueId = String(metadata?.fpl?.leagueId || metadata?.leagueId || "").trim();
+  return /^\d{3,9}$/.test(leagueId) ? leagueId : "";
+}
+
+function shopForProject(project) {
+  const route = routeForProject(project);
+  const leagueId = fplLeagueId(project);
+  return route && leagueId ? { ...project, leagueId, route } : null;
 }
 
 async function queryBendystraw(endpoint, leagueId) {
@@ -69,10 +80,43 @@ async function queryBendystraw(endpoint, leagueId) {
   return [...(body.data?.tagged?.items || []), ...(body.data?.legacy?.items || [])];
 }
 
+async function queryAllFplProjects(endpoint) {
+  const query = `query ListFplShops($fplTag: String!, $legacyText: String!) {
+    tagged: projects(where: { version: 6, tags_has: $fplTag }, limit: 100) {
+      items { ${PROJECT_FIELDS} }
+    }
+    legacy: projects(where: { version: 6, description_contains_nocase: $legacyText }, limit: 100) {
+      items { ${PROJECT_FIELDS} }
+    }
+  }`;
+  const response = await fetch(endpoint, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ query, variables: { fplTag: "fpl", legacyText: "Fantasy Premier League" } }),
+  });
+  if (!response.ok) throw new Error(`Bendystraw returned ${response.status}`);
+  const body = await response.json();
+  if (body.errors?.length) throw new Error(body.errors.map((error) => error.message).join("; "));
+  return [...(body.data?.tagged?.items || []), ...(body.data?.legacy?.items || [])];
+}
+
+function uniqueShops(projects, leagueId = "") {
+  const unique = new Map();
+  projects.forEach((project) => {
+    if (leagueId && !matchesLeague(project, leagueId)) return;
+    const shop = shopForProject(project);
+    if (shop) unique.set(shop.route, shop);
+  });
+  return [...unique.values()].sort((a, b) => {
+    const mainnetFirst = Number(Number(b.chainId) === 8453) - Number(Number(a.chainId) === 8453);
+    return mainnetFirst || Number(b.createdAt || 0) - Number(a.createdAt || 0);
+  });
+}
+
 async function discoverShops(request, ctx) {
   const url = new URL(request.url);
   const leagueId = String(url.searchParams.get("leagueId") || "").trim();
-  if (!/^\d{3,9}$/.test(leagueId)) {
+  if (leagueId && !/^\d{3,9}$/.test(leagueId)) {
     return jsonResponse({ error: "leagueId must be a numeric FPL classic league ID." }, 400);
   }
 
@@ -80,21 +124,11 @@ async function discoverShops(request, ctx) {
   const cached = await cache.match(request);
   if (cached) return cached;
 
-  const settled = await Promise.allSettled(BENDYSTRAW_ENDPOINTS.map((endpoint) => queryBendystraw(endpoint, leagueId)));
-  const unique = new Map();
-  settled.forEach((result) => {
-    if (result.status !== "fulfilled") return;
-    result.value.filter((project) => matchesLeague(project, leagueId)).forEach((project) => {
-      const route = routeForProject(project);
-      if (route) unique.set(route, { ...project, route });
-    });
-  });
-
-  const shops = [...unique.values()].sort((a, b) => {
-    const mainnetFirst = Number(Number(b.chainId) === 8453) - Number(Number(a.chainId) === 8453);
-    return mainnetFirst || Number(b.createdAt || 0) - Number(a.createdAt || 0);
-  });
-  const response = jsonResponse({ leagueId, shops });
+  const query = leagueId ? (endpoint) => queryBendystraw(endpoint, leagueId) : queryAllFplProjects;
+  const settled = await Promise.allSettled(BENDYSTRAW_ENDPOINTS.map(query));
+  const projects = settled.flatMap((result) => result.status === "fulfilled" ? result.value : []);
+  const shops = uniqueShops(projects, leagueId);
+  const response = jsonResponse({ leagueId: leagueId || null, shops });
   ctx.waitUntil(cache.put(request, response.clone()));
   return response;
 }
