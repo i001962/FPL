@@ -908,7 +908,8 @@
     }
 
     body.discovery-mode .shop-view,
-    body.discovery-mode .ownership {
+    body.discovery-mode .ownership,
+    body.discovery-mode .header-side {
       display: none;
     }
 
@@ -998,16 +999,16 @@
     <section class="discovery-view" id="discoveryView" aria-label="FPL league shops">
       <div class="discovery-grid">
         <article class="discovery-panel">
-          <p class="discovery-kicker">Find a League Register</p>
-          <h2>Does your fantasy league have a shop?</h2>
-          <p>Paste your Fantasy Premier League league URL and find out if it has a place for buy-ins, prize pools, and season kickers.</p>
+          <p class="discovery-kicker">League Register</p>
+          <h2>Find your league shop</h2>
+          <p>Enter your FPL league URL or ID to see whether your league already has one.</p>
           <form class="discovery-form" id="discoveryForm">
             <input id="discoveryInput" type="search" placeholder="FPL league URL or league ID" autocomplete="off" aria-label="FPL league URL or league ID">
-            <button class="button primary" type="submit">Find league</button>
+            <button class="button primary" type="submit">Find shop</button>
           </form>
           <div class="league-url-help">
             <strong>Where to find your league ID</strong>
-            <p>Open your league's Standings page in Fantasy Premier League and copy the browser address. The number after <strong>/leagues/</strong> is your league ID.</p>
+            <p>Open your league standings page and copy the number after <strong>/leagues/</strong>.</p>
             <code>fantasy.premierleague.com/en/leagues/143466/standings/c</code>
             <a class="league-url-link" href="https://fantasy.premierleague.com/en/leagues/143466/standings/c" target="_blank" rel="noopener">Open Fantasy Premier League to find your league</a>
           </div>
@@ -1018,14 +1019,14 @@
         </article>
 
         <article class="discovery-panel create-panel">
-          <p class="discovery-kicker">The network cash register</p>
-          <h2>Turn any fantasy league into a programmable club.</h2>
-          <p>A cash register, prize pool, and shop for your fantasy league.</p>
+          <p class="discovery-kicker">Create with an agent</p>
+          <h2>Let an agent build it</h2>
+          <p>Describe what your league needs. The agent can deploy the shop, configure the money rules, and create one link for everyone to use.</p>
           <ul class="create-benefits">
-            <li>Run gameweek or full-season buy-ins for your group.</li>
-            <li>Fund prizes and publish rules everyone can inspect.</li>
-            <li>Sell league merch and NFTs.</li>
-            <li>Give managers and agents one link to pay in, shop, and review the rules.</li>
+            <li>Dues and buy-ins</li>
+            <li>Prizes and rewards</li>
+            <li>Passes, merch, and collectibles</li>
+            <li>Automatic splits and public rules</li>
           </ul>
           <div class="discovery-footnote">
             <div class="agent-actions" aria-label="Create a shop with an AI agent">
@@ -1034,7 +1035,7 @@
               <button class="button agent-copy" id="copyDeployPrompt" type="button">Copy agent instructions</button>
             </div>
             <a class="agent-repository" href="https://github.com/i001962/FPL/" target="_blank" rel="noopener">View the FPL deploy skill</a>
-            <p class="create-note"><strong>League money, with the rules built in.</strong> The instructions use this FPL repository so your project metadata, NFT rules, and shop route are set correctly.</p>
+            <p class="create-note">A cash register for your fantasy league. The instructions use this FPL repository so your project metadata, NFT rules, and shop route are set correctly.</p>
           </div>
         </article>
       </div>
@@ -1627,12 +1628,11 @@
 
     function showDiscovery() {
       document.body.classList.add('discovery-mode');
-      els.title.textContent = 'Turn any fantasy league into a programmable club.';
-      els.subtitle.textContent = 'A cash register, prize pool, and shop for your Fantasy Premier League.';
+      els.title.textContent = 'Give your fantasy league its own shop.';
+      els.subtitle.textContent = 'Collect payments, sell items, fund prizes, and issue rewards through rules your league can inspect.';
       els.directoryLink.hidden = true;
       els.openClaude.href = `https://claude.ai/new?q=${encodeURIComponent(DEPLOY_AGENT_PROMPT)}`;
       els.openChatgpt.href = `https://chatgpt.com/?q=${encodeURIComponent(DEPLOY_AGENT_PROMPT)}`;
-      setStatus('Find or create a league shop', 'Search for your league, or use an AI agent to set up a new shop.');
     }
 
     function extractLeagueId(value) {
