@@ -670,31 +670,30 @@
 
     .discovery-view {
       display: none;
-      max-width: 1040px;
-      margin: 44px auto 0;
+      max-width: 1120px;
+      margin: 30px auto 0;
     }
 
     .discovery-grid {
       display: grid;
-      grid-template-columns: minmax(0, 1.1fr) minmax(290px, 0.9fr);
-      gap: 18px;
-      align-items: stretch;
+      grid-template-columns: minmax(0, 1fr) 300px;
+      gap: 34px;
+      align-items: start;
     }
 
     .discovery-panel {
-      display: flex;
-      flex-direction: column;
-      min-height: 100%;
-      padding: 28px;
-      border: 1px solid var(--line);
-      border-radius: 8px;
-      background: rgba(255, 255, 255, 0.86);
-      box-shadow: var(--shadow);
+      min-height: 0;
+      padding: 0;
+      border: 0;
+      border-radius: 0;
+      background: transparent;
+      box-shadow: none;
     }
 
     .discovery-panel.create-panel {
-      border-color: rgba(8, 168, 138, 0.42);
-      background: linear-gradient(160deg, rgba(8, 168, 138, 0.10), rgba(255, 255, 255, 0.9) 46%);
+      padding-left: 26px;
+      border-left: 1px solid rgba(8, 168, 138, 0.42);
+      background: transparent;
     }
 
     .discovery-kicker {
@@ -717,18 +716,18 @@
     }
 
     .league-url-help {
-      margin: 16px 0 0;
-      padding: 13px 14px;
-      border: 1px solid var(--line);
-      border-radius: 6px;
-      background: rgba(20, 33, 61, 0.035);
+      margin: 12px 0 0;
+      padding: 0;
+      border: 0;
+      border-radius: 0;
+      background: transparent;
       color: var(--muted);
       font-size: 0.87rem;
     }
 
     .league-url-help strong {
-      display: block;
-      margin-bottom: 5px;
+      display: inline;
+      margin: 0;
       color: var(--ink);
       font-weight: 750;
     }
@@ -739,20 +738,21 @@
     }
 
     .league-url-help code {
-      display: inline-block;
-      margin-top: 6px;
-      padding: 3px 5px;
-      border-radius: 4px;
-      background: rgba(8, 168, 138, 0.10);
+      display: block;
+      width: fit-content;
+      margin-top: 5px;
+      padding: 2px 0;
+      border-radius: 0;
+      background: transparent;
       color: var(--accent-dark);
       font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-      font-size: 0.79rem;
+      font-size: 0.75rem;
       overflow-wrap: anywhere;
     }
 
     .league-url-link {
-      display: inline-flex;
-      margin-top: 10px;
+      display: inline;
+      margin: 0;
       color: var(--accent-dark);
       font-size: 0.84rem;
       font-weight: 750;
@@ -825,8 +825,8 @@
     }
 
     .discovery-footnote {
-      margin-top: auto;
-      padding-top: 22px;
+      margin-top: 20px;
+      padding-top: 0;
     }
 
     .discovery-footnote p {
@@ -837,31 +837,20 @@
     }
 
     .create-benefits {
-      display: grid;
-      gap: 11px;
-      margin: 4px 0 22px;
+      margin: 14px 0 18px;
       padding: 0;
-      list-style: none;
-    }
-
-    .create-benefits li {
-      display: grid;
-      grid-template-columns: 18px minmax(0, 1fr);
-      gap: 9px;
-      align-items: start;
       color: var(--muted);
-      font-size: 0.92rem;
+      font-size: 0.9rem;
       line-height: 1.45;
     }
 
-    .create-benefits li::before {
-      content: "";
-      width: 8px;
-      height: 8px;
-      margin-top: 0.34rem;
-      border-radius: 50%;
-      background: var(--accent);
-      box-shadow: 0 0 0 4px rgba(8, 168, 138, 0.12);
+    .create-benefits li {
+      display: inline;
+    }
+
+    .create-benefits li:not(:last-child)::after {
+      content: " · ";
+      color: var(--accent-dark);
     }
 
     .create-panel .button {
@@ -870,7 +859,7 @@
 
     .agent-actions {
       display: grid;
-      grid-template-columns: 1fr 1fr;
+      grid-template-columns: 1fr;
       gap: 10px;
     }
 
@@ -879,7 +868,7 @@
     }
 
     .agent-copy {
-      grid-column: 1 / -1;
+      grid-column: auto;
       color: var(--accent-dark);
     }
 
@@ -904,9 +893,15 @@
     }
 
     .league-directory {
-      margin-top: 42px;
-      padding-top: 26px;
+      margin-top: 34px;
+      padding-top: 24px;
       border-top: 1px solid var(--line);
+      border-right: 0;
+      border-bottom: 0;
+      border-left: 0;
+      border-radius: 0;
+      background: transparent;
+      box-shadow: none;
     }
 
     .league-directory-header {
@@ -998,6 +993,18 @@
       display: none;
     }
 
+    body.discovery-mode h1 {
+      max-width: 700px;
+      font-size: clamp(2.6rem, 4vw, 3.9rem);
+      line-height: 1;
+    }
+
+    body.discovery-mode .subtitle {
+      max-width: 640px;
+      margin-top: 12px;
+      font-size: 1.05rem;
+    }
+
     .error {
       color: var(--error);
     }
@@ -1035,23 +1042,22 @@
 
       .discovery-grid {
         grid-template-columns: 1fr;
+        gap: 26px;
       }
 
       .discovery-panel {
-        padding: 20px;
+        padding: 0;
+      }
+
+      .discovery-panel.create-panel {
+        padding: 22px 0 0;
+        border-top: 1px solid rgba(8, 168, 138, 0.42);
+        border-left: 0;
       }
 
       .discovery-form,
       .shop-result {
         grid-template-columns: 1fr;
-      }
-
-      .agent-actions {
-        grid-template-columns: 1fr;
-      }
-
-      .agent-copy {
-        grid-column: auto;
       }
 
       .league-directory-header {
@@ -1090,16 +1096,15 @@
         <article class="discovery-panel">
           <p class="discovery-kicker">League Register</p>
           <h2>Find your league shop</h2>
-          <p>Enter your FPL league URL or ID to see whether your league already has one.</p>
+          <p>Paste an FPL league URL or ID to see whether it already has a shop.</p>
           <form class="discovery-form" id="discoveryForm">
             <input id="discoveryInput" type="search" placeholder="FPL league URL or league ID" autocomplete="off" aria-label="FPL league URL or league ID">
             <button class="button primary" type="submit">Find shop</button>
           </form>
           <div class="league-url-help">
             <strong>Where to find your league ID</strong>
-            <p>Open your league standings page and copy the number after <strong>/leagues/</strong>.</p>
+            <p>Open your league standings page and copy the number after <strong>/leagues/</strong>. <a class="league-url-link" href="https://fantasy.premierleague.com/en/leagues/143466/standings/c" target="_blank" rel="noopener">Open FPL standings</a></p>
             <code>fantasy.premierleague.com/en/leagues/143466/standings/c</code>
-            <a class="league-url-link" href="https://fantasy.premierleague.com/en/leagues/143466/standings/c" target="_blank" rel="noopener">Open Fantasy Premier League to find your league</a>
           </div>
           <div class="discovery-result" id="discoveryResult" aria-live="polite"></div>
           <div class="discovery-footnote">
@@ -1109,13 +1114,13 @@
 
         <article class="discovery-panel create-panel">
           <p class="discovery-kicker">Create with an agent</p>
-          <h2>Let an agent build it</h2>
-          <p>Describe what your league needs. The agent can deploy the shop, configure the money rules, and create one link for everyone to use.</p>
+          <h2>Set up a league shop with an agent</h2>
+          <p>Tell the agent about the league. It can configure the shop and give everyone one place to use.</p>
           <ul class="create-benefits">
-            <li>Dues and buy-ins</li>
-            <li>Prizes and rewards</li>
-            <li>Passes, merch, and collectibles</li>
-            <li>Automatic splits and public rules</li>
+            <li>Buy-ins</li>
+            <li>Prizes</li>
+            <li>Items</li>
+            <li>Public rules</li>
           </ul>
           <div class="discovery-footnote">
             <div class="agent-actions" aria-label="Create a shop with an AI agent">
@@ -1124,7 +1129,7 @@
               <button class="button agent-copy" id="copyDeployPrompt" type="button">Copy agent instructions</button>
             </div>
             <a class="agent-repository" href="https://github.com/i001962/FPL/" target="_blank" rel="noopener">View the FPL deploy skill</a>
-            <p class="create-note">A cash register for your fantasy league. The instructions use this FPL repository so your project metadata, NFT rules, and shop route are set correctly.</p>
+            <p class="create-note">The FPL deploy skill sets the required project metadata, NFT rules, and shop route.</p>
           </div>
         </article>
       </div>
@@ -1132,8 +1137,8 @@
       <section class="league-directory" aria-labelledby="leagueDirectoryTitle">
         <div class="league-directory-header">
           <div>
-            <h2 id="leagueDirectoryTitle">Explore league shops</h2>
-            <p>Browse FPL projects indexed from public Juicebox data, then open a shop or check your own league above.</p>
+            <h2 id="leagueDirectoryTitle">League shops already live</h2>
+            <p>Browse shops indexed from public Juicebox data, or check a specific league above.</p>
           </div>
         </div>
         <div id="leagueDirectory" aria-live="polite"><p class="league-directory-message">Loading indexed league shops...</p></div>
