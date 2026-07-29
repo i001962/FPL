@@ -48,6 +48,24 @@ The template is a starter UI only. It resolves known test project IDs locally, l
 
 The league data endpoint used by the template must allow browser reads from the QStorage origin. If FC-Footy is used, `GET /api/fpl-league` must send `Access-Control-Allow-Origin: *`. The template also accepts an `apiBase` query parameter for another CORS-capable endpoint.
 
+## Static Template Release
+
+When changing the reusable static buyer app or its QStorage upload script, release it in this order:
+
+1. Validate the changed static HTML/JavaScript.
+2. Commit only the intended template, script, skill, and documentation changes, then push `main` to GitHub.
+3. Mirror the complete local template directory to its fixed QStorage prefix:
+   ```sh
+   QSTORAGE_BUCKET=footy scripts/upload-static-shop-template-qstorage.sh
+   ```
+   The script uses `aws s3 sync --delete` from `static-shop-template/` to `s3://footy/static-shop-template/`. It uploads the full folder tree and deletes only stale files inside that prefix. Never sync to `s3://footy/`, which could delete unrelated bucket contents.
+4. Verify the public app URL returns HTTP 200:
+   ```text
+   https://qstorage.quilibrium.com/footy/static-shop-template/index.html
+   ```
+
+Do not claim the static template release is complete until the GitHub push and QStorage verification both succeed. Keep the repository skill and the installed Codex skill copy in sync whenever this workflow changes.
+
 ## Builder Source
 
 Use JuiceScan as the transaction builder reference. Do not look for, install, or depend on a Juicebox SDK. The needed deploy calls are already implemented in JuiceScan with plain `viem` ABI encoding.
