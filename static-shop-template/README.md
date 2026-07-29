@@ -14,7 +14,9 @@ QSTORAGE_BUCKET=footy scripts/upload-static-shop-template-qstorage.sh
 
 ## Route
 
-Open the app with this hash route:
+The shared template defaults to `basesep:19` when opened without a route. For a project-specific copy, change `DEFAULT_PROJECT_ROUTE` near the top of `index.html` to the deployed project route. This means a branded URL can work without a fragment while preserving the reusable hash-route behavior.
+
+Open the app with this hash route to select or override a project:
 
 ```text
 #<chainSlug>:<projectId>
@@ -24,6 +26,13 @@ Example:
 
 ```text
 #basesep:19
+```
+
+For example, after setting `DEFAULT_PROJECT_ROUTE = 'basesep:19'`, both of these load project 19:
+
+```text
+https://example.com/index.html
+https://example.com/index.html#basesep:19
 ```
 
 The app also accepts query parameters for local testing:

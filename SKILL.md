@@ -46,6 +46,8 @@ https://qstorage.quilibrium.com/footy/static-shop-template/index.html#basesep:19
 
 The template is a starter UI only. It resolves known test project IDs locally, loads the FPL leaderboard through FC-Footy, requires a manager and tier selection, derives `fpl:league={leagueId};entry={entryId}`, and points the buyer to the Juicebox project page. It does not replace the signer-reviewed deploy txlink, and it does not make the FPL manager-to-wallet link strong.
 
+For a project-specific hosted copy, set `DEFAULT_PROJECT_ROUTE` in the copied template to the deployed `chainSlug:projectId` before publishing. The page must then load that project with no URL fragment, while an explicit `#<chainSlug>:<projectId>` fragment continues to override the default for reusable multi-project hosting.
+
 The league data endpoint used by the template must allow browser reads from the QStorage origin. If FC-Footy is used, `GET /api/fpl-league` must send `Access-Control-Allow-Origin: *`. The template also accepts an `apiBase` query parameter for another CORS-capable endpoint.
 
 ## Static Template Release
@@ -436,7 +438,7 @@ Do not tell the user there is no valid txlink solely because the `.jb` draft has
 
 ## Static Shop Rules
 
-The generated shop is a single static app route:
+The generated shop accepts a hash route:
 
 ```text
 #<chainSlug>:<projectId>
@@ -447,6 +449,8 @@ Example:
 ```text
 #basesep:19
 ```
+
+When a deployer publishes a project-specific copy, set its `DEFAULT_PROJECT_ROUTE` to the deployed `chainSlug:projectId` so the bare app URL loads that shop. Keep hash routes enabled as an override for shared or multi-project copies.
 
 For testing, the static template maps `basesep:19` to FPL league `143466` locally. Production shops must include `fpl.leagueId` in project metadata so static buyer pages can resolve the FPL league from a shared `#<chainSlug>:<projectId>` URL. For Juicebox V6, read project metadata from the active controller via `JBDirectory.controllerOf(projectId)` then `IJBProjectUriRegistry.uriOf(projectId)`; `JBProjects.tokenURI(projectId)` may be empty.
 

@@ -1043,6 +1043,8 @@
     const WALLET_RDNS = 'fpl-shop-wallet-rdns';
     const WALLET_PROVIDER_FALLBACK = { info: { uuid: 'injected-0', name: 'Browser wallet', rdns: 'injected', icon: '' }, provider: window.ethereum };
     const discoveredProviders = [];
+    // Set this when publishing a project-specific copy. A hash route still overrides it.
+    const DEFAULT_PROJECT_ROUTE = 'basesep:19';
 
     const state = {
       chainSlug: 'base',
@@ -1110,10 +1112,11 @@
     function parseRoute() {
       const route = window.location.hash.replace(/^#/, '');
       const match = route.match(/^([a-z0-9-]+):(\d+)(?:\/fpl\/(\d+))?/i);
+      const defaultMatch = DEFAULT_PROJECT_ROUTE.match(/^([a-z0-9-]+):(\d+)(?:\/fpl\/(\d+))?$/i);
       const params = new URLSearchParams(window.location.search);
-      state.chainSlug = match?.[1] || params.get('chain') || 'base';
-      state.projectId = match?.[2] || params.get('projectId') || '';
-      state.leagueId = match?.[3] || params.get('leagueId') || '';
+      state.chainSlug = match?.[1] || params.get('chain') || defaultMatch?.[1] || 'base';
+      state.projectId = match?.[2] || params.get('projectId') || defaultMatch?.[2] || '';
+      state.leagueId = match?.[3] || params.get('leagueId') || defaultMatch?.[3] || '';
       state.apiBase = params.get('apiBase') || state.apiBase;
 
       const tierParam = params.get('tiers');
