@@ -14,7 +14,9 @@ QSTORAGE_BUCKET=footy scripts/upload-static-shop-template-qstorage.sh
 
 ## Route
 
-The shared template defaults to `basesep:19` when opened without a route. For a project-specific copy, change `DEFAULT_PROJECT_ROUTE` near the top of `index.html` to the deployed project route. This means a branded URL can work without a fragment while preserving the reusable hash-route behavior.
+When `DEFAULT_PROJECT_ROUTE` is blank, the shared template opens a league discovery view at its bare URL. It validates a pasted FPL league URL or classic league ID, then asks the same-origin `/api/shops` endpoint to query Bendystraw's public Juicebox project index.
+
+For a project-specific copy, set `DEFAULT_PROJECT_ROUTE` near the top of `index.html` to the deployed project route. This makes a branded URL open its shop without a fragment while preserving the reusable hash-route behavior.
 
 Open the app with this hash route to select or override a project:
 
@@ -34,6 +36,8 @@ For example, after setting `DEFAULT_PROJECT_ROUTE = 'basesep:19'`, both of these
 https://example.com/index.html
 https://example.com/index.html#basesep:19
 ```
+
+The discovery endpoint is implemented by `cloudflare-worker/fpl-shop-proxy.js`. It queries Bendystraw's mainnet and testnet GraphQL endpoints for `tags_has: "fpl-league:<leagueId>"`, then falls back to FPL-description matches for legacy projects and verifies `metadata.fpl.leagueId` before returning a result. New project metadata must include both `fpl.leagueId` and the `fpl` / `fpl-league:<leagueId>` tags.
 
 The app also accepts query parameters for local testing:
 

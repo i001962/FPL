@@ -654,6 +654,138 @@
       text-decoration: underline;
     }
 
+    .directory-link {
+      display: inline-flex;
+      align-items: center;
+      min-height: 34px;
+      color: var(--accent-dark);
+      font-size: 0.88rem;
+      font-weight: 750;
+      text-decoration: none;
+    }
+
+    .directory-link:hover {
+      text-decoration: underline;
+    }
+
+    .discovery-view {
+      display: none;
+      max-width: 760px;
+      margin: 52px auto 0;
+    }
+
+    .discovery-panel {
+      padding: 28px;
+    }
+
+    .discovery-panel h2 {
+      margin: 0;
+      font-size: 1.55rem;
+    }
+
+    .discovery-panel > p {
+      margin: 8px 0 20px;
+      color: var(--muted);
+      line-height: 1.5;
+    }
+
+    .discovery-form {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 10px;
+    }
+
+    .discovery-form .button {
+      min-width: 124px;
+    }
+
+    .discovery-result {
+      display: grid;
+      gap: 12px;
+      margin-top: 20px;
+    }
+
+    .discovery-message {
+      margin: 0;
+      color: var(--muted);
+      line-height: 1.5;
+    }
+
+    .discovery-message.error {
+      color: var(--error);
+    }
+
+    .shop-result {
+      display: grid;
+      grid-template-columns: 44px minmax(0, 1fr) auto;
+      align-items: center;
+      gap: 12px;
+      padding: 14px;
+      border: 1px solid var(--line);
+      border-radius: 7px;
+      background: rgba(8, 168, 138, 0.05);
+    }
+
+    .shop-result img,
+    .shop-result-placeholder {
+      width: 44px;
+      height: 44px;
+      border-radius: 6px;
+      object-fit: cover;
+      background: rgba(8, 168, 138, 0.13);
+    }
+
+    .shop-result h3,
+    .shop-result p {
+      margin: 0;
+    }
+
+    .shop-result h3 {
+      font-size: 1rem;
+    }
+
+    .shop-result p {
+      margin-top: 3px;
+      color: var(--muted);
+      font-size: 0.84rem;
+    }
+
+    .discovery-footnote {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 18px;
+      align-items: end;
+      margin-top: 24px;
+      padding-top: 20px;
+      border-top: 1px solid var(--line);
+    }
+
+    .discovery-footnote p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 0.88rem;
+      line-height: 1.45;
+    }
+
+    .discovery-footnote a {
+      color: var(--accent-dark);
+      font-weight: 750;
+      text-decoration: none;
+    }
+
+    .discovery-footnote a:hover {
+      text-decoration: underline;
+    }
+
+    body.discovery-mode .discovery-view {
+      display: block;
+    }
+
+    body.discovery-mode .shop-view,
+    body.discovery-mode .ownership {
+      display: none;
+    }
+
     .error {
       color: var(--error);
     }
@@ -685,6 +817,24 @@
         grid-template-columns: 1fr;
       }
 
+      .discovery-view {
+        margin-top: 20px;
+      }
+
+      .discovery-panel {
+        padding: 20px;
+      }
+
+      .discovery-form,
+      .discovery-footnote,
+      .shop-result {
+        grid-template-columns: 1fr;
+      }
+
+      .shop-result .button {
+        width: 100%;
+      }
+
       aside {
         position: static;
       }
@@ -704,10 +854,27 @@
           Reading the app route.
         </div>
         <div class="ownership" id="ownershipSummary" aria-live="polite"></div>
+        <a class="directory-link" id="directoryLink" href="./">Find a league</a>
       </div>
     </header>
 
-    <div class="layout">
+    <section class="discovery-view" id="discoveryView" aria-label="Find an FPL league shop">
+      <div class="discovery-panel">
+        <h2>Find a league shop</h2>
+        <p>Paste a Fantasy Premier League league URL or enter its classic league ID. We will check the public Juicebox project index.</p>
+        <form class="discovery-form" id="discoveryForm">
+          <input id="discoveryInput" type="search" placeholder="FPL league URL or league ID" autocomplete="off" aria-label="FPL league URL or league ID">
+          <button class="button primary" type="submit">Find league</button>
+        </form>
+        <div class="discovery-result" id="discoveryResult" aria-live="polite"></div>
+        <div class="discovery-footnote">
+          <p>FPL shops are optional Juicebox projects. Project operators set their own buy-ins and reward rules.</p>
+          <a href="https://github.com/mejango/juicebox-skills" target="_blank" rel="noopener">Create a shop</a>
+        </div>
+      </div>
+    </section>
+
+    <div class="layout shop-view" id="shopView">
       <section aria-label="League managers">
         <div class="toolbar">
           <div class="field">
@@ -1044,14 +1211,17 @@
     const WALLET_PROVIDER_FALLBACK = { info: { uuid: 'injected-0', name: 'Browser wallet', rdns: 'injected', icon: '' }, provider: window.ethereum };
     const discoveredProviders = [];
     // Set this when publishing a project-specific copy. A hash route still overrides it.
-    const DEFAULT_PROJECT_ROUTE = 'basesep:19';
+    const DEFAULT_PROJECT_ROUTE = '';
+    const DISCOVERY_API_PATH = '/api/shops';
 
     const state = {
       chainSlug: 'base',
       projectId: '',
       leagueId: '',
       leagueName: '',
+      discoveryLeagueId: '',
       paymentNotice: '',
+      isDiscovery: false,
       projectMetadata: null,
       shopHook: '',
       salesStats: { loading: false, scanned: false, customers: 0, itemsSold: 0, owned: [], scanLimitHit: false },
@@ -1106,7 +1276,11 @@
       buyNft: document.querySelector('#buyNft'),
       txStatus: document.querySelector('#txStatus'),
       openProject: document.querySelector('#openProject'),
-      paymentNotice: document.querySelector('#paymentNotice')
+      paymentNotice: document.querySelector('#paymentNotice'),
+      directoryLink: document.querySelector('#directoryLink'),
+      discoveryForm: document.querySelector('#discoveryForm'),
+      discoveryInput: document.querySelector('#discoveryInput'),
+      discoveryResult: document.querySelector('#discoveryResult')
     };
 
     function parseRoute() {
@@ -1118,6 +1292,7 @@
       state.projectId = match?.[2] || params.get('projectId') || defaultMatch?.[2] || '';
       state.leagueId = match?.[3] || params.get('leagueId') || defaultMatch?.[3] || '';
       state.apiBase = params.get('apiBase') || state.apiBase;
+      state.isDiscovery = !state.projectId;
 
       const tierParam = params.get('tiers');
       if (tierParam) {
@@ -1277,6 +1452,69 @@
       els.subtitle.textContent = `${chainLabel} project ${state.projectId || 'not set'} · FPL league ${state.leagueId}`;
       els.projectLabel.textContent = state.projectId ? `${chainLabel}:${state.projectId}` : 'Project not set';
       els.walletLabel.textContent = state.walletAccount ? `${providerName} ${shortAddress(state.walletAccount)}` : 'Not connected';
+    }
+
+    function showDiscovery() {
+      document.body.classList.add('discovery-mode');
+      els.title.textContent = 'FPL League Shops';
+      els.subtitle.textContent = 'Find an optional Juicebox buy-in for your Fantasy Premier League mini-league.';
+      els.directoryLink.hidden = true;
+      setStatus('Find a league', 'Paste an FPL league URL or enter its classic league ID.');
+    }
+
+    function extractLeagueId(value) {
+      const text = String(value || '').trim();
+      if (/^\d{3,9}$/.test(text)) return text;
+      return text.match(/(?:leagues\/)?(\d{3,9})(?:\/standings|\/|$)/i)?.[1] || '';
+    }
+
+    function chainLabelFromId(chainId) {
+      return Number(chainId) === 8453 ? 'Base' : Number(chainId) === 84532 ? 'Base Sepolia' : `Chain ${chainId}`;
+    }
+
+    function renderDiscoveryMessage(message, isError = false) {
+      els.discoveryResult.innerHTML = `<p class="discovery-message${isError ? ' error' : ''}">${escapeHtml(message)}</p>`;
+    }
+
+    function renderDiscoveryResults(league, shops) {
+      const leagueName = league?.name || `FPL league ${state.discoveryLeagueId}`;
+      if (!shops.length) {
+        els.discoveryResult.innerHTML = `<p class="discovery-message">No Juicebox shop was found for <strong>${escapeHtml(leagueName)}</strong>. You can create one for this league.</p>`;
+        return;
+      }
+      const cards = shops.map((shop) => {
+        const title = shop.name || `${leagueName} Shop`;
+        const image = gatewayUrl(shop.logoUri || '');
+        const visual = image
+          ? `<img src="${escapeHtml(image)}" alt="">`
+          : '<span class="shop-result-placeholder" aria-hidden="true"></span>';
+        return `<article class="shop-result">${visual}<div><h3>${escapeHtml(title)}</h3><p>${escapeHtml(chainLabelFromId(shop.chainId))} project ${escapeHtml(shop.projectId)} · ${Number(shop.contributorsCount || 0)} customers</p></div><a class="button primary" href="${escapeHtml(shop.route)}">Open shop</a></article>`;
+      }).join('');
+      els.discoveryResult.innerHTML = `<p class="discovery-message">Found ${shops.length} shop${shops.length === 1 ? '' : 's'} for <strong>${escapeHtml(leagueName)}</strong>.</p>${cards}`;
+    }
+
+    async function findLeagueShop(value) {
+      const leagueId = extractLeagueId(value);
+      if (!leagueId) {
+        renderDiscoveryMessage('Enter a classic FPL league ID or paste its league URL.', true);
+        return;
+      }
+      state.discoveryLeagueId = leagueId;
+      renderDiscoveryMessage('Checking the FPL league and public Juicebox project index...');
+      try {
+        const leagueUrl = `${state.apiBase}${encodeURIComponent(leagueId)}`;
+        const [leagueResponse, shopResponse] = await Promise.all([
+          fetch(leagueUrl),
+          fetch(`${DISCOVERY_API_PATH}?leagueId=${encodeURIComponent(leagueId)}`)
+        ]);
+        if (!leagueResponse.ok) throw new Error(`FPL league lookup failed: ${leagueResponse.status}`);
+        if (!shopResponse.ok) throw new Error(`Shop discovery failed: ${shopResponse.status}`);
+        const leagueData = await leagueResponse.json();
+        const shopData = await shopResponse.json();
+        renderDiscoveryResults(leagueData?.league, Array.isArray(shopData?.shops) ? shopData.shops : []);
+      } catch (error) {
+        renderDiscoveryMessage(error?.message || 'Could not find this league right now.', true);
+      }
     }
 
     function renderPaymentNotice() {
@@ -2297,32 +2535,43 @@
       else openConnectedWalletMenu();
     });
     els.buyNft.addEventListener('click', buyNft);
+    els.discoveryForm.addEventListener('submit', (event) => {
+      event.preventDefault();
+      findLeagueShop(els.discoveryInput.value);
+    });
+    window.addEventListener('hashchange', () => window.location.reload());
 
     parseRoute();
-    renderTiers();
-    renderPaymentNotice();
-    eagerConnect().catch(() => {});
-    loadLeague()
-      .then(() => {
-        renderAll();
-        setStatus('League ready', `${state.managers.length} managers loaded.`);
-        if (state.projectId) {
-          loadProjectMetadata().catch(() => {
-            state.paymentNotice = '';
-            renderPaymentNotice();
-          });
-          setStatus('Loading NFT tiers', 'Reading the Juicebox 721 shop.');
-          return loadProjectTiers().catch((error) => {
-            renderAll();
-            setStatus('League ready', `${state.managers.length} managers loaded. Using fallback tiers because the shop read failed: ${error.message}`);
-          });
-        }
-      })
-      .catch((error) => {
-        renderHeader();
-        renderSummary();
-        setStatus('Could not load league', error.message, true);
-      });
+    if (state.isDiscovery) {
+      showDiscovery();
+    } else {
+      document.body.classList.remove('discovery-mode');
+      els.directoryLink.hidden = false;
+      renderTiers();
+      renderPaymentNotice();
+      eagerConnect().catch(() => {});
+      loadLeague()
+        .then(() => {
+          renderAll();
+          setStatus('League ready', `${state.managers.length} managers loaded.`);
+          if (state.projectId) {
+            loadProjectMetadata().catch(() => {
+              state.paymentNotice = '';
+              renderPaymentNotice();
+            });
+            setStatus('Loading NFT tiers', 'Reading the Juicebox 721 shop.');
+            return loadProjectTiers().catch((error) => {
+              renderAll();
+              setStatus('League ready', `${state.managers.length} managers loaded. Using fallback tiers because the shop read failed: ${error.message}`);
+            });
+          }
+        })
+        .catch((error) => {
+          renderHeader();
+          renderSummary();
+          setStatus('Could not load league', error.message, true);
+        });
+    }
   </script>
 </body>
 </html>

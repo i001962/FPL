@@ -147,6 +147,7 @@ Choose the pinning path explicitly:
        "twitter": "",
        "discord": "",
        "telegram": "",
+       "tags": ["fpl", "fpl-league:143466"],
        "fpl": {
          "leagueId": "143466"
        }
@@ -304,6 +305,7 @@ Apply optional edits to the temporary deploy state only. Example: if the user sa
        "twitter": "",
        "discord": "",
        "telegram": "",
+       "tags": ["fpl", "fpl-league:{leagueId}"],
        "fpl": {
          "leagueId": "{leagueId}"
        }
@@ -330,6 +332,7 @@ Apply optional edits to the temporary deploy state only. Example: if the user sa
    - built project metadata `description`
    - built project metadata includes `infoUri`, `twitter`, `discord`, and `telegram` keys, with blank strings when unset
    - built project metadata `fpl.leagueId` exactly matches the resolved numeric league ID as a string
+   - built project metadata `tags` is exactly `['fpl', 'fpl-league:{leagueId}']`, with `{leagueId}` replaced by the resolved numeric ID
    - every NFT tier metadata `name` and `description`
 10. Let the deployer review or edit the final draft only as a pre-transaction review step.
 11. Build a fresh Juicebox V6 launch transaction using the JuiceScan create-flow logic listed in **Builder Source**. Do not reuse calldata from an already mined deployment and do not use a Juicebox SDK.
@@ -450,9 +453,9 @@ Example:
 #basesep:19
 ```
 
-When a deployer publishes a project-specific copy, set its `DEFAULT_PROJECT_ROUTE` to the deployed `chainSlug:projectId` so the bare app URL loads that shop. Keep hash routes enabled as an override for shared or multi-project copies.
+When a deployer publishes a project-specific copy, set its `DEFAULT_PROJECT_ROUTE` to the deployed `chainSlug:projectId` so the bare app URL loads that shop. Keep hash routes enabled as an override for shared or multi-project copies. Leave `DEFAULT_PROJECT_ROUTE` blank for a shared directory deployment; it then opens the league finder and queries the same-origin Bendystraw proxy at `/api/shops`.
 
-For testing, the static template maps `basesep:19` to FPL league `143466` locally. Production shops must include `fpl.leagueId` in project metadata so static buyer pages can resolve the FPL league from a shared `#<chainSlug>:<projectId>` URL. For Juicebox V6, read project metadata from the active controller via `JBDirectory.controllerOf(projectId)` then `IJBProjectUriRegistry.uriOf(projectId)`; `JBProjects.tokenURI(projectId)` may be empty.
+For testing, the static template maps `basesep:19` to FPL league `143466` locally. Production shops must include `fpl.leagueId` and the indexed tags `fpl` plus `fpl-league:{leagueId}` in project metadata. The directory uses Bendystraw's `tags_has` filter to locate a league shop, then verifies `metadata.fpl.leagueId`; a temporary description fallback only supports legacy untagged projects. For Juicebox V6, read project metadata from the active controller via `JBDirectory.controllerOf(projectId)` then `IJBProjectUriRegistry.uriOf(projectId)`; `JBProjects.tokenURI(projectId)` may be empty.
 
 Buyer flow:
 
