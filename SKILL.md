@@ -53,18 +53,17 @@ The league data endpoint used by the template must allow browser reads from the 
 When changing the reusable static buyer app or its QStorage upload script, release it in this order:
 
 1. Validate the changed static HTML/JavaScript.
-2. Commit only the intended template, script, skill, and documentation changes, then push `main` to GitHub.
-3. Mirror the complete local template directory to its fixed QStorage prefix:
-   ```sh
-   QSTORAGE_BUCKET=footy scripts/upload-static-shop-template-qstorage.sh
-   ```
-   The script uses `aws s3 sync --delete` from `static-shop-template/` to `s3://footy/static-shop-template/`. It uploads the full folder tree and deletes only stale files inside that prefix. Never sync to `s3://footy/`, which could delete unrelated bucket contents.
-4. Verify the public app URL returns HTTP 200:
+2. Commit only the intended template, script, skill, workflow, and documentation changes, then push `main` to GitHub.
+3. Let `.github/workflows/deploy-static-shop-template.yml` publish the template. Configure these repository Actions secrets before the first release:
+   - `QSTORAGE_ACCESS_KEY_ID`
+   - `QSTORAGE_SECRET_ACCESS_KEY`
+   The workflow uses path-style S3 requests and runs `aws s3 sync --delete` from `static-shop-template/` to `s3://footy/static-shop-template/`. It uploads the full folder tree and deletes only stale files inside that prefix. Never sync to `s3://footy/`, which could delete unrelated bucket contents.
+4. Confirm the GitHub Actions run succeeds and the public app URL returns HTTP 200:
    ```text
    https://qstorage.quilibrium.com/footy/static-shop-template/index.html
    ```
 
-Do not claim the static template release is complete until the GitHub push and QStorage verification both succeed. Keep the repository skill and the installed Codex skill copy in sync whenever this workflow changes.
+Do not use a local QStorage credential as the normal release path. Do not claim the static template release is complete until the GitHub push, Actions run, and QStorage verification all succeed. Keep the repository skill and the installed Codex skill copy in sync whenever this workflow changes.
 
 ## Builder Source
 

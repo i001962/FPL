@@ -4,13 +4,13 @@ This is a copyable static app template for FPL league NFT shops. It is intention
 
 ## Publishing
 
-Publish the entire template directory after pushing its repository changes to `main`:
+Pushing changes to `main` publishes the entire template directory through GitHub Actions. Configure the repository Actions secrets `QSTORAGE_ACCESS_KEY_ID` and `QSTORAGE_SECRET_ACCESS_KEY` first. The workflow uses path-style S3 requests and mirrors `static-shop-template/` to `s3://footy/static-shop-template/` with `--delete`, so QStorage exactly matches the local template folder without affecting any other bucket prefix.
+
+For a deliberate local recovery only:
 
 ```sh
 QSTORAGE_BUCKET=footy scripts/upload-static-shop-template-qstorage.sh
 ```
-
-The script mirrors `static-shop-template/` to `s3://footy/static-shop-template/` with `--delete`, so QStorage exactly matches the local template folder without affecting any other bucket prefix.
 
 ## Route
 
