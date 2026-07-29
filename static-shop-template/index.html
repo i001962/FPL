@@ -676,24 +676,24 @@
 
     .discovery-grid {
       display: grid;
-      grid-template-columns: minmax(0, 1fr) 300px;
-      gap: 34px;
+      grid-template-columns: minmax(0, 1fr) 360px;
+      gap: 18px;
       align-items: start;
+      margin-top: 20px;
     }
 
     .discovery-panel {
-      min-height: 0;
-      padding: 0;
-      border: 0;
-      border-radius: 0;
-      background: transparent;
-      box-shadow: none;
+      min-height: 100%;
+      padding: 26px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.84);
+      box-shadow: var(--shadow);
     }
 
     .discovery-panel.create-panel {
-      padding-left: 26px;
-      border-left: 1px solid rgba(8, 168, 138, 0.42);
-      background: transparent;
+      border-color: rgba(8, 168, 138, 0.42);
+      background: rgba(8, 168, 138, 0.05);
     }
 
     .discovery-kicker {
@@ -893,20 +893,17 @@
     }
 
     .league-directory {
-      margin-top: 34px;
-      padding-top: 24px;
-      border-top: 1px solid var(--line);
-      border-right: 0;
-      border-bottom: 0;
-      border-left: 0;
-      border-radius: 0;
-      background: transparent;
-      box-shadow: none;
+      margin: 0;
+      padding: 26px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.84);
+      box-shadow: var(--shadow);
     }
 
     .league-directory-header {
-      display: flex;
-      justify-content: space-between;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(240px, 320px);
       gap: 18px;
       align-items: end;
       margin-bottom: 16px;
@@ -922,6 +919,18 @@
       margin: 6px 0 0;
       color: var(--muted);
       line-height: 1.45;
+    }
+
+    .directory-filter {
+      display: grid;
+      gap: 7px;
+    }
+
+    .directory-filter label {
+      color: var(--muted);
+      font-size: 0.74rem;
+      font-weight: 800;
+      text-transform: uppercase;
     }
 
     .league-directory-table-wrap {
@@ -1046,13 +1055,7 @@
       }
 
       .discovery-panel {
-        padding: 0;
-      }
-
-      .discovery-panel.create-panel {
-        padding: 22px 0 0;
-        border-top: 1px solid rgba(8, 168, 138, 0.42);
-        border-left: 0;
+        padding: 20px;
       }
 
       .discovery-form,
@@ -1062,6 +1065,14 @@
 
       .league-directory-header {
         display: block;
+      }
+
+      .directory-filter {
+        margin-top: 16px;
+      }
+
+      .league-directory {
+        padding: 20px;
       }
 
       .shop-result .button {
@@ -1092,10 +1103,25 @@
     </header>
 
     <section class="discovery-view" id="discoveryView" aria-label="FPL league shops">
+      <section class="league-directory" aria-labelledby="leagueDirectoryTitle">
+        <div class="league-directory-header">
+          <div>
+            <p class="discovery-kicker">Find your leagues</p>
+            <h2 id="leagueDirectoryTitle">League shops already live</h2>
+            <p>Browse deployed projects, then open a shop or check a specific FPL league below.</p>
+          </div>
+          <div class="directory-filter">
+            <label for="directoryFilter">Filter deployed shops</label>
+            <input id="directoryFilter" type="search" placeholder="League, project, or description" autocomplete="off">
+          </div>
+        </div>
+        <div id="leagueDirectory" aria-live="polite"><p class="league-directory-message">Loading indexed league shops...</p></div>
+      </section>
+
       <div class="discovery-grid">
-        <article class="discovery-panel">
-          <p class="discovery-kicker">League Register</p>
-          <h2>Find your league shop</h2>
+        <article class="discovery-panel register-panel">
+          <p class="discovery-kicker">Register a league</p>
+          <h2>Check a specific league</h2>
           <p>Paste an FPL league URL or ID to see whether it already has a shop.</p>
           <form class="discovery-form" id="discoveryForm">
             <input id="discoveryInput" type="search" placeholder="FPL league URL or league ID" autocomplete="off" aria-label="FPL league URL or league ID">
@@ -1133,16 +1159,6 @@
           </div>
         </article>
       </div>
-
-      <section class="league-directory" aria-labelledby="leagueDirectoryTitle">
-        <div class="league-directory-header">
-          <div>
-            <h2 id="leagueDirectoryTitle">League shops already live</h2>
-            <p>Browse shops indexed from public Juicebox data, or check a specific league above.</p>
-          </div>
-        </div>
-        <div id="leagueDirectory" aria-live="polite"><p class="league-directory-message">Loading indexed league shops...</p></div>
-      </section>
     </section>
 
     <div class="layout shop-view" id="shopView">
@@ -1497,6 +1513,7 @@
       isDiscovery: false,
       projectMetadata: null,
       shopHook: '',
+      directoryShops: [],
       salesStats: { loading: false, scanned: false, customers: 0, itemsSold: 0, owned: [], scanLimitHit: false },
       salesStatsRequest: 0,
       managers: [],
@@ -1555,6 +1572,7 @@
       discoveryInput: document.querySelector('#discoveryInput'),
       discoveryResult: document.querySelector('#discoveryResult'),
       leagueDirectory: document.querySelector('#leagueDirectory'),
+      directoryFilter: document.querySelector('#directoryFilter'),
       openClaude: document.querySelector('#openClaude'),
       openChatgpt: document.querySelector('#openChatgpt'),
       copyDeployPrompt: document.querySelector('#copyDeployPrompt')
@@ -1775,14 +1793,18 @@
       return `https://fantasy.premierleague.com/en/leagues/${encodeURIComponent(leagueId)}/standings/c`;
     }
 
+    function plainProjectText(value) {
+      return String(value || '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+    }
+
     function renderLeagueDirectory(shops) {
       if (!shops.length) {
         els.leagueDirectory.innerHTML = '<p class="league-directory-message">No indexed FPL shops are available yet.</p>';
         return;
       }
       const rows = shops.map((shop) => {
-        const title = shop.name || `FPL project ${shop.projectId}`;
-        const description = shop.description || shop.projectTagline || 'No project description published.';
+        const title = plainProjectText(shop.name) || `FPL project ${shop.projectId}`;
+        const description = plainProjectText(shop.description || shop.projectTagline) || 'No project description published.';
         const leagueId = shop.leagueId || shop.metadata?.fpl?.leagueId || '';
         const leagueLink = leagueId
           ? `<a class="league-directory-link" href="${escapeHtml(leagueStandingsUrl(leagueId))}" target="_blank" rel="noopener">FPL league ${escapeHtml(leagueId)}</a>`
@@ -1792,12 +1814,30 @@
       els.leagueDirectory.innerHTML = `<div class="league-directory-table-wrap"><table class="league-directory-table"><thead><tr><th>League</th><th>Shop</th><th>Description</th><th>Network</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>`;
     }
 
+    function filterLeagueDirectory() {
+      const query = String(els.directoryFilter.value || '').trim().toLowerCase();
+      if (!query) {
+        renderLeagueDirectory(state.directoryShops);
+        return;
+      }
+      const filtered = state.directoryShops.filter((shop) => [
+        shop.leagueId,
+        shop.projectId,
+        shop.name,
+        shop.description,
+        shop.projectTagline,
+        shop.chainId
+      ].some((value) => plainProjectText(value).toLowerCase().includes(query)));
+      renderLeagueDirectory(filtered);
+    }
+
     async function loadLeagueDirectory() {
       try {
         const response = await fetch(DISCOVERY_API_PATH);
         if (!response.ok) throw new Error(`Directory request failed: ${response.status}`);
         const data = await response.json();
-        renderLeagueDirectory(Array.isArray(data?.shops) ? data.shops : []);
+        state.directoryShops = Array.isArray(data?.shops) ? data.shops : [];
+        filterLeagueDirectory();
       } catch (_) {
         els.leagueDirectory.innerHTML = '<p class="league-directory-message">Could not load indexed league shops right now. You can still check a specific league above.</p>';
       }
@@ -2849,6 +2889,7 @@
       event.preventDefault();
       findLeagueShop(els.discoveryInput.value);
     });
+    els.directoryFilter.addEventListener('input', filterLeagueDirectory);
     els.copyDeployPrompt.addEventListener('click', async () => {
       try {
         await navigator.clipboard.writeText(DEPLOY_AGENT_PROMPT);
