@@ -676,8 +676,7 @@
 
     .discovery-grid {
       display: grid;
-      grid-template-columns: minmax(0, 1fr) 360px;
-      gap: 18px;
+      grid-template-columns: 1fr;
       align-items: start;
       margin-top: 20px;
     }
@@ -692,6 +691,10 @@
     }
 
     .discovery-panel.create-panel {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(260px, 320px);
+      gap: 28px;
+      align-items: start;
       border-color: rgba(8, 168, 138, 0.42);
       background: rgba(8, 168, 138, 0.05);
     }
@@ -933,6 +936,23 @@
       text-transform: uppercase;
     }
 
+    .directory-help {
+      margin: 10px 0 0;
+      color: var(--muted);
+      font-size: 0.84rem;
+      line-height: 1.45;
+    }
+
+    .directory-help a {
+      color: var(--accent-dark);
+      font-weight: 750;
+      text-decoration: none;
+    }
+
+    .directory-help a:hover {
+      text-decoration: underline;
+    }
+
     .league-directory-table-wrap {
       overflow-x: auto;
       border: 1px solid var(--line);
@@ -1058,6 +1078,11 @@
         padding: 20px;
       }
 
+      .discovery-panel.create-panel {
+        grid-template-columns: 1fr;
+        gap: 20px;
+      }
+
       .discovery-form,
       .shop-result {
         grid-template-columns: 1fr;
@@ -1106,48 +1131,33 @@
       <section class="league-directory" aria-labelledby="leagueDirectoryTitle">
         <div class="league-directory-header">
           <div>
-            <p class="discovery-kicker">Find your leagues</p>
-            <h2 id="leagueDirectoryTitle">League shops already live</h2>
-            <p>Browse deployed projects, then open a shop or check a specific FPL league below.</p>
+            <p class="discovery-kicker">League Register</p>
+            <h2 id="leagueDirectoryTitle">Find a league shop</h2>
+            <p>Search deployed FPL shops by league ID, project, or description.</p>
           </div>
           <div class="directory-filter">
-            <label for="directoryFilter">Filter deployed shops</label>
-            <input id="directoryFilter" type="search" placeholder="League, project, or description" autocomplete="off">
+            <label for="directoryFilter">Search league shops</label>
+            <input id="directoryFilter" type="search" placeholder="FPL URL, league ID, project, or description" autocomplete="off">
           </div>
         </div>
+        <p class="directory-help">Need a league ID? Open your FPL standings and copy the number after <strong>/leagues/</strong>. <a href="https://fantasy.premierleague.com/en/leagues/143466/standings/c" target="_blank" rel="noopener">Open FPL standings</a></p>
         <div id="leagueDirectory" aria-live="polite"><p class="league-directory-message">Loading indexed league shops...</p></div>
       </section>
 
       <div class="discovery-grid">
-        <article class="discovery-panel register-panel">
-          <p class="discovery-kicker">Register a league</p>
-          <h2>Check a specific league</h2>
-          <p>Paste an FPL league URL or ID to see whether it already has a shop.</p>
-          <form class="discovery-form" id="discoveryForm">
-            <input id="discoveryInput" type="search" placeholder="FPL league URL or league ID" autocomplete="off" aria-label="FPL league URL or league ID">
-            <button class="button primary" type="submit">Find shop</button>
-          </form>
-          <div class="league-url-help">
-            <strong>Where to find your league ID</strong>
-            <p>Open your league standings page and copy the number after <strong>/leagues/</strong>. <a class="league-url-link" href="https://fantasy.premierleague.com/en/leagues/143466/standings/c" target="_blank" rel="noopener">Open FPL standings</a></p>
-            <code>fantasy.premierleague.com/en/leagues/143466/standings/c</code>
-          </div>
-          <div class="discovery-result" id="discoveryResult" aria-live="polite"></div>
-          <div class="discovery-footnote">
-            <p>Shops may be created by anybody, so make sure you review the terms and trust the shop operator.</p>
-          </div>
-        </article>
-
         <article class="discovery-panel create-panel">
-          <p class="discovery-kicker">Create with an agent</p>
-          <h2>Set up a league shop with an agent</h2>
-          <p>Tell the agent about the league. It can configure the shop and give everyone one place to use.</p>
-          <ul class="create-benefits">
-            <li>Buy-ins</li>
-            <li>Prizes</li>
-            <li>Items</li>
-            <li>Public rules</li>
-          </ul>
+          <div>
+            <p class="discovery-kicker">Create with an agent</p>
+            <h2>Set up a league shop with an agent</h2>
+            <p>Tell the agent about the league. It can configure the shop and give everyone one place to use.</p>
+            <ul class="create-benefits">
+              <li>Buy-ins</li>
+              <li>Prizes</li>
+              <li>Items</li>
+              <li>Public rules</li>
+            </ul>
+            <p class="create-note">The FPL deploy skill sets the required project metadata, NFT rules, and shop route.</p>
+          </div>
           <div class="discovery-footnote">
             <div class="agent-actions" aria-label="Create a shop with an AI agent">
               <a class="button primary" id="openClaude" href="https://claude.ai/new" target="_blank" rel="noopener">Open in Claude</a>
@@ -1155,7 +1165,6 @@
               <button class="button agent-copy" id="copyDeployPrompt" type="button">Copy agent instructions</button>
             </div>
             <a class="agent-repository" href="https://github.com/i001962/FPL/" target="_blank" rel="noopener">View the FPL deploy skill</a>
-            <p class="create-note">The FPL deploy skill sets the required project metadata, NFT rules, and shop route.</p>
           </div>
         </article>
       </div>
@@ -1568,9 +1577,6 @@
       openProject: document.querySelector('#openProject'),
       paymentNotice: document.querySelector('#paymentNotice'),
       directoryLink: document.querySelector('#directoryLink'),
-      discoveryForm: document.querySelector('#discoveryForm'),
-      discoveryInput: document.querySelector('#discoveryInput'),
-      discoveryResult: document.querySelector('#discoveryResult'),
       leagueDirectory: document.querySelector('#leagueDirectory'),
       directoryFilter: document.querySelector('#directoryFilter'),
       openClaude: document.querySelector('#openClaude'),
@@ -1768,27 +1774,6 @@
       return Number(chainId) === 8453 ? 'Base' : Number(chainId) === 84532 ? 'Base Sepolia' : `Chain ${chainId}`;
     }
 
-    function renderDiscoveryMessage(message, isError = false) {
-      els.discoveryResult.innerHTML = `<p class="discovery-message${isError ? ' error' : ''}">${escapeHtml(message)}</p>`;
-    }
-
-    function renderDiscoveryResults(league, shops) {
-      const leagueName = league?.name || `FPL league ${state.discoveryLeagueId}`;
-      if (!shops.length) {
-        els.discoveryResult.innerHTML = `<p class="discovery-message">No shop was found for <strong>${escapeHtml(leagueName)}</strong>. Use the deploy guide to start one for this league.</p>`;
-        return;
-      }
-      const cards = shops.map((shop) => {
-        const title = shop.name || `${leagueName} Shop`;
-        const image = gatewayUrl(shop.logoUri || '');
-        const visual = image
-          ? `<img src="${escapeHtml(image)}" alt="">`
-          : '<span class="shop-result-placeholder" aria-hidden="true"></span>';
-        return `<article class="shop-result">${visual}<div><h3>${escapeHtml(title)}</h3><p>${escapeHtml(chainLabelFromId(shop.chainId))} project ${escapeHtml(shop.projectId)} · ${Number(shop.contributorsCount || 0)} customers</p></div><a class="button primary" href="${escapeHtml(shop.route)}">Open shop</a></article>`;
-      }).join('');
-      els.discoveryResult.innerHTML = `<p class="discovery-message">Found ${shops.length} shop${shops.length === 1 ? '' : 's'} for <strong>${escapeHtml(leagueName)}</strong>.</p>${cards}`;
-    }
-
     function leagueStandingsUrl(leagueId) {
       return `https://fantasy.premierleague.com/en/leagues/${encodeURIComponent(leagueId)}/standings/c`;
     }
@@ -1809,13 +1794,19 @@
         const leagueLink = leagueId
           ? `<a class="league-directory-link" href="${escapeHtml(leagueStandingsUrl(leagueId))}" target="_blank" rel="noopener">FPL league ${escapeHtml(leagueId)}</a>`
           : 'League not specified';
-        return `<tr><td>${leagueLink}</td><td><span class="league-directory-name">${escapeHtml(title)}</span></td><td><span class="league-directory-description">${escapeHtml(description)}</span></td><td>${escapeHtml(chainLabelFromId(shop.chainId))}</td><td><a class="button primary" href="${escapeHtml(shop.route)}">Open shop</a></td></tr>`;
+        const projectRoute = String(shop.route || '').replace(/^#/, '');
+        const projectLabel = `${chainLabelFromId(shop.chainId)}:${shop.projectId}`;
+        const projectLink = projectRoute
+          ? `<a class="league-directory-link" href="https://juicebox.money/v6/${escapeHtml(projectRoute)}" target="_blank" rel="noopener">${escapeHtml(projectLabel)}</a>`
+          : escapeHtml(projectLabel);
+        return `<tr><td>${leagueLink}</td><td><span class="league-directory-name">${escapeHtml(title)}</span></td><td><span class="league-directory-description">${escapeHtml(description)}</span></td><td>${projectLink}</td><td><a class="button primary" href="${escapeHtml(shop.route)}">Open shop</a></td></tr>`;
       }).join('');
-      els.leagueDirectory.innerHTML = `<div class="league-directory-table-wrap"><table class="league-directory-table"><thead><tr><th>League</th><th>Shop</th><th>Description</th><th>Network</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>`;
+      els.leagueDirectory.innerHTML = `<div class="league-directory-table-wrap"><table class="league-directory-table"><thead><tr><th>League</th><th>Shop</th><th>Description</th><th>JB project</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>`;
     }
 
     function filterLeagueDirectory() {
-      const query = String(els.directoryFilter.value || '').trim().toLowerCase();
+      const rawQuery = String(els.directoryFilter.value || '').trim();
+      const query = (extractLeagueId(rawQuery) || rawQuery).toLowerCase();
       if (!query) {
         renderLeagueDirectory(state.directoryShops);
         return;
@@ -1840,30 +1831,6 @@
         filterLeagueDirectory();
       } catch (_) {
         els.leagueDirectory.innerHTML = '<p class="league-directory-message">Could not load indexed league shops right now. You can still check a specific league above.</p>';
-      }
-    }
-
-    async function findLeagueShop(value) {
-      const leagueId = extractLeagueId(value);
-      if (!leagueId) {
-        renderDiscoveryMessage('Enter a classic FPL league ID or paste its league URL.', true);
-        return;
-      }
-      state.discoveryLeagueId = leagueId;
-      renderDiscoveryMessage('Checking the FPL league and public Juicebox project index...');
-      try {
-        const leagueUrl = `${state.apiBase}${encodeURIComponent(leagueId)}`;
-        const [leagueResponse, shopResponse] = await Promise.all([
-          fetch(leagueUrl),
-          fetch(`${DISCOVERY_API_PATH}?leagueId=${encodeURIComponent(leagueId)}`)
-        ]);
-        if (!leagueResponse.ok) throw new Error(`FPL league lookup failed: ${leagueResponse.status}`);
-        if (!shopResponse.ok) throw new Error(`Shop discovery failed: ${shopResponse.status}`);
-        const leagueData = await leagueResponse.json();
-        const shopData = await shopResponse.json();
-        renderDiscoveryResults(leagueData?.league, Array.isArray(shopData?.shops) ? shopData.shops : []);
-      } catch (error) {
-        renderDiscoveryMessage(error?.message || 'Could not find this league right now.', true);
       }
     }
 
@@ -2885,10 +2852,6 @@
       else openConnectedWalletMenu();
     });
     els.buyNft.addEventListener('click', buyNft);
-    els.discoveryForm.addEventListener('submit', (event) => {
-      event.preventDefault();
-      findLeagueShop(els.discoveryInput.value);
-    });
     els.directoryFilter.addEventListener('input', filterLeagueDirectory);
     els.copyDeployPrompt.addEventListener('click', async () => {
       try {
