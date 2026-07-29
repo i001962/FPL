@@ -33,7 +33,6 @@ aws s3 sync "$ROOT/static-shop-template/" "s3://$BUCKET/$PREFIX/" \
   --endpoint-url "$ENDPOINT" \
   --region "$REGION" \
   --cache-control "public, max-age=300" \
-  --acl public-read \
   --delete
 
 PUBLIC_BASE="${PUBLIC_BASE%/}"
