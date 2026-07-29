@@ -1034,6 +1034,27 @@
       font-size: 1.05rem;
     }
 
+    .discovery-hero-image {
+      display: none;
+    }
+
+    body.discovery-mode header {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(150px, 230px);
+      gap: 26px;
+      align-items: start;
+    }
+
+    body.discovery-mode .discovery-hero-image {
+      display: block;
+      width: min(220px, 100%);
+      height: auto;
+      justify-self: end;
+      margin-top: -12px;
+      pointer-events: none;
+      user-select: none;
+    }
+
     .error {
       color: var(--error);
     }
@@ -1100,6 +1121,16 @@
         padding: 20px;
       }
 
+      body.discovery-mode header {
+        grid-template-columns: minmax(0, 1fr) 118px;
+        gap: 14px;
+      }
+
+      body.discovery-mode .discovery-hero-image {
+        width: 118px;
+        margin-top: 0;
+      }
+
       .shop-result .button {
         width: 100%;
       }
@@ -1125,6 +1156,7 @@
         <div class="ownership" id="ownershipSummary" aria-live="polite"></div>
         <a class="directory-link" id="directoryLink" href="./">Find a league</a>
       </div>
+      <img class="discovery-hero-image" src="assets/league-peach.png" alt="Peach illustration">
     </header>
 
     <section class="discovery-view" id="discoveryView" aria-label="FPL league shops">
@@ -1757,8 +1789,8 @@
 
     function showDiscovery() {
       document.body.classList.add('discovery-mode');
-      els.title.textContent = 'Give the league something to play for.';
-      els.subtitle.textContent = 'Collect payments, sell items, fund prizes, and issue rewards through rules your league can inspect.';
+      els.title.textContent = 'Give the fantasy league something to play for.';
+      els.subtitle.textContent = 'Collect payments, sell collectibles, fund prizes, and issue rewards—all through transparent rules your league can help shape.';
       els.directoryLink.hidden = true;
       els.openClaude.href = `https://claude.ai/new?q=${encodeURIComponent(DEPLOY_AGENT_PROMPT)}`;
       els.openChatgpt.href = `https://chatgpt.com/?q=${encodeURIComponent(DEPLOY_AGENT_PROMPT)}`;
@@ -1799,7 +1831,7 @@
         const projectLink = projectRoute
           ? `<a class="league-directory-link" href="https://juicebox.money/v6/${escapeHtml(projectRoute)}" target="_blank" rel="noopener">${escapeHtml(projectLabel)}</a>`
           : escapeHtml(projectLabel);
-        return `<tr><td>${leagueLink}</td><td><span class="league-directory-name">${escapeHtml(title)}</span></td><td><span class="league-directory-description">${escapeHtml(description)}</span></td><td>${projectLink}</td><td><a class="button primary" href="${escapeHtml(shop.route)}">Open shop</a></td></tr>`;
+        return `<tr><td>${leagueLink}</td><td><span class="league-directory-name">${escapeHtml(title)}</span></td><td><span class="league-directory-description">${escapeHtml(description)}</span></td><td>${projectLink}</td><td><a class="button primary" href="${escapeHtml(shop.route)}">See items</a></td></tr>`;
       }).join('');
       els.leagueDirectory.innerHTML = `<div class="league-directory-table-wrap"><table class="league-directory-table"><thead><tr><th>League</th><th>Shop</th><th>Description</th><th>JB project</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>`;
     }
