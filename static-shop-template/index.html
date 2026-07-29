@@ -936,7 +936,16 @@
     }
 
     .directory-prompt {
-      min-width: 78px;
+      align-self: center;
+      color: var(--muted);
+      font-size: 0.84rem;
+      font-weight: 750;
+      text-decoration: none;
+      white-space: nowrap;
+    }
+
+    .directory-prompt:hover,
+    .directory-prompt.copied {
       color: var(--accent-dark);
     }
 
@@ -1182,6 +1191,7 @@
 
       .directory-prompt {
         width: 100%;
+        text-align: right;
       }
 
       .league-directory {
@@ -1238,7 +1248,7 @@
             <label for="directoryFilter">Search league shops</label>
             <div class="directory-filter-row">
               <input id="directoryFilter" type="search" placeholder="FPL URL, league ID, project, or description" autocomplete="off">
-              <button class="button directory-prompt" id="copyDiscoveryPrompt" type="button">Prompt</button>
+              <a class="directory-prompt" id="copyDiscoveryPrompt" href="#copy-discovery-prompt">[prompt]</a>
             </div>
           </div>
         </div>
@@ -1612,8 +1622,8 @@
     const DEFAULT_PROJECT_ROUTE = '';
     const DISCOVERY_API_PATH = '/api/shops';
     const DEPLOY_REPOSITORY_URL = 'https://github.com/i001962/FPL/';
-    const DEPLOY_AGENT_PROMPT = `I want to create a Fantasy Premier League league shop. Read and use the FPL League NFT Shop deploy skill in ${DEPLOY_REPOSITORY_URL} before preparing anything. Ask me for my FPL league URL, buy-in price, NFT description, and image preference. Follow the repository defaults and rules, including the required Juicebox V6 metadata, fpl.leagueId, fpl and fpl-league:<leagueId> tags, social fields even when blank, payment notice, and NFT tiers that cannot be bought with credits. Prepare a wallet-signable transaction link or deploy through my wallet, then give me the shop URL on https://fpl.d33m.com/.`;
-    const DISCOVERY_AGENT_PROMPT = `Find a Fantasy Premier League (FPL) Juicebox shop for me. First, get the classic FPL league ID from a standings URL such as https://fantasy.premierleague.com/en/leagues/<leagueId>/standings/c. Search the public FPL Shop Registry at https://fpl.d33m.com/ using the FPL URL, league ID, Juicebox project ID, or project description. For an exact programmatic lookup, request https://fpl.d33m.com/api/shops?leagueId=<leagueId>. To browse all indexed FPL projects, request https://fpl.d33m.com/api/shops. A result's Project chain icon opens that Juicebox project; See items opens the shop. Before recommending a payment, inspect the project's terms, payment notice, and metadata. If there is no shop, offer to create one using the deploy skill at ${DEPLOY_REPOSITORY_URL}.`;
+    const DEPLOY_AGENT_PROMPT = `I want to create a Fantasy Premier League league shop. Read and use the FPL League NFT Shop deploy skill in ${DEPLOY_REPOSITORY_URL} before preparing anything. Ask me for my FPL league URL, buy-in price, NFT description, and image preference. Follow the repository defaults and rules, including the required Juicebox V6 metadata, fpl.leagueId, fpl and fpl-league:<leagueId> tags, social fields even when blank, payment notice, and NFT tiers that cannot be bought with credits. Prepare a wallet-signable transaction link or deploy through my wallet. Do not depend on fpl.d33m.com or another hosted directory for deployment, discovery, or payment: project metadata and onchain Juicebox data must be sufficient. A static shop frontend may be shared after deployment, but it is optional.`;
+    const DISCOVERY_AGENT_PROMPT = `Find a Fantasy Premier League (FPL) Juicebox shop without relying on fpl.d33m.com or any hosted directory. First, get the classic FPL league ID from a standings URL such as https://fantasy.premierleague.com/en/leagues/<leagueId>/standings/c. Query the public Juicebox V6 index directly at https://bendystraw.xyz/graphql and, when relevant, https://testnet.bendystraw.xyz/graphql. Search projects with version: 6 and tags_has: "fpl" or "fpl-league:<leagueId>". Request projectId, chainId, name, description, metadataUri, tags, and metadata. Keep only projects whose metadata.fpl.leagueId exactly equals the FPL league ID. Use the chain ID to construct a direct Juicebox route: 1=eth, 11155111=sep, 42161=arb, 421614=arbsep, 8453=base, 84532=basesep, 10=op, 11155420=opsep; the direct UI URL is https://juicebox.money/v6/<chainSlug>:<projectId>. Inspect the project's terms, payment notice, metadata, and onchain state before recommending a payment. If no project exists, offer to create one with the deploy skill at ${DEPLOY_REPOSITORY_URL}. fpl.d33m.com is only an optional human-facing shop frontend, never a required service.`;
 
     const state = {
       chainSlug: 'base',
@@ -2999,14 +3009,19 @@
     });
     els.buyNft.addEventListener('click', buyNft);
     els.directoryFilter.addEventListener('input', filterLeagueDirectory);
-    els.copyDiscoveryPrompt.addEventListener('click', async () => {
+    els.copyDiscoveryPrompt.addEventListener('click', async (event) => {
+      event.preventDefault();
       try {
         await navigator.clipboard.writeText(DISCOVERY_AGENT_PROMPT);
-        els.copyDiscoveryPrompt.textContent = 'Copied';
-        window.setTimeout(() => { els.copyDiscoveryPrompt.textContent = 'Prompt'; }, 1200);
+        els.copyDiscoveryPrompt.classList.add('copied');
+        els.copyDiscoveryPrompt.textContent = '[copied]';
+        window.setTimeout(() => {
+          els.copyDiscoveryPrompt.classList.remove('copied');
+          els.copyDiscoveryPrompt.textContent = '[prompt]';
+        }, 1400);
       } catch (_) {
-        els.copyDiscoveryPrompt.textContent = 'Unavailable';
-        window.setTimeout(() => { els.copyDiscoveryPrompt.textContent = 'Prompt'; }, 1200);
+        els.copyDiscoveryPrompt.textContent = '[unavailable]';
+        window.setTimeout(() => { els.copyDiscoveryPrompt.textContent = '[prompt]'; }, 1400);
       }
     });
     els.copyDeployPrompt.addEventListener('click', async () => {
