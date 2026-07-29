@@ -855,6 +855,34 @@
       width: 100%;
     }
 
+    .agent-actions {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+
+    .agent-actions .button {
+      min-height: 44px;
+    }
+
+    .agent-copy {
+      grid-column: 1 / -1;
+      color: var(--accent-dark);
+    }
+
+    .agent-repository {
+      display: inline-block;
+      margin-top: 14px;
+      color: var(--accent-dark);
+      font-size: 0.84rem;
+      font-weight: 750;
+      text-decoration: none;
+    }
+
+    .agent-repository:hover {
+      text-decoration: underline;
+    }
+
     .create-note {
       margin: 12px 0 0;
       color: var(--muted);
@@ -919,6 +947,14 @@
         grid-template-columns: 1fr;
       }
 
+      .agent-actions {
+        grid-template-columns: 1fr;
+      }
+
+      .agent-copy {
+        grid-column: auto;
+      }
+
       .shop-result .button {
         width: 100%;
       }
@@ -978,8 +1014,13 @@
             <li>Share one simple shop link with every manager.</li>
           </ul>
           <div class="discovery-footnote">
-            <a class="button primary" href="https://github.com/mejango/juicebox-skills" target="_blank" rel="noopener">Open the FPL shop deploy guide</a>
-            <p class="create-note">Use the guide with your preferred LLM agent. It will collect your league URL and create the correct shop metadata.</p>
+            <div class="agent-actions" aria-label="Create a shop with an AI agent">
+              <a class="button primary" id="openClaude" href="https://claude.ai/new" target="_blank" rel="noopener">Open in Claude</a>
+              <a class="button primary" id="openChatgpt" href="https://chatgpt.com/" target="_blank" rel="noopener">Open in ChatGPT</a>
+              <button class="button agent-copy" id="copyDeployPrompt" type="button">Copy agent instructions</button>
+            </div>
+            <a class="agent-repository" href="https://github.com/i001962/FPL/" target="_blank" rel="noopener">View the FPL deploy skill</a>
+            <p class="create-note">The instructions use this FPL repository so your project metadata, NFT rules, and shop route are set correctly.</p>
           </div>
         </article>
       </div>
@@ -1324,6 +1365,8 @@
     // Set this when publishing a project-specific copy. A hash route still overrides it.
     const DEFAULT_PROJECT_ROUTE = '';
     const DISCOVERY_API_PATH = '/api/shops';
+    const DEPLOY_REPOSITORY_URL = 'https://github.com/i001962/FPL/';
+    const DEPLOY_AGENT_PROMPT = `I want to create a Fantasy Premier League league shop. Read and use the FPL League NFT Shop deploy skill in ${DEPLOY_REPOSITORY_URL} before preparing anything. Ask me for my FPL league URL, buy-in price, NFT description, and image preference. Follow the repository defaults and rules, including the required Juicebox V6 metadata, fpl.leagueId, fpl and fpl-league:<leagueId> tags, social fields even when blank, payment notice, and NFT tiers that cannot be bought with credits. Prepare a wallet-signable transaction link or deploy through my wallet, then give me the shop URL on https://fpl.d33m.com/.`;
 
     const state = {
       chainSlug: 'base',
@@ -1391,7 +1434,10 @@
       directoryLink: document.querySelector('#directoryLink'),
       discoveryForm: document.querySelector('#discoveryForm'),
       discoveryInput: document.querySelector('#discoveryInput'),
-      discoveryResult: document.querySelector('#discoveryResult')
+      discoveryResult: document.querySelector('#discoveryResult'),
+      openClaude: document.querySelector('#openClaude'),
+      openChatgpt: document.querySelector('#openChatgpt'),
+      copyDeployPrompt: document.querySelector('#copyDeployPrompt')
     };
 
     function parseRoute() {
@@ -1568,8 +1614,10 @@
     function showDiscovery() {
       document.body.classList.add('discovery-mode');
       els.title.textContent = 'FPL League Shops';
-      els.subtitle.textContent = 'Find a league buy-in or create a prize pool for your Fantasy Premier League mini-league.';
+      els.subtitle.textContent = 'Find a league buy-in or create a prize pool for your Fantasy Premier League.';
       els.directoryLink.hidden = true;
+      els.openClaude.href = `https://claude.ai/new?q=${encodeURIComponent(DEPLOY_AGENT_PROMPT)}`;
+      els.openChatgpt.href = `https://chatgpt.com/?q=${encodeURIComponent(DEPLOY_AGENT_PROMPT)}`;
       setStatus('Your league, together', 'Find an existing shop or start one with an agent.');
     }
 
@@ -2649,6 +2697,15 @@
     els.discoveryForm.addEventListener('submit', (event) => {
       event.preventDefault();
       findLeagueShop(els.discoveryInput.value);
+    });
+    els.copyDeployPrompt.addEventListener('click', async () => {
+      try {
+        await navigator.clipboard.writeText(DEPLOY_AGENT_PROMPT);
+        els.copyDeployPrompt.textContent = 'Instructions copied';
+        window.setTimeout(() => { els.copyDeployPrompt.textContent = 'Copy agent instructions'; }, 1800);
+      } catch (_) {
+        els.copyDeployPrompt.textContent = 'Copy unavailable';
+      }
     });
     window.addEventListener('hashchange', () => window.location.reload());
 
