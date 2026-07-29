@@ -670,12 +670,39 @@
 
     .discovery-view {
       display: none;
-      max-width: 760px;
-      margin: 52px auto 0;
+      max-width: 1040px;
+      margin: 44px auto 0;
+    }
+
+    .discovery-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1.1fr) minmax(290px, 0.9fr);
+      gap: 18px;
+      align-items: stretch;
     }
 
     .discovery-panel {
+      display: flex;
+      flex-direction: column;
+      min-height: 100%;
       padding: 28px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.86);
+      box-shadow: var(--shadow);
+    }
+
+    .discovery-panel.create-panel {
+      border-color: rgba(8, 168, 138, 0.42);
+      background: linear-gradient(160deg, rgba(8, 168, 138, 0.10), rgba(255, 255, 255, 0.9) 46%);
+    }
+
+    .discovery-kicker {
+      margin: 0 0 9px;
+      color: var(--accent-dark);
+      font-size: 0.78rem;
+      font-weight: 800;
+      text-transform: uppercase;
     }
 
     .discovery-panel h2 {
@@ -687,6 +714,40 @@
       margin: 8px 0 20px;
       color: var(--muted);
       line-height: 1.5;
+    }
+
+    .league-url-help {
+      margin: 16px 0 0;
+      padding: 13px 14px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: rgba(20, 33, 61, 0.035);
+      color: var(--muted);
+      font-size: 0.87rem;
+    }
+
+    .league-url-help strong {
+      display: block;
+      margin-bottom: 5px;
+      color: var(--ink);
+      font-weight: 750;
+    }
+
+    .league-url-help p {
+      margin: 0;
+      line-height: 1.45;
+    }
+
+    .league-url-help code {
+      display: inline-block;
+      margin-top: 6px;
+      padding: 3px 5px;
+      border-radius: 4px;
+      background: rgba(8, 168, 138, 0.10);
+      color: var(--accent-dark);
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 0.79rem;
+      overflow-wrap: anywhere;
     }
 
     .discovery-form {
@@ -751,13 +812,8 @@
     }
 
     .discovery-footnote {
-      display: grid;
-      grid-template-columns: 1fr auto;
-      gap: 18px;
-      align-items: end;
-      margin-top: 24px;
-      padding-top: 20px;
-      border-top: 1px solid var(--line);
+      margin-top: auto;
+      padding-top: 22px;
     }
 
     .discovery-footnote p {
@@ -767,14 +823,43 @@
       line-height: 1.45;
     }
 
-    .discovery-footnote a {
-      color: var(--accent-dark);
-      font-weight: 750;
-      text-decoration: none;
+    .create-benefits {
+      display: grid;
+      gap: 11px;
+      margin: 4px 0 22px;
+      padding: 0;
+      list-style: none;
     }
 
-    .discovery-footnote a:hover {
-      text-decoration: underline;
+    .create-benefits li {
+      display: grid;
+      grid-template-columns: 18px minmax(0, 1fr);
+      gap: 9px;
+      align-items: start;
+      color: var(--muted);
+      font-size: 0.92rem;
+      line-height: 1.45;
+    }
+
+    .create-benefits li::before {
+      content: "";
+      width: 8px;
+      height: 8px;
+      margin-top: 0.34rem;
+      border-radius: 50%;
+      background: var(--accent);
+      box-shadow: 0 0 0 4px rgba(8, 168, 138, 0.12);
+    }
+
+    .create-panel .button {
+      width: 100%;
+    }
+
+    .create-note {
+      margin: 12px 0 0;
+      color: var(--muted);
+      font-size: 0.82rem;
+      line-height: 1.45;
     }
 
     body.discovery-mode .discovery-view {
@@ -821,12 +906,15 @@
         margin-top: 20px;
       }
 
+      .discovery-grid {
+        grid-template-columns: 1fr;
+      }
+
       .discovery-panel {
         padding: 20px;
       }
 
       .discovery-form,
-      .discovery-footnote,
       .shop-result {
         grid-template-columns: 1fr;
       }
@@ -858,19 +946,41 @@
       </div>
     </header>
 
-    <section class="discovery-view" id="discoveryView" aria-label="Find an FPL league shop">
-      <div class="discovery-panel">
-        <h2>Find a league shop</h2>
-        <p>Paste a Fantasy Premier League league URL or enter its classic league ID. We will check the public Juicebox project index.</p>
-        <form class="discovery-form" id="discoveryForm">
-          <input id="discoveryInput" type="search" placeholder="FPL league URL or league ID" autocomplete="off" aria-label="FPL league URL or league ID">
-          <button class="button primary" type="submit">Find league</button>
-        </form>
-        <div class="discovery-result" id="discoveryResult" aria-live="polite"></div>
-        <div class="discovery-footnote">
-          <p>FPL shops are optional Juicebox projects. Project operators set their own buy-ins and reward rules.</p>
-          <a href="https://github.com/mejango/juicebox-skills" target="_blank" rel="noopener">Create a shop</a>
-        </div>
+    <section class="discovery-view" id="discoveryView" aria-label="FPL league shops">
+      <div class="discovery-grid">
+        <article class="discovery-panel">
+          <p class="discovery-kicker">Find a buy-in</p>
+          <h2>Does your league have a shop?</h2>
+          <p>Paste your Fantasy Premier League league URL and find its optional buy-in, prize pool, and season extras.</p>
+          <form class="discovery-form" id="discoveryForm">
+            <input id="discoveryInput" type="search" placeholder="FPL league URL or league ID" autocomplete="off" aria-label="FPL league URL or league ID">
+            <button class="button primary" type="submit">Find league</button>
+          </form>
+          <div class="league-url-help">
+            <strong>Where to find your league ID</strong>
+            <p>Open your league's Standings page in Fantasy Premier League and copy the browser address. The number after <strong>/leagues/</strong> is your league ID.</p>
+            <code>fantasy.premierleague.com/en/leagues/143466/standings/c</code>
+          </div>
+          <div class="discovery-result" id="discoveryResult" aria-live="polite"></div>
+          <div class="discovery-footnote">
+            <p>Each league sets its own buy-ins and reward rules.</p>
+          </div>
+        </article>
+
+        <article class="discovery-panel create-panel">
+          <p class="discovery-kicker">Start one</p>
+          <h2>Create a shop for your league</h2>
+          <p>Make your mini-league more social with optional buy-ins that can grow a prize pool for the season.</p>
+          <ul class="create-benefits">
+            <li>Run gameweek or full-season buy-ins for your group.</li>
+            <li>Set reward rules that fit your league and its banter.</li>
+            <li>Share one simple shop link with every manager.</li>
+          </ul>
+          <div class="discovery-footnote">
+            <a class="button primary" href="https://github.com/mejango/juicebox-skills" target="_blank" rel="noopener">Open the FPL shop deploy guide</a>
+            <p class="create-note">Use the guide with your preferred LLM agent. It will collect your league URL and create the correct shop metadata.</p>
+          </div>
+        </article>
       </div>
     </section>
 
@@ -1457,9 +1567,9 @@
     function showDiscovery() {
       document.body.classList.add('discovery-mode');
       els.title.textContent = 'FPL League Shops';
-      els.subtitle.textContent = 'Find an optional Juicebox buy-in for your Fantasy Premier League mini-league.';
+      els.subtitle.textContent = 'Find a league buy-in or create a prize pool for your Fantasy Premier League mini-league.';
       els.directoryLink.hidden = true;
-      setStatus('Find a league', 'Paste an FPL league URL or enter its classic league ID.');
+      setStatus('Your league, together', 'Find an existing shop or start one with an agent.');
     }
 
     function extractLeagueId(value) {
@@ -1479,7 +1589,7 @@
     function renderDiscoveryResults(league, shops) {
       const leagueName = league?.name || `FPL league ${state.discoveryLeagueId}`;
       if (!shops.length) {
-        els.discoveryResult.innerHTML = `<p class="discovery-message">No Juicebox shop was found for <strong>${escapeHtml(leagueName)}</strong>. You can create one for this league.</p>`;
+        els.discoveryResult.innerHTML = `<p class="discovery-message">No shop was found for <strong>${escapeHtml(leagueName)}</strong>. Use the deploy guide to start one for this league.</p>`;
         return;
       }
       const cards = shops.map((shop) => {
