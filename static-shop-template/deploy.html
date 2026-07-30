@@ -147,12 +147,38 @@
       border-radius: 7px;
       background: #fff;
       color: var(--ink);
+      font: inherit;
       outline: none;
     }
 
     .field input:focus {
       border-color: var(--accent);
       box-shadow: 0 0 0 3px rgba(8, 168, 138, 0.16);
+    }
+
+    .field textarea {
+      width: 100%;
+      min-height: 92px;
+      padding: 12px;
+      border: 1px solid var(--line);
+      border-radius: 7px;
+      background: #fff;
+      color: var(--ink);
+      font: inherit;
+      outline: none;
+      resize: vertical;
+      line-height: 1.45;
+    }
+
+    .field textarea:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(8, 168, 138, 0.16);
+    }
+
+    .row {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(150px, 0.36fr);
+      gap: 12px;
     }
 
     .actions {
@@ -207,6 +233,22 @@
       border: 1px solid var(--line);
       border-radius: 8px;
       object-fit: cover;
+    }
+
+    .upload-box {
+      display: grid;
+      gap: 8px;
+      align-content: center;
+      min-height: 96px;
+      padding: 18px;
+      border: 1px dashed rgba(8, 168, 138, 0.52);
+      border-radius: 8px;
+      background: rgba(8, 168, 138, 0.06);
+    }
+
+    .upload-box input {
+      padding: 10px;
+      background: #fff;
     }
 
     .summary {
@@ -305,7 +347,8 @@
 
     @media (max-width: 900px) {
       header,
-      .layout {
+      .layout,
+      .row {
         display: grid;
         grid-template-columns: 1fr;
       }
@@ -320,8 +363,8 @@
   <main class="shell">
     <header>
       <div>
-        <h1>FPL League Checkout</h1>
-        <p class="subtitle">Pay $2.00 USDC to the FPL shop project on Base Sepolia. The payment memo is the loaded classic league ID.</p>
+        <h1>Deploy FPL League Shop</h1>
+        <p class="subtitle">Configure the league shop, then pay the separate $2.00 USDC deploy checkout on Base Sepolia. The deploy payment memo is the loaded classic league ID.</p>
       </div>
       <div class="status" id="status">
         <strong>Load a league</strong>
@@ -330,7 +373,7 @@
     </header>
 
     <div class="layout">
-      <section aria-label="League checkout">
+      <section aria-label="League shop configuration">
         <h2>League</h2>
         <div class="grid">
           <div class="field">
@@ -340,18 +383,44 @@
           <div class="actions">
             <button class="button primary" id="loadLeague" type="button">Load league</button>
           </div>
-          <p class="muted">The checkout sends $2.00 USDC to Juicebox project basesep:12. The memo is exactly the loaded league ID.</p>
+          <p class="muted">Loading the league fills the default project name and description. The $2.00 checkout pays for deploying this configured project; it is not the membership NFT price.</p>
         </div>
-        <img class="checkout-image" src="assets/slopsshop.png" alt="FPL Shop">
+
+        <h2 style="margin-top: 26px;">Project Being Deployed</h2>
+        <div class="grid">
+          <div class="field">
+            <label for="projectName">Project name</label>
+            <input id="projectName" type="text" autocomplete="off" placeholder="FPL League Name Shop">
+          </div>
+          <div class="field">
+            <label for="projectDescription">Project description</label>
+            <textarea id="projectDescription" placeholder="This shop is a companion to Fantasy Premier League team #..."></textarea>
+          </div>
+          <div class="row">
+            <div class="field upload-box">
+              <label for="projectImageUpload">Project image upload</label>
+              <input id="projectImageUpload" type="file" accept="image/*">
+              <p class="muted" id="imageLabel">Using slopsshop.png as the default deploy image.</p>
+            </div>
+            <div class="field">
+              <label for="membershipPrice">Membership NFT price in USD</label>
+              <input id="membershipPrice" type="number" min="0" step="0.01" value="5.00" autocomplete="off">
+            </div>
+          </div>
+          <p class="muted">The membership NFT price belongs to the league shop being deployed. It is separate from the fixed $2.00 deploy checkout.</p>
+        </div>
+        <img class="checkout-image" id="imagePreview" src="assets/slopsshop.png" alt="FPL Shop">
       </section>
 
       <aside aria-label="Payment summary">
         <h2>Checkout</h2>
         <div class="summary">
           <div class="summary-row"><span>League</span><strong id="leagueLabel">Not loaded</strong></div>
-          <div class="summary-row"><span>Project</span><strong>basesep:12</strong></div>
-          <div class="summary-row"><span>Amount</span><strong>$2.00 USDC</strong></div>
-          <div class="summary-row"><span>Memo</span><strong id="memoLabel">Load league</strong></div>
+          <div class="summary-row"><span>Configured shop</span><strong id="shopLabel">Not configured</strong></div>
+          <div class="summary-row"><span>Membership NFT</span><strong id="membershipLabel">$5.00</strong></div>
+          <div class="summary-row"><span>Checkout project</span><strong>basesep:12</strong></div>
+          <div class="summary-row"><span>Deploy fee</span><strong>$2.00 USDC</strong></div>
+          <div class="summary-row"><span>Payment memo</span><strong id="memoLabel">Load league</strong></div>
           <div class="summary-row"><span>Wallet</span><strong id="walletLabel">Not connected</strong></div>
         </div>
         <div class="actions">
@@ -424,6 +493,11 @@
     const state = {
       leagueId: '',
       leagueName: '',
+      projectName: '',
+      projectDescription: '',
+      imageDataUrl: '',
+      imageName: 'slopsshop.png',
+      membershipPrice: '5.00',
       walletAccount: '',
       walletChainId: '',
       activeProvider: window.ethereum || null,
@@ -444,7 +518,15 @@
       status: document.querySelector('#status'),
       leagueInput: document.querySelector('#leagueInput'),
       loadLeague: document.querySelector('#loadLeague'),
+      projectName: document.querySelector('#projectName'),
+      projectDescription: document.querySelector('#projectDescription'),
+      projectImageUpload: document.querySelector('#projectImageUpload'),
+      imageLabel: document.querySelector('#imageLabel'),
+      membershipPrice: document.querySelector('#membershipPrice'),
+      imagePreview: document.querySelector('#imagePreview'),
       leagueLabel: document.querySelector('#leagueLabel'),
+      shopLabel: document.querySelector('#shopLabel'),
+      membershipLabel: document.querySelector('#membershipLabel'),
       memoLabel: document.querySelector('#memoLabel'),
       walletLabel: document.querySelector('#walletLabel'),
       connectWallet: document.querySelector('#connectWallet'),
@@ -487,6 +569,30 @@
       return text.match(/(?:leagues\/)?(\d{3,9})(?:\/standings|\/|$)/i)?.[1] || '';
     }
 
+    function shopNameForLeague(name) {
+      const trimmed = String(name || '').trim();
+      const withoutShop = trimmed.replace(/\s+shop$/i, '').trim();
+      return /^fpl\b/i.test(withoutShop) ? `${withoutShop} Shop` : `FPL ${withoutShop} Shop`;
+    }
+
+    function formatUsd(value) {
+      const amount = Number(value || 0);
+      if (!Number.isFinite(amount)) return '$0.00';
+      return new Intl.NumberFormat('en-US', {
+        style: 'currency',
+        currency: 'USD',
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2
+      }).format(amount);
+    }
+
+    function applyConfig() {
+      state.projectName = els.projectName.value.trim();
+      state.projectDescription = els.projectDescription.value.trim();
+      state.membershipPrice = els.membershipPrice.value || '0';
+      render();
+    }
+
     async function fetchLeague(leagueId) {
       const params = new URLSearchParams(window.location.search);
       const apiBase = params.get('apiBase') || DEFAULT_API_BASE;
@@ -510,6 +616,10 @@
         const league = await fetchLeague(leagueId);
         state.leagueId = String(leagueId);
         state.leagueName = league?.league?.name || `League ${leagueId}`;
+        state.projectName = shopNameForLeague(state.leagueName);
+        state.projectDescription = `This shop is a companion to Fantasy Premier League team #${state.leagueId} - ${state.leagueName}.`;
+        els.projectName.value = state.projectName;
+        els.projectDescription.value = state.projectDescription;
         setStatus('League loaded', `${state.leagueName} is ready for checkout.`);
         render();
       } catch (error) {
@@ -519,6 +629,8 @@
 
     function render() {
       els.leagueLabel.textContent = state.leagueName ? `${state.leagueName} #${state.leagueId}` : 'Not loaded';
+      els.shopLabel.textContent = state.projectName || 'Not configured';
+      els.membershipLabel.textContent = formatUsd(state.membershipPrice);
       els.memoLabel.textContent = state.leagueId || 'Load league';
       els.walletLabel.textContent = state.walletAccount
         ? `${state.activeProviderInfo?.name || 'Wallet'} ${shortAddress(state.walletAccount)}`
@@ -530,6 +642,32 @@
       els.connectWallet.title = state.walletAccount || 'Connect a wallet';
       els.connectWallet.disabled = state.walletConnecting;
       els.payButton.disabled = !state.leagueId || !state.walletAccount || state.walletConnecting;
+    }
+
+    function handleImageUpload() {
+      const file = els.projectImageUpload.files?.[0];
+      if (!file) {
+        state.imageDataUrl = '';
+        state.imageName = 'slopsshop.png';
+        els.imageLabel.textContent = 'Using slopsshop.png as the default deploy image.';
+        els.imagePreview.src = 'assets/slopsshop.png';
+        return;
+      }
+      if (!file.type.startsWith('image/')) {
+        setStatus('Image unavailable', 'Choose an image file.', true);
+        return;
+      }
+      const reader = new FileReader();
+      reader.addEventListener('load', () => {
+        state.imageDataUrl = String(reader.result || '');
+        state.imageName = file.name;
+        els.imageLabel.textContent = `${file.name} selected for the configured shop.`;
+        els.imagePreview.src = state.imageDataUrl;
+      });
+      reader.addEventListener('error', () => {
+        setStatus('Image unavailable', 'Could not read that image file.', true);
+      });
+      reader.readAsDataURL(file);
     }
 
     function walletNameForProvider(provider) {
@@ -920,6 +1058,10 @@
     }
 
     els.loadLeague.addEventListener('click', loadLeague);
+    els.projectName.addEventListener('input', applyConfig);
+    els.projectDescription.addEventListener('input', applyConfig);
+    els.membershipPrice.addEventListener('input', applyConfig);
+    els.projectImageUpload.addEventListener('change', handleImageUpload);
     els.connectWallet.addEventListener('click', () => {
       if (!state.walletAccount) {
         if (walletMenu) closeWalletMenu();
