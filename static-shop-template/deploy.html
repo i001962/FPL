@@ -419,6 +419,7 @@
           <div class="summary-row"><span>League</span><strong id="leagueLabel">Not loaded</strong></div>
           <div class="summary-row"><span>Configured shop</span><strong id="shopLabel">Not configured</strong></div>
           <div class="summary-row"><span>Membership NFT</span><strong id="membershipLabel">$5.00</strong></div>
+          <div class="summary-row"><span>Project 12 payment</span><strong>$2.00 USDC</strong></div>
           <div class="summary-row"><span>Network</span><strong>Base Sepolia</strong></div>
           <div class="summary-row"><span>Template</span><strong>.jb direct deploy</strong></div>
           <div class="summary-row"><span>Metadata</span><strong id="memoLabel">Pin on deploy</strong></div>
@@ -427,6 +428,7 @@
         <div class="actions">
           <button class="button full" id="connectWallet" type="button">Connect wallet</button>
           <button class="button primary full" id="payButton" type="button" disabled>Pin and deploy</button>
+          <button class="button full" id="batchPayButton" type="button" disabled>Deploy + pay project 12</button>
         </div>
         <div class="tx-status" id="txStatus" aria-live="polite"></div>
       </aside>
@@ -445,6 +447,8 @@
     const TIER_UNLIMITED_SUPPLY = 999999999;
     const PROJECT = {
       chainSlug: 'basesep',
+      project12Id: 12n,
+      project12AmountUsd: '2.00',
       chain: {
         chainId: 84532,
         chainHex: '0x14a34',
@@ -583,6 +587,37 @@
       ],
       outputs: [{ name: 'projectId', type: 'uint256' }, { name: 'hook', type: 'address' }]
     }];
+    const ERC20_ABI = [
+      {
+        type: 'function',
+        name: 'allowance',
+        stateMutability: 'view',
+        inputs: [{ name: 'owner', type: 'address' }, { name: 'spender', type: 'address' }],
+        outputs: [{ name: '', type: 'uint256' }]
+      },
+      {
+        type: 'function',
+        name: 'approve',
+        stateMutability: 'nonpayable',
+        inputs: [{ name: 'spender', type: 'address' }, { name: 'amount', type: 'uint256' }],
+        outputs: [{ name: '', type: 'bool' }]
+      }
+    ];
+    const PAY_ABI = [{
+      type: 'function',
+      name: 'pay',
+      stateMutability: 'payable',
+      inputs: [
+        { name: 'projectId', type: 'uint256' },
+        { name: 'token', type: 'address' },
+        { name: 'amount', type: 'uint256' },
+        { name: 'beneficiary', type: 'address' },
+        { name: 'minReturnedTokens', type: 'uint256' },
+        { name: 'memo', type: 'string' },
+        { name: 'metadata', type: 'bytes' }
+      ],
+      outputs: [{ name: 'beneficiaryTokenCount', type: 'uint256' }]
+    }];
     const CREATION_FEE_ABI = [{ type: 'function', name: 'creationFee', stateMutability: 'view', inputs: [], outputs: [{ name: '', type: 'uint256' }] }];
     const PROJECT_CREATE_EVENT = [{ type: 'event', name: 'Create', inputs: [
       { name: 'projectId', type: 'uint256', indexed: true },
@@ -634,6 +669,7 @@
       walletLabel: document.querySelector('#walletLabel'),
       connectWallet: document.querySelector('#connectWallet'),
       payButton: document.querySelector('#payButton'),
+      batchPayButton: document.querySelector('#batchPayButton'),
       txStatus: document.querySelector('#txStatus')
     };
 
@@ -745,6 +781,7 @@
       els.connectWallet.title = state.walletAccount || 'Connect a wallet';
       els.connectWallet.disabled = state.walletConnecting;
       els.payButton.disabled = !state.leagueId || !state.walletAccount || state.walletConnecting;
+      els.batchPayButton.disabled = !state.leagueId || !state.walletAccount || state.walletConnecting;
     }
 
     function handleImageUpload() {
@@ -1535,6 +1572,19 @@
       return BigInt(result || '0x0');
     }
 
+    async function readAllowance(owner, spender) {
+      const data = encodeFunctionData({
+        abi: ERC20_ABI,
+        functionName: 'allowance',
+        args: [owner, spender]
+      });
+      const result = await state.activeProvider.request({
+        method: 'eth_call',
+        params: [{ to: PROJECT.chain.token.address, data }, 'latest']
+      });
+      return BigInt(result || '0x0');
+    }
+
     function buildLaunchTransaction(draft, projectUri, creationFee) {
       const salt = keccak256(stringToHex(`${draft.details.name || 'project'}:${state.walletAccount.toLowerCase()}`));
       const args = [
@@ -1567,6 +1617,112 @@
         } catch (_) {}
       }
       return '';
+    }
+
+    function buildProject12PayCalls(amount) {
+      const approveData = encodeFunctionData({
+        abi: ERC20_ABI,
+        functionName: 'approve',
+        args: [PROJECT.chain.terminal, amount]
+      });
+      const payData = encodeFunctionData({
+        abi: PAY_ABI,
+        functionName: 'pay',
+        args: [
+          PROJECT.project12Id,
+          PROJECT.chain.token.address,
+          amount,
+          state.walletAccount,
+          0n,
+          state.leagueId,
+          '0x'
+        ]
+      });
+      return {
+        approve: { to: PROJECT.chain.token.address, data: approveData, value: '0x0' },
+        pay: { to: PROJECT.chain.terminal, data: payData, value: '0x0' }
+      };
+    }
+
+    async function atomicBatchStatus() {
+      let capabilities;
+      try {
+        capabilities = await state.activeProvider.request({
+          method: 'wallet_getCapabilities',
+          params: [state.walletAccount, [PROJECT.chain.chainHex]]
+        });
+      } catch (error) {
+        throw new Error(`Wallet does not expose EIP-5792 capabilities: ${error?.message || error}`);
+      }
+      const chainCaps = capabilities?.[PROJECT.chain.chainHex]
+        || capabilities?.[PROJECT.chain.chainHex.toLowerCase()]
+        || capabilities?.[String(PROJECT.chain.chainId)]
+        || {};
+      return String(chainCaps?.atomic?.status || '').toLowerCase();
+    }
+
+    async function waitForBatchReceipts(batchId) {
+      for (let index = 0; index < 60; index += 1) {
+        const status = await state.activeProvider.request({
+          method: 'wallet_getCallsStatus',
+          params: [batchId]
+        }).catch(() => null);
+        const receipts = status?.receipts || [];
+        if (receipts.length) {
+          const failed = receipts.find((receipt) => receipt.status && receipt.status !== '0x1');
+          if (failed) throw new Error(`Batch transaction failed: ${failed.transactionHash || batchId}`);
+          return receipts;
+        }
+        await new Promise((resolve) => window.setTimeout(resolve, 2000));
+      }
+      return [];
+    }
+
+    async function deployAndPayProject12() {
+      try {
+        if (!state.leagueId) throw new Error('Load a league first.');
+        if (!state.projectName || !state.projectDescription) throw new Error('Project name and description are required.');
+        setTxStatus('Preparing atomic deploy + project 12 payment...');
+        await ensureWalletChain();
+        const atomic = await atomicBatchStatus();
+        if (atomic !== 'supported' && atomic !== 'ready') {
+          throw new Error(`This wallet does not support atomic EIP-5792 batching on Base Sepolia. Status: ${atomic || 'unsupported'}.`);
+        }
+        const { draft, projectUri } = await prepareDeployDraft();
+        setTxStatus('Reading Juicebox project creation fee and USDC allowance...');
+        const creationFee = await creationFeeOf();
+        const deployTx = buildLaunchTransaction(draft, projectUri, creationFee);
+        const amount = parseUnits(PROJECT.project12AmountUsd, PROJECT.chain.token.decimals);
+        const allowance = await readAllowance(state.walletAccount, PROJECT.chain.terminal);
+        const project12Calls = buildProject12PayCalls(amount);
+        const calls = [
+          { to: deployTx.to, data: deployTx.data, value: deployTx.value },
+          ...(allowance < amount ? [project12Calls.approve] : []),
+          project12Calls.pay
+        ];
+        setTxStatus(`Confirm atomic batch: deploy project + pay ${PROJECT.project12AmountUsd} USDC to project 12.`);
+        const result = await state.activeProvider.request({
+          method: 'wallet_sendCalls',
+          params: [{
+            version: '2.0.0',
+            from: state.walletAccount,
+            chainId: PROJECT.chain.chainHex,
+            atomicRequired: true,
+            calls
+          }]
+        });
+        const batchId = typeof result === 'string' ? result : result?.id;
+        if (!batchId) {
+          setTxStatus('Atomic batch submitted.');
+          return;
+        }
+        setTxStatus(`Atomic batch submitted: ${batchId}`);
+        const receipts = await waitForBatchReceipts(batchId);
+        const route = receipts.map(deployedProjectRoute).find(Boolean);
+        setTxStatus(route ? `Project deployed and project 12 paid: ${route}` : `Batch confirmed: ${batchId}`);
+      } catch (error) {
+        setTxStatus(error?.message || String(error), true);
+      }
     }
 
     async function payCheckout() {
@@ -1611,6 +1767,7 @@
       else openConnectedWalletMenu();
     });
     els.payButton.addEventListener('click', payCheckout);
+    els.batchPayButton.addEventListener('click', deployAndPayProject12);
 
     render();
     eagerConnect().catch(() => {});

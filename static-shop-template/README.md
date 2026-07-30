@@ -4,7 +4,7 @@ This is a copyable project-specific static app template for FPL league NFT shops
 
 `find.html` preserves the previous league registry concept and copy as an orphaned reference page. It is not part of the supported project-specific buyer app. Its directory lookup expects a separate registry API/proxy to provide its shop list.
 
-`deploy.html` is a lightweight direct deploy page. It asks for a league ID, loads league data through the configured browser-readable FPL API, mutates the bundled `.jb` template with the project name, description, image, owner, and first membership NFT price, pins project and tier metadata, then sends `JB721TiersHookProjectDeployer.launchProjectFor(...)` on Base Sepolia from the connected wallet. It does not pay project `basesep:12`.
+`deploy.html` is a lightweight direct deploy page. It asks for a league ID, loads league data through the configured browser-readable FPL API, mutates the bundled `.jb` template with the project name, description, image, owner, and first membership NFT price, pins project and tier metadata, then sends `JB721TiersHookProjectDeployer.launchProjectFor(...)` on Base Sepolia from the connected wallet. It also has an experimental EIP-5792 `Deploy + pay project 12` button that atomically batches the deploy call with a `$2.00` USDC approval/payment to `basesep:12` when the connected wallet supports atomic `wallet_sendCalls`.
 
 ## Publishing
 
