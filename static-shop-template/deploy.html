@@ -1389,6 +1389,26 @@
       return draft;
     }
 
+    function logDeployDraft(template, draft, projectUri) {
+      const output = {
+        beforeTemplate: template,
+        afterDeployDraft: draft,
+        transactionInputs: {
+          projectUri,
+          owner: addrOrZero(draft.details?.owner) !== ZERO_ADDRESS ? draft.details.owner : state.walletAccount,
+          chainId: PROJECT.chain.chainId,
+          deployer: PROJECT.chain.deployer721,
+          controller: PROJECT.chain.controller
+        }
+      };
+      console.groupCollapsed('FPL deploy .jb template before/after');
+      console.log('Original .jb template', cloneJson(template));
+      console.log('Mutated .jb draft used for deploy', cloneJson(draft));
+      console.log('Deploy transaction inputs', output.transactionInputs);
+      console.log('Full deploy debug object', output);
+      console.groupEnd();
+    }
+
     async function prepareDeployDraft() {
       const template = await loadJbTemplate();
       let imageUri = template?.details?.logoUri || '';
@@ -1406,6 +1426,7 @@
         nft.metaUri = await pinJson(`fpl-${state.leagueId}-tier-${index + 1}.json`, tierMetadataFor(draft, nft, index));
         nft.encodedIpfsUri = encodeIpfsUriToBytes32(nft.metaUri);
       }
+      logDeployDraft(template, draft, projectUri);
       return { draft, projectUri };
     }
 
