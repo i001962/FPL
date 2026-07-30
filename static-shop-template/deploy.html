@@ -1157,9 +1157,10 @@
     }
 
     function operatorAddressForDraft(draft) {
+      if (isAddress(state.walletAccount)) return state.walletAccount;
       if (isAddress(draft?.revOperator)) return draft.revOperator;
       if (isAddress(draft?.details?.owner)) return draft.details.owner;
-      return state.walletAccount || ZERO_ADDRESS;
+      return ZERO_ADDRESS;
     }
 
     function isProject12Id(value) {
@@ -1393,7 +1394,9 @@
       draft.details.ticker = leagueSymbol();
       draft.details.description = state.projectDescription;
       draft.details.logoUri = imageUri;
+      draft.details.owner = operatorAddressForDraft(draft);
       draft.details.tags = Array.from(new Set([...(draft.details.tags || []), 'fpl', `fpl-league:${state.leagueId}`]));
+      draft.revOperator = operatorAddressForDraft(draft);
       if (draft.details.coverImageUri) draft.details.coverImageUri = imageUri;
       draft.collection = draft.collection || {};
       draft.collection.name = state.projectName;
@@ -1401,6 +1404,13 @@
       draft.collection.nameTouched = true;
       draft.collection.symbolTouched = true;
       const operator = operatorAddressForDraft(draft);
+      for (const stage of draft.stages || []) {
+        for (const recipient of stage.payoutRecipients || []) {
+          if (recipient.type === 'project' && isProject12Id(recipient.projectId)) {
+            recipient.address = operator;
+          }
+        }
+      }
       for (const [index, nft] of (draft.nfts || []).entries()) {
         nft.imageUri = imageUri;
         nft.mediaType = state.imageFile?.type || nft.mediaType || 'image/png';

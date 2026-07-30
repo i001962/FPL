@@ -122,6 +122,11 @@ state.collection.symbolTouched = true;
 for (const stage of state.stages || []) {
   stage.tokenMode = 'none';
   stage.weight = '0';
+  for (const recipient of stage.payoutRecipients || []) {
+    if (recipient.type === 'project' && isProject12Id(recipient.projectId)) {
+      recipient.address = state.revOperator || state.details.owner;
+    }
+  }
 }
 
 state.collection = state.collection || {};
