@@ -39,6 +39,10 @@ function shopNameForLeague(name) {
   return /^fpl\b/i.test(withoutShop) ? `${withoutShop} Shop` : `FPL ${withoutShop} Shop`;
 }
 
+function isProject12Id(value) {
+  return /^\d+$/.test(String(value || '')) && Number(value) === 12;
+}
+
 const leagueIdMatch = String(leagueUrl).match(/\/leagues\/(\d+)\/standings\/c\b/);
 if (!leagueIdMatch) {
   console.error(`Could not parse classic league ID from URL: ${leagueUrl}`);
@@ -129,7 +133,7 @@ for (const nft of state.nfts || []) {
   nft.imageUri = state.details.logoUri;
   if (nft.splitOn && Array.isArray(nft.splitRecipients)) {
     for (const recipient of nft.splitRecipients) {
-      if (/^\d+$/.test(String(recipient.recip || '')) && Number(recipient.recip) === 12) {
+      if (isProject12Id(recipient.recip)) {
         recipient.benef = state.revOperator || state.details.owner;
       }
     }

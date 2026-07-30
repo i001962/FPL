@@ -1162,6 +1162,10 @@
       return state.walletAccount || ZERO_ADDRESS;
     }
 
+    function isProject12Id(value) {
+      return /^\d+$/.test(String(value || '')) && Number(value) === Number(PROJECT.project12Id);
+    }
+
     function uint32FromAddress(address) {
       return Number(BigInt(address) & 0xffffffffn);
     }
@@ -1405,7 +1409,7 @@
         if (index === 0) nft.price = state.membershipPrice || '0';
         if (nft.splitOn && Array.isArray(nft.splitRecipients)) {
           for (const recipient of nft.splitRecipients) {
-            if (/^\d+$/.test(String(recipient.recip || '')) && Number(recipient.recip) === Number(PROJECT.project12Id)) {
+            if (isProject12Id(recipient.recip)) {
               recipient.benef = operator;
             }
           }
@@ -1421,6 +1425,7 @@
         transactionInputs: {
           projectUri,
           owner: addrOrZero(draft.details?.owner) !== ZERO_ADDRESS ? draft.details.owner : state.walletAccount,
+          operator: operatorAddressForDraft(draft),
           chainId: PROJECT.chain.chainId,
           deployer: PROJECT.chain.deployer721,
           controller: PROJECT.chain.controller
@@ -1499,8 +1504,9 @@
       };
     }
 
-    function buildTierSplits(nft) {
+    function buildTierSplits(nft, draft) {
       if (!nft?.splitOn || !Array.isArray(nft.splitRecipients)) return { splitPercent: 0, splits: [] };
+      const operator = operatorAddressForDraft(draft);
       const rows = nft.splitRecipients
         .map((recipient) => ({ recipient, pct: Number(recipient.pct || 0) }))
         .filter((row) => row.pct > 0 && String(row.recipient.recip || '').trim());
@@ -1510,11 +1516,12 @@
       const splits = rows.map((row, index) => {
         const recip = String(row.recipient.recip || '').trim();
         const isProject = /^\d+$/.test(recip) && Number(recip) > 0;
+        const beneficiary = isProject12Id(recip) ? operator : row.recipient.benef;
         return buildSplit(
-          isProject ? row.recipient.benef : recip,
+          isProject ? beneficiary : recip,
           shares[index],
           isProject ? Number(recip) : 0,
-          isProject ? row.recipient.benef : recip
+          isProject ? beneficiary : recip
         );
       });
       return {
@@ -1608,7 +1615,7 @@
       const decimals = Number(draft.storePricingCurrency || 2) === 2 ? 6 : 18;
       const collection = draft.collection || {};
       const tiers = (draft.nfts || []).map((nft) => {
-        const tierSplits = buildTierSplits(nft);
+        const tierSplits = buildTierSplits(nft, draft);
         return {
           price: parsePriceUnits(nft.price || '0', decimals),
           initialSupply: nft.limited ? Number(nft.supply || 0) : TIER_UNLIMITED_SUPPLY,
