@@ -51,34 +51,39 @@ if (!/^0x[a-fA-F0-9]{40}$/.test(wallet)) {
 }
 
 const leagueId = Number(leagueIdMatch[1]);
-const endpoint = `https://fc-footy.vercel.app/api/fpl-league?leagueId=${leagueId}`;
-let response;
-try {
-  response = await fetch(endpoint);
-} catch (error) {
-  console.error(`FPL league fetch failed: ${error.message}`);
-  process.exit(1);
-}
-if (!response.ok) {
-  console.error(`FPL league fetch failed: ${response.status} ${response.statusText}`);
-  process.exit(1);
+async function fetchLeaguePage(page) {
+  const endpoint = `https://fantasy.premierleague.com/api/leagues-classic/${leagueId}/standings/?page_standings=${page}`;
+  let response;
+  try {
+    response = await fetch(endpoint);
+  } catch (error) {
+    console.error(`FPL league fetch failed: ${error.message}`);
+    process.exit(1);
+  }
+  if (!response.ok) {
+    console.error(`FPL league fetch failed: ${response.status} ${response.statusText}`);
+    process.exit(1);
+  }
+
+  try {
+    return await response.json();
+  } catch (error) {
+    console.error(`FPL league fetch returned malformed JSON: ${error.message}`);
+    process.exit(1);
+  }
 }
 
-let league;
-try {
-  league = await response.json();
-} catch (error) {
-  console.error(`FPL league fetch returned malformed JSON: ${error.message}`);
-  process.exit(1);
-}
+const league = await fetchLeaguePage(1);
 
 const leagueName = league?.league?.name;
-const managerCount = Math.max(
-  Number(league?.standings?.total || 0),
-  Number(league?.new_entries?.total || 0),
-  Number(league?.standings?.results?.length || 0),
-  Number(league?.new_entries?.results?.length || 0),
-);
+let managerCount = Number(league?.standings?.results?.length || 0);
+let page = Number(league?.standings?.page || 1);
+while (league?.standings?.has_next && page < 50) {
+  page += 1;
+  const nextLeague = await fetchLeaguePage(page);
+  managerCount += Number(nextLeague?.standings?.results?.length || 0);
+  league.standings.has_next = Boolean(nextLeague?.standings?.has_next);
+}
 if (!leagueName || !managerCount) {
   console.error('FPL league response did not include usable league name and manager data.');
   process.exit(1);

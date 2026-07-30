@@ -1,6 +1,6 @@
 # FPL League NFT Shop Static Template
 
-This is a copyable static app template for FPL league NFT shops. It is intentionally separate from the `fpl-league-nft-shop-deployer` skill so the skill can stay focused on deploy txlinks.
+This is a copyable project-specific static app template for FPL league NFT shops. It is intentionally separate from the `fpl-league-nft-shop-deployer` skill so the skill can stay focused on deploy txlinks.
 
 ## Publishing
 
@@ -14,9 +14,9 @@ QSTORAGE_BUCKET=footy scripts/upload-static-shop-template-qstorage.sh
 
 ## Route
 
-When `DEFAULT_PROJECT_ROUTE` is blank, the shared template opens a league discovery view at its bare URL. It validates a pasted FPL league URL or classic league ID, then asks the same-origin `/api/shops` endpoint to query Bendystraw's public Juicebox project index.
+Set `DEFAULT_PROJECT_ROUTE` near the top of `index.html` to the deployed project route before publishing a project-specific copy. This makes the bare app URL open its shop without a fragment while preserving the reusable hash-route behavior.
 
-For a project-specific copy, set `DEFAULT_PROJECT_ROUTE` near the top of `index.html` to the deployed project route. This makes a branded URL open its shop without a fragment while preserving the reusable hash-route behavior.
+If `DEFAULT_PROJECT_ROUTE` is blank and no hash or query route is supplied, the app shows a configuration error. It does not include a global FPL shop directory or proxy.
 
 Open the app with this hash route to select or override a project:
 
@@ -36,8 +36,6 @@ For example, after setting `DEFAULT_PROJECT_ROUTE = 'basesep:19'`, both of these
 https://example.com/index.html
 https://example.com/index.html#basesep:19
 ```
-
-The discovery endpoint is implemented by `cloudflare-worker/fpl-shop-proxy.js`. It queries Bendystraw's mainnet and testnet GraphQL endpoints for `tags_has: "fpl-league:<leagueId>"`, then falls back to FPL-description matches for legacy projects and verifies `metadata.fpl.leagueId` before returning a result. New project metadata must include both `fpl.leagueId` and the `fpl` / `fpl-league:<leagueId>` tags.
 
 The app also accepts query parameters for local testing:
 
@@ -83,7 +81,7 @@ Access-Control-Allow-Origin: *
 ## Behavior
 
 - Resolves known test project IDs locally. The bundled test mapping is `basesep:19 -> 143466`.
-- Loads the FPL league leaderboard from `https://fc-footy.vercel.app/api/fpl-league` by default, or from the `apiBase` query parameter. The request includes `includeManagersInfo=1`.
+- Loads the FPL league leaderboard in the browser from `https://fc-footy.vercel.app/api/fpl-league` by default, or from the `apiBase` query parameter. The request includes `includeManagersInfo=1`.
 - Renders each manager's compact club badge from the FC-Footy response's `club_badge_src`. The static app never calls the FPL entry endpoint directly.
 - Reads the active Juicebox V6 721 shop from `JBDirectory -> controllerOf -> currentRulesetOf -> dataHook`, then loads all tiers with `tiersOf(...)`.
 - Resolves tier thumbnails from the hook's `tokenUriResolverOf(...)`, `resolvedUri`, or encoded IPFS metadata.
@@ -102,6 +100,5 @@ Access-Control-Allow-Origin: *
 - Encodes cart items in the same V6 721 pay metadata envelope used by JuiceScan, repeating tier IDs by quantity.
 - Clears the cart after the wallet returns a successful purchase transaction hash.
 - Links to the matching Juicebox V6 project page as `Use on Juicebox`.
-- Provides a minimal Claude link seeded with the Juicebox skills repo for creating a similar buyer page.
 
 The app is a starter buyer page. It does not verify that the buyer controls the selected FPL manager entry.

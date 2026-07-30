@@ -654,70 +654,6 @@
       text-decoration: underline;
     }
 
-    .directory-link {
-      display: inline-flex;
-      align-items: center;
-      min-height: 34px;
-      color: var(--accent-dark);
-      font-size: 0.88rem;
-      font-weight: 750;
-      text-decoration: none;
-    }
-
-    .directory-link:hover {
-      text-decoration: underline;
-    }
-
-    .discovery-view {
-      display: none;
-      max-width: 1120px;
-      margin: 30px auto 0;
-    }
-
-    .discovery-grid {
-      display: grid;
-      grid-template-columns: 1fr;
-      align-items: start;
-      margin-top: 20px;
-    }
-
-    .discovery-panel {
-      min-height: 100%;
-      padding: 26px;
-      border: 1px solid var(--line);
-      border-radius: 8px;
-      background: rgba(255, 255, 255, 0.84);
-      box-shadow: var(--shadow);
-    }
-
-    .discovery-panel.create-panel {
-      display: grid;
-      grid-template-columns: minmax(0, 1fr) minmax(260px, 320px);
-      gap: 28px;
-      align-items: start;
-      border-color: rgba(8, 168, 138, 0.42);
-      background: rgba(8, 168, 138, 0.05);
-    }
-
-    .discovery-kicker {
-      margin: 0 0 9px;
-      color: var(--accent-dark);
-      font-size: 0.78rem;
-      font-weight: 800;
-      text-transform: uppercase;
-    }
-
-    .discovery-panel h2 {
-      margin: 0;
-      font-size: 1.55rem;
-    }
-
-    .discovery-panel > p {
-      margin: 8px 0 20px;
-      color: var(--muted);
-      line-height: 1.5;
-    }
-
     .league-url-help {
       margin: 12px 0 0;
       padding: 0;
@@ -766,363 +702,6 @@
       text-decoration: underline;
     }
 
-    .discovery-form {
-      display: grid;
-      grid-template-columns: minmax(0, 1fr) auto;
-      gap: 10px;
-    }
-
-    .discovery-form .button {
-      min-width: 124px;
-    }
-
-    .discovery-result {
-      display: grid;
-      gap: 12px;
-      margin-top: 20px;
-    }
-
-    .discovery-message {
-      margin: 0;
-      color: var(--muted);
-      line-height: 1.5;
-    }
-
-    .discovery-message.error {
-      color: var(--error);
-    }
-
-    .shop-result {
-      display: grid;
-      grid-template-columns: 44px minmax(0, 1fr) auto;
-      align-items: center;
-      gap: 12px;
-      padding: 14px;
-      border: 1px solid var(--line);
-      border-radius: 7px;
-      background: rgba(8, 168, 138, 0.05);
-    }
-
-    .shop-result img,
-    .shop-result-placeholder {
-      width: 44px;
-      height: 44px;
-      border-radius: 6px;
-      object-fit: cover;
-      background: rgba(8, 168, 138, 0.13);
-    }
-
-    .shop-result h3,
-    .shop-result p {
-      margin: 0;
-    }
-
-    .shop-result h3 {
-      font-size: 1rem;
-    }
-
-    .shop-result p {
-      margin-top: 3px;
-      color: var(--muted);
-      font-size: 0.84rem;
-    }
-
-    .discovery-footnote {
-      margin-top: 20px;
-      padding-top: 0;
-    }
-
-    .discovery-footnote p {
-      margin: 0;
-      color: var(--muted);
-      font-size: 0.88rem;
-      line-height: 1.45;
-    }
-
-    .create-benefits {
-      margin: 14px 0 18px;
-      padding: 0;
-      color: var(--muted);
-      font-size: 0.9rem;
-      line-height: 1.45;
-    }
-
-    .create-benefits li {
-      display: inline;
-    }
-
-    .create-benefits li:not(:last-child)::after {
-      content: " · ";
-      color: var(--accent-dark);
-    }
-
-    .create-panel .button {
-      width: 100%;
-    }
-
-    .agent-actions {
-      display: grid;
-      grid-template-columns: 1fr;
-      gap: 10px;
-    }
-
-    .agent-actions .button {
-      min-height: 44px;
-    }
-
-    .agent-copy {
-      grid-column: auto;
-      color: var(--accent-dark);
-    }
-
-    .agent-repository {
-      display: inline-block;
-      margin-top: 14px;
-      color: var(--accent-dark);
-      font-size: 0.84rem;
-      font-weight: 750;
-      text-decoration: none;
-    }
-
-    .agent-repository:hover {
-      text-decoration: underline;
-    }
-
-    .create-note {
-      margin: 12px 0 0;
-      color: var(--muted);
-      font-size: 0.82rem;
-      line-height: 1.45;
-    }
-
-    .league-directory {
-      margin: 0;
-      padding: 26px;
-      border: 1px solid var(--line);
-      border-radius: 8px;
-      background: rgba(255, 255, 255, 0.84);
-      box-shadow: var(--shadow);
-    }
-
-    .league-directory-header {
-      display: grid;
-      grid-template-columns: minmax(0, 1fr) minmax(240px, 320px);
-      gap: 18px;
-      align-items: end;
-      margin-bottom: 16px;
-    }
-
-    .league-directory h2 {
-      margin: 0;
-      font-size: 1.35rem;
-    }
-
-    .league-directory-header p,
-    .league-directory-message {
-      margin: 6px 0 0;
-      color: var(--muted);
-      line-height: 1.45;
-    }
-
-    .directory-filter {
-      display: grid;
-      gap: 7px;
-    }
-
-    .directory-filter-row {
-      display: grid;
-      grid-template-columns: minmax(0, 1fr) auto;
-      gap: 8px;
-    }
-
-    .directory-prompt {
-      align-self: center;
-      color: var(--muted);
-      font-size: 0.84rem;
-      font-weight: 750;
-      text-decoration: none;
-      white-space: nowrap;
-    }
-
-    .directory-prompt:hover,
-    .directory-prompt.copied {
-      color: var(--accent-dark);
-    }
-
-    .directory-filter label {
-      color: var(--muted);
-      font-size: 0.74rem;
-      font-weight: 800;
-      text-transform: uppercase;
-    }
-
-    .directory-help {
-      margin: 10px 0 0;
-      color: var(--muted);
-      font-size: 0.84rem;
-      line-height: 1.45;
-    }
-
-    .directory-help a {
-      color: var(--accent-dark);
-      font-weight: 750;
-      text-decoration: none;
-    }
-
-    .directory-help a:hover {
-      text-decoration: underline;
-    }
-
-    .league-directory-table-wrap {
-      overflow-x: auto;
-      border: 1px solid var(--line);
-      border-radius: 8px;
-      background: rgba(255, 255, 255, 0.72);
-    }
-
-    .league-directory-table {
-      width: 100%;
-      min-width: 720px;
-      border-collapse: collapse;
-      text-align: left;
-    }
-
-    .league-directory-table th,
-    .league-directory-table td {
-      padding: 14px;
-      border-bottom: 1px solid var(--line);
-      vertical-align: top;
-    }
-
-    .league-directory-table tr:last-child td {
-      border-bottom: 0;
-    }
-
-    .league-directory-table th {
-      color: var(--muted);
-      font-size: 0.74rem;
-      font-weight: 800;
-      text-transform: uppercase;
-    }
-
-    .league-directory-table td {
-      font-size: 0.9rem;
-    }
-
-    .league-directory-name {
-      display: block;
-      max-width: 280px;
-      color: var(--ink);
-      font-weight: 750;
-    }
-
-    .league-directory-description {
-      max-width: 340px;
-      color: var(--muted);
-      line-height: 1.4;
-    }
-
-    .league-directory-link {
-      color: var(--accent-dark);
-      font-weight: 750;
-      text-decoration: none;
-    }
-
-    .project-deployments {
-      display: inline-flex;
-      align-items: center;
-      gap: 5px;
-      min-height: 22px;
-    }
-
-    .project-chain-link {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      width: 22px;
-      height: 22px;
-      border-radius: 50%;
-      transition: opacity 120ms ease, transform 120ms ease;
-    }
-
-    .project-chain-link:hover {
-      opacity: 0.72;
-      transform: translateY(-1px);
-    }
-
-    .project-chain-logo {
-      display: block;
-      width: 18px;
-      height: 18px;
-    }
-
-    .project-chain-logo svg {
-      display: block;
-      width: 18px;
-      height: 18px;
-    }
-
-    .project-chain-fallback {
-      display: inline-flex;
-      width: 18px;
-      height: 18px;
-      align-items: center;
-      justify-content: center;
-      border-radius: 50%;
-      background: var(--line);
-      color: var(--muted);
-      font-size: 0.7rem;
-      font-weight: 800;
-    }
-
-    .league-directory-link:hover {
-      text-decoration: underline;
-    }
-
-    body.discovery-mode .discovery-view {
-      display: block;
-    }
-
-    body.discovery-mode .shop-view,
-    body.discovery-mode .ownership,
-    body.discovery-mode .header-side {
-      display: none;
-    }
-
-    body.discovery-mode h1 {
-      max-width: 700px;
-      font-size: clamp(2.6rem, 4vw, 3.9rem);
-      line-height: 1;
-    }
-
-    body.discovery-mode .subtitle {
-      max-width: 640px;
-      margin-top: 12px;
-      font-size: 1.05rem;
-    }
-
-    .discovery-hero-image {
-      display: none;
-    }
-
-    body.discovery-mode header {
-      display: grid;
-      grid-template-columns: minmax(0, 1fr) minmax(150px, 230px);
-      gap: 26px;
-      align-items: start;
-    }
-
-    body.discovery-mode .discovery-hero-image {
-      display: block;
-      width: min(220px, 100%);
-      height: auto;
-      justify-self: end;
-      margin-top: -12px;
-      border-radius: 8px;
-      pointer-events: none;
-      user-select: none;
-    }
-
     .error {
       color: var(--error);
     }
@@ -1154,64 +733,6 @@
         grid-template-columns: 1fr;
       }
 
-      .discovery-view {
-        margin-top: 20px;
-      }
-
-      .discovery-grid {
-        grid-template-columns: 1fr;
-        gap: 26px;
-      }
-
-      .discovery-panel {
-        padding: 20px;
-      }
-
-      .discovery-panel.create-panel {
-        grid-template-columns: 1fr;
-        gap: 20px;
-      }
-
-      .discovery-form,
-      .shop-result {
-        grid-template-columns: 1fr;
-      }
-
-      .league-directory-header {
-        display: block;
-      }
-
-      .directory-filter {
-        margin-top: 16px;
-      }
-
-      .directory-filter-row {
-        grid-template-columns: 1fr;
-      }
-
-      .directory-prompt {
-        width: 100%;
-        text-align: right;
-      }
-
-      .league-directory {
-        padding: 20px;
-      }
-
-      body.discovery-mode header {
-        grid-template-columns: minmax(0, 1fr) 118px;
-        gap: 14px;
-      }
-
-      body.discovery-mode .discovery-hero-image {
-        width: 118px;
-        margin-top: 0;
-      }
-
-      .shop-result .button {
-        width: 100%;
-      }
-
       aside {
         position: static;
       }
@@ -1231,56 +752,8 @@
           Reading the app route.
         </div>
         <div class="ownership" id="ownershipSummary" aria-live="polite"></div>
-        <a class="directory-link" id="directoryLink" href="./">Find a league</a>
       </div>
-      <img class="discovery-hero-image" src="assets/jblogo.gif" alt="Animated peach logo">
     </header>
-
-    <section class="discovery-view" id="discoveryView" aria-label="FPL league shops">
-      <section class="league-directory" aria-labelledby="leagueDirectoryTitle">
-        <div class="league-directory-header">
-          <div>
-            <p class="discovery-kicker">League Register</p>
-            <h2 id="leagueDirectoryTitle">Find a league shop</h2>
-            <p>Search deployed FPL shops by league ID, project, or description.</p>
-          </div>
-          <div class="directory-filter">
-            <label for="directoryFilter">Search league shops</label>
-            <div class="directory-filter-row">
-              <input id="directoryFilter" type="search" placeholder="FPL URL, league ID, project, or description" autocomplete="off">
-              <a class="directory-prompt" id="copyDiscoveryPrompt" href="#copy-discovery-prompt">[prompt]</a>
-            </div>
-          </div>
-        </div>
-        <p class="directory-help">Need a league ID? Open your FPL standings and copy the number after <strong>/leagues/</strong>. <a href="https://fantasy.premierleague.com/en/leagues/143466/standings/c" target="_blank" rel="noopener">Open FPL standings</a></p>
-        <div id="leagueDirectory" aria-live="polite"><p class="league-directory-message">Loading indexed league shops...</p></div>
-      </section>
-
-      <div class="discovery-grid">
-        <article class="discovery-panel create-panel">
-          <div>
-            <p class="discovery-kicker">Create with an agent</p>
-            <h2>Set up a league shop with an agent</h2>
-            <p>Tell the agent about the league. It can configure the shop and give everyone one place to use.</p>
-            <ul class="create-benefits">
-              <li>Buy-ins</li>
-              <li>Prizes</li>
-              <li>Items</li>
-              <li>Public rules</li>
-            </ul>
-            <p class="create-note">The FPL deploy skill sets the required project metadata, NFT rules, and shop route.</p>
-          </div>
-          <div class="discovery-footnote">
-            <div class="agent-actions" aria-label="Create a shop with an AI agent">
-              <a class="button primary" id="openClaude" href="https://claude.ai/new" target="_blank" rel="noopener">Open in Claude</a>
-              <a class="button primary" id="openChatgpt" href="https://chatgpt.com/" target="_blank" rel="noopener">Open in ChatGPT</a>
-              <button class="button agent-copy" id="copyDeployPrompt" type="button">Copy agent instructions</button>
-            </div>
-            <a class="agent-repository" href="https://github.com/i001962/FPL/" target="_blank" rel="noopener">View the FPL deploy skill</a>
-          </div>
-        </article>
-      </div>
-    </section>
 
     <div class="layout shop-view" id="shopView">
       <section aria-label="League managers">
@@ -1620,30 +1093,15 @@
     const discoveredProviders = [];
     // Set this when publishing a project-specific copy. A hash route still overrides it.
     const DEFAULT_PROJECT_ROUTE = '';
-    const DISCOVERY_API_PATH = '/api/shops';
-    const DEPLOY_REPOSITORY_URL = 'https://github.com/i001962/FPL/';
-    const DEPLOY_AGENT_PROMPT = `I want to create a Fantasy Premier League league shop. Read and use the FPL League NFT Shop deploy skill in ${DEPLOY_REPOSITORY_URL} before preparing anything. Ask me for my FPL league URL, buy-in price, NFT description, and image preference. Follow the repository defaults and rules, including the required Juicebox V6 metadata, fpl.leagueId, fpl and fpl-league:<leagueId> tags, social fields even when blank, payment notice, and NFT tiers that cannot be bought with credits. Prepare a wallet-signable transaction link or deploy through my wallet. Do not depend on fpl.d33m.com or another hosted directory for deployment, discovery, or payment: project metadata and onchain Juicebox data must be sufficient. A static shop frontend may be shared after deployment, but it is optional.`;
-    const DISCOVERY_AGENT_PROMPT = `Use the fpl-league-nft-shop-deployer skill to find a Fantasy Premier League (FPL) Juicebox shop and its current purchasable NFT tiers. Before inspecting, read its references/inspect-existing-shop.md workflow. If the skill is not installed, read https://github.com/i001962/FPL/blob/main/SKILL.md and https://github.com/i001962/FPL/blob/main/references/inspect-existing-shop.md. Do not rely on fpl.d33m.com or another hosted directory, and do not stop after finding project IDs. Completion requires a tier inventory for every matched project: name, tier ID, price and currency, initial supply, remaining supply, and availability; include image and description when metadata resolves.
-
-First, get the classic FPL league ID from a standings URL such as https://fantasy.premierleague.com/en/leagues/<leagueId>/standings/c. Query the public Juicebox V6 index directly at https://bendystraw.xyz/graphql and, when relevant, https://testnet.bendystraw.xyz/graphql. Search projects with version: 6 and tags_has: "fpl" or "fpl-league:<leagueId>". Request projectId, chainId, name, description, metadataUri, tags, and metadata. Keep only projects whose metadata.fpl.leagueId exactly equals the FPL league ID.
-
-For every matching project, read the active Juicebox V6 721 hook and its live tiers with eth_call. ${DEPLOY_REPOSITORY_URL}static-shop-template/index.html contains a reference implementation for these reads. Resolve JBDirectory.controllerOf(projectId), then the controller's currentRulesetOf(projectId). Use the current ruleset's dataHook; if it is the omnichain deployer, resolve tiered721HookOf(projectId, rulesetId). From the resolved hook read STORE(), METADATA_ID_TARGET(), pricingContext(), then call the store's tiersOf(hook, [], false, 0, 200). Exclude tiers with initialSupply = 0. Resolve each tier's metadata from tokenUriResolverOf(hook) / tokenUriOf(hook, tierId * 1_000_000_000), resolvedUri, or encodedIpfsUri. Convert tier price using pricingContext and the project's payment currency; retain the raw price too.
-
-Use the chain's direct RPC first. For Base Sepolia (84532), try https://sepolia.base.org, then https://sepolia-preconf.base.org, then https://base-sepolia-rpc.publicnode.com. If a runtime blocks direct RPC, use the direct Juicebox project UI or the chain explorer as a read-only fallback. Do not ask the user to copy item cards or transcribe tier data. Report an incomplete result only after these fallbacks fail, name the exact failed endpoint or call, and still return every tier value you could read.
-
-Direct Juicebox routes use: 1=eth, 11155111=sep, 42161=arb, 421614=arbsep, 8453=base, 84532=basesep, 10=op, 11155420=opsep. The direct UI URL is https://juicebox.money/v6/<chainSlug>:<projectId>. Inspect terms, payment notice, metadata, and onchain state before recommending a payment. If no project exists, offer to create one with the deploy skill at ${DEPLOY_REPOSITORY_URL}. fpl.d33m.com is only an optional human-facing frontend, never a required service.`;
 
     const state = {
       chainSlug: 'base',
       projectId: '',
       leagueId: '',
       leagueName: '',
-      discoveryLeagueId: '',
       paymentNotice: '',
-      isDiscovery: false,
       projectMetadata: null,
       shopHook: '',
-      directoryShops: [],
       salesStats: { loading: false, scanned: false, customers: 0, itemsSold: 0, owned: [], scanLimitHit: false },
       salesStatsRequest: 0,
       managers: [],
@@ -1697,13 +1155,7 @@ Direct Juicebox routes use: 1=eth, 11155111=sep, 42161=arb, 421614=arbsep, 8453=
       txStatus: document.querySelector('#txStatus'),
       openProject: document.querySelector('#openProject'),
       paymentNotice: document.querySelector('#paymentNotice'),
-      directoryLink: document.querySelector('#directoryLink'),
-      leagueDirectory: document.querySelector('#leagueDirectory'),
-      directoryFilter: document.querySelector('#directoryFilter'),
-      copyDiscoveryPrompt: document.querySelector('#copyDiscoveryPrompt'),
-      openClaude: document.querySelector('#openClaude'),
-      openChatgpt: document.querySelector('#openChatgpt'),
-      copyDeployPrompt: document.querySelector('#copyDeployPrompt')
+      shopView: document.querySelector('#shopView')
     };
 
     function parseRoute() {
@@ -1715,7 +1167,6 @@ Direct Juicebox routes use: 1=eth, 11155111=sep, 42161=arb, 421614=arbsep, 8453=
       state.projectId = match?.[2] || params.get('projectId') || defaultMatch?.[2] || '';
       state.leagueId = match?.[3] || params.get('leagueId') || defaultMatch?.[3] || '';
       state.apiBase = params.get('apiBase') || state.apiBase;
-      state.isDiscovery = !state.projectId;
 
       const tierParam = params.get('tiers');
       if (tierParam) {
@@ -1875,127 +1326,6 @@ Direct Juicebox routes use: 1=eth, 11155111=sep, 42161=arb, 421614=arbsep, 8453=
       els.subtitle.textContent = `${chainLabel} project ${state.projectId || 'not set'} · FPL league ${state.leagueId}`;
       els.projectLabel.textContent = state.projectId ? `${chainLabel}:${state.projectId}` : 'Project not set';
       els.walletLabel.textContent = state.walletAccount ? `${providerName} ${shortAddress(state.walletAccount)}` : 'Not connected';
-    }
-
-    function showDiscovery() {
-      document.body.classList.add('discovery-mode');
-      els.title.textContent = 'Give the fantasy league something to play for.';
-      els.subtitle.textContent = 'Collect payments, accept tips, sell collectibles, fund prizes, and issue rewards—all through transparent rules your league can help shape.';
-      els.directoryLink.hidden = true;
-      els.openClaude.href = `https://claude.ai/new?q=${encodeURIComponent(DEPLOY_AGENT_PROMPT)}`;
-      els.openChatgpt.href = `https://chatgpt.com/?q=${encodeURIComponent(DEPLOY_AGENT_PROMPT)}`;
-    }
-
-    function extractLeagueId(value) {
-      const text = String(value || '').trim();
-      if (/^\d{3,9}$/.test(text)) return text;
-      return text.match(/(?:leagues\/)?(\d{3,9})(?:\/standings|\/|$)/i)?.[1] || '';
-    }
-
-    function chainLabelFromId(chainId) {
-      const labels = {
-        1: 'Ethereum',
-        10: 'Optimism',
-        8453: 'Base',
-        42161: 'Arbitrum',
-        11155111: 'Ethereum Sepolia',
-        11155420: 'Optimism Sepolia',
-        84532: 'Base Sepolia',
-        421614: 'Arbitrum Sepolia'
-      };
-      return labels[Number(chainId)] || `Chain ${chainId}`;
-    }
-
-    // Mirrors JuiceScan's compact chain marks. Testnets use their parent chain mark.
-    const CHAIN_LOGO_SVG = {
-      eth: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="12" fill="#627EEA"/><path d="M12 4v5.9l5 2.25z" fill="#fff" fill-opacity=".6"/><path d="M12 4L7 12.15l5-2.25z" fill="#fff"/><path d="M12 16v3.99l5-6.92z" fill="#fff" fill-opacity=".6"/><path d="M12 19.99V16l-5-3.07z" fill="#fff"/><path d="M12 15.07l5-2.92-5-2.24z" fill="#fff" fill-opacity=".2"/><path d="M7 12.15l5 2.92v-5.16z" fill="#fff" fill-opacity=".6"/></svg>',
-      op: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="12" fill="#FF0420"/><text x="12" y="15.6" font-size="8.5" font-weight="700" fill="#fff" text-anchor="middle" font-family="Helvetica,Arial,sans-serif">OP</text></svg>',
-      base: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="12" fill="#0052FF"/><path d="M12 6.2A5.8 5.8 0 0 0 12 17.8V6.2z" fill="#fff"/></svg>',
-      arb: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="12" fill="#2D374B"/><path d="M12 6l4.8 11h-2.4L12 11.2 9.6 17H7.2z" fill="#28A0F0"/><path d="M12 6l-1.05 2.45L12 11.2l1.05-2.75z" fill="#fff"/></svg>'
-    };
-
-    function chainLogoFamily(chainId) {
-      const id = Number(chainId);
-      if (id === 1 || id === 11155111) return 'eth';
-      if (id === 10 || id === 11155420) return 'op';
-      if (id === 8453 || id === 84532) return 'base';
-      if (id === 42161 || id === 421614) return 'arb';
-      return '';
-    }
-
-    function projectDeployments(shop) {
-      const deployments = Array.isArray(shop.deployments) && shop.deployments.length
-        ? shop.deployments
-        : [{ chainId: shop.chainId, projectId: shop.projectId, route: shop.route }];
-      return deployments.map((deployment) => {
-        const route = String(deployment.route || '').replace(/^#/, '');
-        const label = `${chainLabelFromId(deployment.chainId)} project ${deployment.projectId}`;
-        const family = chainLogoFamily(deployment.chainId);
-        const icon = family
-          ? `<span class="project-chain-logo">${CHAIN_LOGO_SVG[family]}</span>`
-          : `<span class="project-chain-fallback">?</span>`;
-        const content = icon;
-        return route
-          ? `<a class="project-chain-link" href="https://juicebox.money/v6/${escapeHtml(route)}" target="_blank" rel="noopener" aria-label="${escapeHtml(label)}" title="${escapeHtml(label)}">${content}</a>`
-          : `<span class="project-chain-link" role="img" aria-label="${escapeHtml(label)}" title="${escapeHtml(label)}">${content}</span>`;
-      }).join('');
-    }
-
-    function leagueStandingsUrl(leagueId) {
-      return `https://fantasy.premierleague.com/en/leagues/${encodeURIComponent(leagueId)}/standings/c`;
-    }
-
-    function plainProjectText(value) {
-      return String(value || '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
-    }
-
-    function renderLeagueDirectory(shops) {
-      if (!shops.length) {
-        els.leagueDirectory.innerHTML = '<p class="league-directory-message">No indexed FPL shops are available yet.</p>';
-        return;
-      }
-      const rows = shops.map((shop) => {
-        const title = plainProjectText(shop.name) || `FPL project ${shop.projectId}`;
-        const description = plainProjectText(shop.description || shop.projectTagline) || 'No project description published.';
-        const leagueId = shop.leagueId || shop.metadata?.fpl?.leagueId || '';
-        const leagueLink = leagueId
-          ? `<a class="league-directory-link" href="${escapeHtml(leagueStandingsUrl(leagueId))}" target="_blank" rel="noopener">FPL league ${escapeHtml(leagueId)}</a>`
-          : 'League not specified';
-        const deployments = projectDeployments(shop);
-        return `<tr><td>${leagueLink}</td><td><span class="league-directory-name">${escapeHtml(title)}</span></td><td><span class="league-directory-description">${escapeHtml(description)}</span></td><td><span class="project-deployments">${deployments}</span></td><td><a class="button primary" href="${escapeHtml(shop.route)}">See items</a></td></tr>`;
-      }).join('');
-      els.leagueDirectory.innerHTML = `<div class="league-directory-table-wrap"><table class="league-directory-table"><thead><tr><th>League</th><th>Shop</th><th>Description</th><th>Project</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>`;
-    }
-
-    function filterLeagueDirectory() {
-      const rawQuery = String(els.directoryFilter.value || '').trim();
-      const query = (extractLeagueId(rawQuery) || rawQuery).toLowerCase();
-      if (!query) {
-        renderLeagueDirectory(state.directoryShops);
-        return;
-      }
-      const filtered = state.directoryShops.filter((shop) => [
-        shop.leagueId,
-        shop.projectId,
-        shop.name,
-        shop.description,
-        shop.projectTagline,
-        shop.chainId,
-        ...(shop.deployments || []).flatMap((deployment) => [deployment.chainId, deployment.projectId])
-      ].some((value) => plainProjectText(value).toLowerCase().includes(query)));
-      renderLeagueDirectory(filtered);
-    }
-
-    async function loadLeagueDirectory() {
-      try {
-        const response = await fetch(DISCOVERY_API_PATH);
-        if (!response.ok) throw new Error(`Directory request failed: ${response.status}`);
-        const data = await response.json();
-        state.directoryShops = Array.isArray(data?.shops) ? data.shops : [];
-        filterLeagueDirectory();
-      } catch (_) {
-        els.leagueDirectory.innerHTML = '<p class="league-directory-message">Could not load indexed league shops right now. You can still check a specific league above.</p>';
-      }
     }
 
     function renderPaymentNotice() {
@@ -3016,40 +2346,16 @@ Direct Juicebox routes use: 1=eth, 11155111=sep, 42161=arb, 421614=arbsep, 8453=
       else openConnectedWalletMenu();
     });
     els.buyNft.addEventListener('click', buyNft);
-    els.directoryFilter.addEventListener('input', filterLeagueDirectory);
-    els.copyDiscoveryPrompt.addEventListener('click', async (event) => {
-      event.preventDefault();
-      try {
-        await navigator.clipboard.writeText(DISCOVERY_AGENT_PROMPT);
-        els.copyDiscoveryPrompt.classList.add('copied');
-        els.copyDiscoveryPrompt.textContent = '[copied]';
-        window.setTimeout(() => {
-          els.copyDiscoveryPrompt.classList.remove('copied');
-          els.copyDiscoveryPrompt.textContent = '[prompt]';
-        }, 1400);
-      } catch (_) {
-        els.copyDiscoveryPrompt.textContent = '[unavailable]';
-        window.setTimeout(() => { els.copyDiscoveryPrompt.textContent = '[prompt]'; }, 1400);
-      }
-    });
-    els.copyDeployPrompt.addEventListener('click', async () => {
-      try {
-        await navigator.clipboard.writeText(DEPLOY_AGENT_PROMPT);
-        els.copyDeployPrompt.textContent = 'Instructions copied';
-        window.setTimeout(() => { els.copyDeployPrompt.textContent = 'Copy agent instructions'; }, 1800);
-      } catch (_) {
-        els.copyDeployPrompt.textContent = 'Copy unavailable';
-      }
-    });
     window.addEventListener('hashchange', () => window.location.reload());
 
     parseRoute();
-    if (state.isDiscovery) {
-      showDiscovery();
-      loadLeagueDirectory();
+    if (!state.projectId) {
+      els.shopView.hidden = true;
+      els.ownershipSummary.hidden = true;
+      els.title.textContent = 'FPL League NFT Shop';
+      els.subtitle.textContent = 'This project-specific template needs a Juicebox project route before it can load.';
+      setStatus('Project not configured', 'Set DEFAULT_PROJECT_ROUTE or open with #<chainSlug>:<projectId>.', true);
     } else {
-      document.body.classList.remove('discovery-mode');
-      els.directoryLink.hidden = false;
       renderTiers();
       renderPaymentNotice();
       eagerConnect().catch(() => {});
@@ -3057,17 +2363,15 @@ Direct Juicebox routes use: 1=eth, 11155111=sep, 42161=arb, 421614=arbsep, 8453=
         .then(() => {
           renderAll();
           setStatus('League ready', `${state.managers.length} managers loaded.`);
-          if (state.projectId) {
-            loadProjectMetadata().catch(() => {
-              state.paymentNotice = '';
-              renderPaymentNotice();
-            });
-            setStatus('Loading NFT tiers', 'Reading the Juicebox 721 shop.');
-            return loadProjectTiers().catch((error) => {
-              renderAll();
-              setStatus('League ready', `${state.managers.length} managers loaded. Using fallback tiers because the shop read failed: ${error.message}`);
-            });
-          }
+          loadProjectMetadata().catch(() => {
+            state.paymentNotice = '';
+            renderPaymentNotice();
+          });
+          setStatus('Loading NFT tiers', 'Reading the Juicebox 721 shop.');
+          return loadProjectTiers().catch((error) => {
+            renderAll();
+            setStatus('League ready', `${state.managers.length} managers loaded. Using fallback tiers because the shop read failed: ${error.message}`);
+          });
         })
         .catch((error) => {
           renderHeader();

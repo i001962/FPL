@@ -44,11 +44,11 @@ Example copied onto the pinned template:
 https://qstorage.quilibrium.com/footy/static-shop-template/index.html#basesep:19
 ```
 
-The template is a starter UI only. It resolves known test project IDs locally, loads the FPL leaderboard through FC-Footy, requires a manager and tier selection, derives `fpl:league={leagueId};entry={entryId}`, and points the buyer to the Juicebox project page. It does not replace the signer-reviewed deploy txlink, and it does not make the FPL manager-to-wallet link strong.
+The template is a starter UI only. It resolves known test project IDs locally, loads the FPL leaderboard in the browser through a CORS-capable endpoint such as FC-Footy, requires a manager and tier selection, uses only the selected FPL entry ID as the payment memo, and points the buyer to the Juicebox project page. It does not replace the signer-reviewed deploy txlink, and it does not make the FPL manager-to-wallet link strong.
 
-For a project-specific hosted copy, set `DEFAULT_PROJECT_ROUTE` in the copied template to the deployed `chainSlug:projectId` before publishing. The page must then load that project with no URL fragment, while an explicit `#<chainSlug>:<projectId>` fragment continues to override the default for reusable multi-project hosting.
+For a project-specific hosted copy, set `DEFAULT_PROJECT_ROUTE` in the copied template to the deployed `chainSlug:projectId` before publishing. The page must then load that project with no URL fragment, while an explicit `#<chainSlug>:<projectId>` fragment continues to override the default for testing. If no route is configured, the template shows a configuration error; it must not depend on a global shop index.
 
-The league data endpoint used by the template must allow browser reads from the QStorage origin. If FC-Footy is used, `GET /api/fpl-league` must send `Access-Control-Allow-Origin: *`. The template also accepts an `apiBase` query parameter for another CORS-capable endpoint.
+The league data endpoint used by the browser template must allow reads from the QStorage origin. If FC-Footy is used, `GET /api/fpl-league` must send `Access-Control-Allow-Origin: *`. The template also accepts an `apiBase` query parameter for another CORS-capable endpoint. This browser constraint does not apply to the skill workflow; agents should call Fantasy Premier League APIs directly when possible.
 
 ## Static Template Release
 
@@ -296,8 +296,7 @@ Apply optional edits to the temporary deploy state only. Example: if the user sa
 ## Workflow
 
 1. Parse the FPL classic league ID from `/leagues/{leagueId}/standings/c`.
-2. Fetch the league through the FC-Footy proxy to verify it exists:
-   - `https://fc-footy.vercel.app/api/fpl-league?leagueId={leagueId}`
+2. Fetch the league through Fantasy Premier League's public APIs to verify it exists. Agents do not need the FC-Footy browser proxy for this step because they are not constrained by browser CORS.
 3. If the league fetch fails, returns a non-2xx response, returns malformed JSON, or does not contain usable league standings/name data, stop. Do not deploy and do not output a txlink.
 4. Show the deployer the league name, manager count, and target chain before building the transaction.
 5. Load the bundled `.jb` draft and replace placeholders before building project metadata, pinning metadata, or building calldata:
@@ -461,9 +460,9 @@ Example:
 #basesep:19
 ```
 
-When a deployer publishes a project-specific copy, set its `DEFAULT_PROJECT_ROUTE` to the deployed `chainSlug:projectId` so the bare app URL loads that shop. Keep hash routes enabled as an override for shared or multi-project copies. Leave `DEFAULT_PROJECT_ROUTE` blank for a shared directory deployment; it then opens the league finder and queries the same-origin Bendystraw proxy at `/api/shops`.
+When a deployer publishes a project-specific copy, set its `DEFAULT_PROJECT_ROUTE` to the deployed `chainSlug:projectId` so the bare app URL loads that shop. Keep hash routes enabled as an override for testing. Do not require or create a global shop index for this template.
 
-For testing, the static template maps `basesep:19` to FPL league `143466` locally. Production shops must include `fpl.leagueId` and the indexed tags `fpl` plus `fpl-league:{leagueId}` in project metadata. The directory uses Bendystraw's `tags_has` filter to locate a league shop, then verifies `metadata.fpl.leagueId`; a temporary description fallback only supports legacy untagged projects. For Juicebox V6, read project metadata from the active controller via `JBDirectory.controllerOf(projectId)` then `IJBProjectUriRegistry.uriOf(projectId)`; `JBProjects.tokenURI(projectId)` may be empty.
+For testing, the static template maps `basesep:19` to FPL league `143466` locally. Production shops must include `fpl.leagueId` and the indexed tags `fpl` plus `fpl-league:{leagueId}` in project metadata. For Juicebox V6, read project metadata from the active controller via `JBDirectory.controllerOf(projectId)` then `IJBProjectUriRegistry.uriOf(projectId)`; `JBProjects.tokenURI(projectId)` may be empty.
 
 Buyer flow:
 
