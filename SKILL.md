@@ -270,7 +270,9 @@ The draft is intentionally opinionated:
 - Includes two initial NFT tiers:
   - `Full Season`, priced at `5`.
   - `Game Week 1`, priced at `5`.
+- Includes store categories: `Buy-ins`, `Contests`, `Collectibles`, and `Rewards`.
 - NFT tiers must not be buyable with credits. Set every tier's `flags.allowCredits` to `false`.
+- NFT tiers have no default splits. Proceeds should enter the league treasury unless the deployer explicitly selects a fee recipient and percentage for the deploy state.
 - Cash outs are disabled.
 - Owner/operator should be the deployer wallet.
 - Use the same default pinned image URI for the project logo and every NFT tier image unless the deployer explicitly provides replacements. This URI is already in the `.jb` draft and can be reused; do not block txlink creation just to pin new image files.
@@ -287,7 +289,7 @@ Ask for missing values only when they cannot be inferred:
 Optional edits:
 
 - League display name.
-- NFT tier name, description, price, supply, image, or split recipients.
+- NFT tier name, description, price, supply, image, category, or explicitly selected split recipients.
 - Project tagline or description.
 - Project metadata links/socials: `infoUri`, `twitter`, `discord`, `telegram`. Ask for these when preparing metadata, but do not require them. Include all four keys in project metadata even when the values are blank strings.
 
@@ -327,6 +329,8 @@ Apply optional edits to the temporary deploy state only. Example: if the user sa
    - `collection.issueTokensForSplits = false`
    - every NFT tier has `flags.allowCredits = false`
    - every NFT tier uses `state.details.logoUri` as `imageUri` unless explicitly overridden
+   - every NFT tier uses an intended store category from `state.storeCategories`
+   - no NFT tier has split recipients unless the deployer explicitly selected a fee recipient and percentage
    - if the default image URI is used, tell the deployer the project and NFT images can be changed later in Juicebox/Juicebox Money
 7. Set chain/network:
    - `base`: `network = "mainnet"`, `chainIds = [8453]`

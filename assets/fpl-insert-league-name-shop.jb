@@ -14,7 +14,7 @@
     "telegram": "",
     "tags": [],
     "coverImageUri": "",
-    "payDisclosure": "",
+    "payDisclosure": "Payments support the league treasury and may fund prizes. Contest winners are determined according to the rules shown for each contest. Unless stated otherwise, the league manager confirms results and authorizes rewards. Purchases are not automatically refundable.",
     "owner": "0x59733c7cd78d08dab90368ad2cc09c8c81f097c0",
     "immutable": false,
     "linksOpen": false,
@@ -105,23 +105,8 @@
       "price": "5",
       "limited": false,
       "supply": "",
-      "splitOn": true,
-      "splitRecipients": [
-        {
-          "pct": "1",
-          "recip": "0x8b80755C441d355405CA7571443Bb9247B77Ec16",
-          "benef": "",
-          "resolvedFor": null,
-          "resolvedAddress": null
-        },
-        {
-          "pct": "",
-          "recip": "11",
-          "benef": "0x8b80755C441d355405CA7571443Bb9247B77Ec16",
-          "resolvedFor": null,
-          "resolvedAddress": null
-        }
-      ],
+      "splitOn": false,
+      "splitRecipients": [],
       "discountOn": false,
       "discountPct": "",
       "category": 0,
@@ -150,26 +135,11 @@
       "price": "5",
       "limited": false,
       "supply": "",
-      "splitOn": true,
-      "splitRecipients": [
-        {
-          "pct": "1",
-          "recip": "0x8b80755C441d355405CA7571443Bb9247B77Ec16",
-          "benef": "",
-          "resolvedFor": null,
-          "resolvedAddress": null
-        },
-        {
-          "pct": "",
-          "recip": "11",
-          "benef": "0x8b80755C441d355405CA7571443Bb9247B77Ec16",
-          "resolvedFor": null,
-          "resolvedAddress": null
-        }
-      ],
+      "splitOn": false,
+      "splitRecipients": [],
       "discountOn": false,
       "discountPct": "",
-      "category": 0,
+      "category": 1,
       "reserveOn": false,
       "reserveFrequency": "",
       "reserveBeneficiary": "",
@@ -185,7 +155,12 @@
     }
   ],
   "perChain": {},
-  "storeCategories": [],
+  "storeCategories": [
+    "Buy-ins",
+    "Contests",
+    "Collectibles",
+    "Rewards"
+  ],
   "collection": {
     "name": "",
     "symbol": "",

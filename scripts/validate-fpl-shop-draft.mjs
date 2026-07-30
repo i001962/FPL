@@ -75,14 +75,24 @@ async function fetchLeaguePage(page) {
 
 const league = await fetchLeaguePage(1);
 
+function managerCountForPage(leaguePage) {
+  return Number(leaguePage?.standings?.results?.length || 0)
+    + Number(leaguePage?.new_entries?.results?.length || 0);
+}
+
+function pageHasNext(leaguePage) {
+  return Boolean(leaguePage?.standings?.has_next || leaguePage?.new_entries?.has_next);
+}
+
 const leagueName = league?.league?.name;
-let managerCount = Number(league?.standings?.results?.length || 0);
-let page = Number(league?.standings?.page || 1);
-while (league?.standings?.has_next && page < 50) {
+let managerCount = managerCountForPage(league);
+let page = Math.max(Number(league?.standings?.page || 1), Number(league?.new_entries?.page || 1));
+let hasNext = pageHasNext(league);
+while (hasNext && page < 50) {
   page += 1;
   const nextLeague = await fetchLeaguePage(page);
-  managerCount += Number(nextLeague?.standings?.results?.length || 0);
-  league.standings.has_next = Boolean(nextLeague?.standings?.has_next);
+  managerCount += managerCountForPage(nextLeague);
+  hasNext = pageHasNext(nextLeague);
 }
 if (!leagueName || !managerCount) {
   console.error('FPL league response did not include usable league name and manager data.');
@@ -126,6 +136,7 @@ const projectMetadata = {
   projectTagline: state.details.tagline || '',
   description: state.details.description,
   logoUri: state.details.logoUri,
+  payDisclosure: state.details.payDisclosure || '',
   infoUri: state.details.website || '',
   twitter: state.details.twitter || '',
   discord: state.details.discord || '',
@@ -147,6 +158,7 @@ const fields = [
   ['projectMetadata.name', projectMetadata.name],
   ['projectMetadata.projectTagline', projectMetadata.projectTagline],
   ['projectMetadata.description', projectMetadata.description],
+  ['projectMetadata.payDisclosure', projectMetadata.payDisclosure],
   ['projectMetadata.infoUri', projectMetadata.infoUri],
   ['projectMetadata.twitter', projectMetadata.twitter],
   ['projectMetadata.discord', projectMetadata.discord],
@@ -168,8 +180,19 @@ if (placeholderFailures.length) {
 
 const tierNames = (state.nfts || []).map((nft) => nft.name);
 const tierFailures = [];
+const expectedCategories = ['Buy-ins', 'Contests', 'Collectibles', 'Rewards'];
 if (!tierNames.includes('Full Season')) tierFailures.push('missing Full Season tier');
 if (!tierNames.includes('Game Week 1')) tierFailures.push('missing Game Week 1 tier');
+if (!projectMetadata.payDisclosure.trim()) tierFailures.push('payment disclosure is blank');
+if (JSON.stringify(state.storeCategories || []) !== JSON.stringify(expectedCategories)) {
+  tierFailures.push(`store categories must be ${expectedCategories.join(', ')}`);
+}
+if ((state.nfts || []).some((nft) => !Number.isInteger(nft.category) || nft.category < 0 || nft.category >= expectedCategories.length)) {
+  tierFailures.push('at least one NFT tier has no valid store category');
+}
+if ((state.nfts || []).some((nft) => nft.splitOn || (nft.splitRecipients || []).length)) {
+  tierFailures.push('reusable draft must not contain default NFT tier splits');
+}
 if ((state.nfts || []).some((nft) => nft.flags?.allowCredits !== false)) {
   tierFailures.push('at least one NFT tier allows credit purchases');
 }
@@ -199,7 +222,10 @@ console.log(JSON.stringify({
   nfts: state.nfts.map((nft) => ({
     name: nft.name,
     price: nft.price,
+    category: expectedCategories[nft.category] || null,
     allowCredits: nft.flags.allowCredits,
+    splitOn: nft.splitOn,
+    splitRecipients: nft.splitRecipients?.length || 0,
     imageMatchesProject: nft.imageUri === state.details.logoUri,
   })),
 }, null, 2));
