@@ -212,9 +212,71 @@
       color: #fff;
     }
 
+    .button.connected {
+      border-color: rgba(8, 168, 138, 0.5);
+      background: rgba(8, 168, 138, 0.08);
+      color: var(--ink);
+    }
+
     .button:disabled {
       cursor: not-allowed;
       opacity: 0.52;
+    }
+
+    .wallet-menu {
+      position: fixed;
+      z-index: 20;
+      min-width: 220px;
+      padding: 6px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+      box-shadow: 0 18px 45px rgba(20, 33, 61, 0.18);
+    }
+
+    .wallet-menu-item,
+    .wallet-menu-note {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      width: 100%;
+      min-height: 36px;
+      padding: 8px 10px;
+      border: 0;
+      border-radius: 6px;
+      background: transparent;
+      color: var(--ink);
+      font: inherit;
+      font-size: 0.88rem;
+      text-align: left;
+      text-decoration: none;
+    }
+
+    .wallet-menu-item {
+      cursor: pointer;
+    }
+
+    .wallet-menu-item:hover {
+      background: rgba(8, 168, 138, 0.08);
+    }
+
+    .wallet-menu-danger {
+      color: var(--error);
+    }
+
+    .wallet-menu-note {
+      color: var(--muted);
+      cursor: default;
+    }
+
+    .wallet-menu-error {
+      color: var(--error);
+    }
+
+    .wallet-pick-icon {
+      width: 18px;
+      height: 18px;
+      border-radius: 4px;
     }
 
     .wallet-card,
@@ -286,6 +348,22 @@
       background: rgba(8, 168, 138, 0.08);
     }
 
+    .upload-box {
+      display: grid;
+      gap: 8px;
+      min-height: 96px;
+      align-content: center;
+      padding: 18px;
+      border: 1px dashed rgba(8, 168, 138, 0.52);
+      border-radius: 8px;
+      background: rgba(8, 168, 138, 0.06);
+    }
+
+    .upload-box input {
+      padding: 10px;
+      background: #fff;
+    }
+
     @media (max-width: 900px) {
       header,
       .layout,
@@ -347,16 +425,17 @@
             <textarea id="projectDescription"></textarea>
           </div>
           <div class="row">
-            <div class="field">
-              <label for="projectImage">Project image URI</label>
-              <input id="projectImage" type="text" placeholder="ipfs://..." autocomplete="off">
+            <div class="field upload-box">
+              <label for="projectImageUpload">Project image upload</label>
+              <input id="projectImageUpload" type="file" accept="image/*">
+              <p class="muted" id="imageLabel">Using the template image until one is uploaded.</p>
             </div>
             <div class="field">
               <label for="membershipPrice">Membership price</label>
               <input id="membershipPrice" type="number" min="0" step="0.01" autocomplete="off">
             </div>
           </div>
-          <p class="muted">The project image also becomes the first NFT membership image. Other NFT tiers, categories, payment settings, token settings, and split defaults stay unchanged from the `.jb` template.</p>
+          <p class="muted">The uploaded project image also becomes the first NFT membership image. This page embeds the upload in the preview draft so an agent can pin it before deploy. Other NFT tiers, categories, payment settings, token settings, and split defaults stay unchanged from the `.jb` template.</p>
         </div>
       </section>
 
@@ -393,14 +472,33 @@
     ];
     const DEFAULT_API_BASE = 'https://fc-footy.vercel.app/api/fpl-league?leagueId=';
     const DEFAULT_IMAGE = 'ipfs://bafkreib3a2bk2ufpr2dwolmwzxb7zkgvgcry65qmyicvqmnnbvtwhifjri';
+    const WALLET_FLAG = 'fpl-shop-deploy-wallet-connected';
+    const WALLET_RDNS = 'fpl-shop-deploy-wallet-rdns';
+    const WALLET_PROVIDER_FALLBACK = { info: { uuid: 'injected-0', name: 'Browser wallet', rdns: 'injected', icon: '' }, provider: window.ethereum };
+    const discoveredProviders = [];
 
     const state = {
       template: null,
       draft: null,
       leagueId: '',
       leagueName: '',
-      wallet: ''
+      imageDataUrl: '',
+      imageName: '',
+      walletAccount: '',
+      walletChainId: '',
+      activeProvider: window.ethereum || null,
+      activeProviderInfo: window.ethereum ? WALLET_PROVIDER_FALLBACK.info : null,
+      walletConnecting: false
     };
+
+    window.addEventListener?.('eip6963:announceProvider', (event) => {
+      const detail = event?.detail;
+      if (!detail?.info || !detail?.provider) return;
+      if (!discoveredProviders.some((entry) => entry.info.uuid === detail.info.uuid)) {
+        discoveredProviders.push(detail);
+      }
+    });
+    try { window.dispatchEvent(new Event('eip6963:requestProvider')); } catch (_) {}
 
     const els = {
       status: document.querySelector('#status'),
@@ -409,7 +507,8 @@
       resetDraft: document.querySelector('#resetDraft'),
       projectName: document.querySelector('#projectName'),
       projectDescription: document.querySelector('#projectDescription'),
-      projectImage: document.querySelector('#projectImage'),
+      projectImageUpload: document.querySelector('#projectImageUpload'),
+      imageLabel: document.querySelector('#imageLabel'),
       membershipPrice: document.querySelector('#membershipPrice'),
       connectWallet: document.querySelector('#connectWallet'),
       walletLabel: document.querySelector('#walletLabel'),
@@ -461,6 +560,11 @@
       return `https://ipfs.io/ipfs/${text.slice('ipfs://'.length)}`;
     }
 
+    function shortAddress(address) {
+      const text = String(address || '');
+      return text ? `${text.slice(0, 6)}...${text.slice(-4)}` : '';
+    }
+
     async function loadTemplate() {
       let lastError = null;
       for (const path of DRAFT_PATHS) {
@@ -483,7 +587,9 @@
       state.draft = clone(state.template);
       state.leagueId = '';
       state.leagueName = '';
-      if (state.wallet) applyWallet();
+      state.imageDataUrl = '';
+      state.imageName = '';
+      if (state.walletAccount) applyWallet();
       hydrateFields();
       render();
     }
@@ -492,7 +598,8 @@
       const draft = state.draft;
       els.projectName.value = draft?.details?.name || '';
       els.projectDescription.value = draft?.details?.description || '';
-      els.projectImage.value = draft?.details?.logoUri || DEFAULT_IMAGE;
+      els.projectImageUpload.value = '';
+      els.imageLabel.textContent = 'Using the template image until one is uploaded.';
       els.membershipPrice.value = draft?.nfts?.[0]?.price || '';
     }
 
@@ -535,15 +642,15 @@
     }
 
     function applyWallet() {
-      if (!state.draft || !state.wallet) return;
-      state.draft.details.owner = state.wallet;
-      state.draft.revOperator = state.wallet;
+      if (!state.draft) return;
+      state.draft.details.owner = state.walletAccount || state.template?.details?.owner || '';
+      state.draft.revOperator = state.walletAccount || state.template?.revOperator || '';
     }
 
     function applyForm() {
       if (!state.draft) return;
       const draft = state.draft;
-      const imageUri = els.projectImage.value.trim() || DEFAULT_IMAGE;
+      const imageUri = state.imageDataUrl || draft.details.logoUri || DEFAULT_IMAGE;
       draft.details.name = els.projectName.value.trim();
       draft.details.description = els.projectDescription.value.trim();
       draft.details.logoUri = imageUri;
@@ -562,9 +669,16 @@
       const nft = draft?.nfts?.[0] || {};
       const imageUri = draft?.details?.logoUri || DEFAULT_IMAGE;
       els.leagueLabel.textContent = state.leagueName ? `${state.leagueName} #${state.leagueId}` : 'Not loaded';
-      els.ownerLabel.textContent = state.wallet || 'Not set';
-      els.walletLabel.textContent = state.wallet || 'Not connected';
-      els.connectWallet.textContent = state.wallet ? 'Wallet connected' : 'Connect wallet';
+      els.ownerLabel.textContent = state.walletAccount || 'Not set';
+      els.walletLabel.textContent = state.walletAccount
+        ? `${state.activeProviderInfo?.name || 'Wallet'} ${shortAddress(state.walletAccount)}`
+        : 'Not connected';
+      els.connectWallet.textContent = state.walletAccount
+        ? shortAddress(state.walletAccount)
+        : (state.walletConnecting ? 'Connecting...' : 'Connect wallet');
+      els.connectWallet.classList.toggle('connected', !!state.walletAccount);
+      els.connectWallet.title = state.walletAccount || 'Connect a wallet';
+      els.connectWallet.disabled = state.walletConnecting;
       els.nftLabel.textContent = nft.name || 'Full Season';
       els.priceLabel.textContent = nft.price || '0';
       els.splitsLabel.textContent = nft.splitOn || nft.splitRecipients?.length ? 'Custom' : 'None';
@@ -572,20 +686,301 @@
       els.draftPreview.value = draft ? JSON.stringify(draft, null, 2) : '';
     }
 
-    async function connectWallet() {
-      const provider = window.ethereum;
-      if (!provider?.request) {
-        setStatus('Wallet unavailable', 'Open this page in a browser with an injected wallet.', true);
+    function walletNameForProvider(provider) {
+      if (!provider) return 'Browser wallet';
+      if (provider.isMetaMask) return 'MetaMask';
+      if (provider.isCoinbaseWallet) return 'Coinbase Wallet';
+      if (provider.isRabby) return 'Rabby';
+      if (provider.isTrust) return 'Trust Wallet';
+      if (provider.isBraveWallet) return 'Brave Wallet';
+      return 'Browser wallet';
+    }
+
+    function walletRdnsForProvider(provider) {
+      if (!provider) return 'injected';
+      if (provider.isMetaMask) return 'io.metamask';
+      if (provider.isCoinbaseWallet) return 'com.coinbase.wallet';
+      if (provider.isRabby) return 'io.rabby';
+      if (provider.isTrust) return 'com.trustwallet.app';
+      if (provider.isBraveWallet) return 'com.brave.wallet';
+      return 'injected';
+    }
+
+    function legacyProviders() {
+      if (!window.ethereum) return [];
+      const list = Array.isArray(window.ethereum.providers) && window.ethereum.providers.length
+        ? window.ethereum.providers
+        : [window.ethereum];
+      const seen = [];
+      return list.filter((provider) => {
+        if (!provider || seen.includes(provider)) return false;
+        seen.push(provider);
+        return true;
+      }).map((provider, index) => ({
+        info: { uuid: `injected-${index}`, name: walletNameForProvider(provider), rdns: walletRdnsForProvider(provider), icon: '' },
+        provider
+      }));
+    }
+
+    function getProviders() {
+      return discoveredProviders.length ? [...discoveredProviders] : legacyProviders();
+    }
+
+    function refreshProviders(waitMs = 350) {
+      try { window.dispatchEvent(new Event('eip6963:requestProvider')); } catch (_) {}
+      return new Promise((resolve) => window.setTimeout(() => resolve(getProviders()), waitMs));
+    }
+
+    function walletDappUrl(href) {
+      const raw = String(href || '');
+      let url;
+      try { url = new URL(raw); } catch (_) { return raw; }
+      const suffix = '.ipfs.inbrowser.link';
+      const host = url.hostname.toLowerCase();
+      if (host.endsWith(suffix) && host.length > suffix.length) {
+        const cid = host.slice(0, -suffix.length);
+        return `https://ipfs.io/ipfs/${cid}${url.pathname || '/'}${url.search || ''}${url.hash || ''}`;
+      }
+      if (host === 'ipfs.inbrowser.link') {
+        const match = /^\/ipfs\/([^/]+)(\/.*)?$/.exec(url.pathname);
+        if (match) return `https://ipfs.io/ipfs/${match[1]}${match[2] || '/'}${url.search || ''}${url.hash || ''}`;
+      }
+      return raw;
+    }
+
+    function mobileWalletLinks(href) {
+      const full = walletDappUrl(href);
+      const dapp = encodeURIComponent(full.replace(/^https?:\/\//i, ''));
+      return [
+        { name: 'Open in MetaMask', href: `https://metamask.app.link/dapp/${dapp}` },
+        { name: 'Open in Coinbase Wallet', href: `https://go.cb-w.com/dapp?cb_url=${encodeURIComponent(full)}` },
+        { name: 'Open in Trust Wallet', href: `https://link.trustwallet.com/open_url?coin_id=60&url=${encodeURIComponent(full)}` }
+      ];
+    }
+
+    function bindProviderEvents(provider) {
+      if (!provider?.on) return;
+      try {
+        provider.on('accountsChanged', (accounts) => {
+          state.walletAccount = accounts?.[0] || '';
+          if (!state.walletAccount) {
+            localStorage.removeItem(WALLET_FLAG);
+            localStorage.removeItem(WALLET_RDNS);
+          }
+          applyForm();
+        });
+        provider.on('chainChanged', (chainId) => {
+          state.walletChainId = chainId;
+          render();
+        });
+      } catch (_) {}
+    }
+
+    async function connectToProvider(entry) {
+      if (entry?.provider) {
+        state.activeProvider = entry.provider;
+        state.activeProviderInfo = entry.info || { name: 'Wallet', rdns: 'injected' };
+        bindProviderEvents(state.activeProvider);
+        localStorage.setItem(WALLET_RDNS, state.activeProviderInfo.rdns || '');
+      }
+      if (!state.activeProvider) throw new Error('No wallet detected in this browser.');
+      const accounts = await state.activeProvider.request({ method: 'eth_requestAccounts' });
+      state.walletAccount = accounts?.[0] || '';
+      state.walletChainId = await state.activeProvider.request({ method: 'eth_chainId' }).catch(() => '');
+      localStorage.setItem(WALLET_FLAG, '1');
+      applyForm();
+      return state.walletAccount;
+    }
+
+    async function disconnectWallet() {
+      try {
+        await state.activeProvider?.request?.({ method: 'wallet_revokePermissions', params: [{ eth_accounts: {} }] });
+      } catch (_) {}
+      state.walletAccount = '';
+      state.walletChainId = '';
+      localStorage.removeItem(WALLET_FLAG);
+      localStorage.removeItem(WALLET_RDNS);
+      applyForm();
+    }
+
+    async function eagerConnect() {
+      if (localStorage.getItem(WALLET_FLAG) !== '1') return;
+      const rdns = localStorage.getItem(WALLET_RDNS) || '';
+      const providers = await refreshProviders(450);
+      const match = providers.find((entry) => entry.info?.rdns === rdns) || providers[0];
+      if (!match?.provider) return;
+      state.activeProvider = match.provider;
+      state.activeProviderInfo = match.info || null;
+      bindProviderEvents(state.activeProvider);
+      const accounts = await state.activeProvider.request({ method: 'eth_accounts' }).catch(() => []);
+      state.walletAccount = accounts?.[0] || '';
+      state.walletChainId = state.walletAccount ? await state.activeProvider.request({ method: 'eth_chainId' }).catch(() => '') : '';
+      applyForm();
+    }
+
+    let walletMenu = null;
+
+    function closeWalletMenu() {
+      if (!walletMenu) return;
+      walletMenu.remove();
+      walletMenu = null;
+      document.removeEventListener('click', onWalletDocClick, true);
+    }
+
+    function onWalletDocClick(event) {
+      if (walletMenu && event.target !== els.connectWallet && !walletMenu.contains(event.target)) closeWalletMenu();
+    }
+
+    function positionWalletMenu() {
+      const rect = els.connectWallet.getBoundingClientRect();
+      walletMenu.style.top = `${rect.bottom + 6}px`;
+      walletMenu.style.right = `${Math.max(8, window.innerWidth - rect.right)}px`;
+    }
+
+    function openWalletNotice(message, isError = false) {
+      closeWalletMenu();
+      walletMenu = document.createElement('div');
+      walletMenu.className = 'wallet-menu';
+      positionWalletMenu();
+      const note = document.createElement('div');
+      note.className = `wallet-menu-note${isError ? ' wallet-menu-error' : ''}`;
+      note.textContent = message;
+      walletMenu.appendChild(note);
+      if (!getProviders().length) {
+        mobileWalletLinks(window.location.href).forEach((link) => {
+          const anchor = document.createElement('a');
+          anchor.className = 'wallet-menu-item wallet-menu-link';
+          anchor.href = link.href;
+          anchor.textContent = link.name;
+          walletMenu.appendChild(anchor);
+        });
+        if (typeof navigator.share === 'function') {
+          const share = document.createElement('button');
+          share.type = 'button';
+          share.className = 'wallet-menu-item';
+          share.textContent = 'Open another wallet...';
+          share.addEventListener('click', () => {
+            navigator.share({ title: document.title, url: walletDappUrl(window.location.href) }).catch((error) => {
+              if (!error || error.name !== 'AbortError') openWalletNotice(error?.message || 'Could not open wallet apps.', true);
+            });
+          });
+          walletMenu.appendChild(share);
+        }
+      }
+      document.body.appendChild(walletMenu);
+      window.setTimeout(() => document.addEventListener('click', onWalletDocClick, true), 0);
+    }
+
+    function openConnectedWalletMenu() {
+      closeWalletMenu();
+      walletMenu = document.createElement('div');
+      walletMenu.className = 'wallet-menu';
+      positionWalletMenu();
+      const provider = document.createElement('div');
+      provider.className = 'wallet-menu-note';
+      provider.textContent = state.activeProviderInfo?.name || 'Connected wallet';
+      const copy = document.createElement('button');
+      copy.type = 'button';
+      copy.className = 'wallet-menu-item';
+      copy.textContent = 'Copy address';
+      copy.addEventListener('click', async () => {
+        try { await navigator.clipboard.writeText(state.walletAccount); } catch (_) {}
+        closeWalletMenu();
+      });
+      const disconnect = document.createElement('button');
+      disconnect.type = 'button';
+      disconnect.className = 'wallet-menu-item wallet-menu-danger';
+      disconnect.textContent = 'Disconnect';
+      disconnect.addEventListener('click', async () => {
+        closeWalletMenu();
+        await disconnectWallet();
+        setStatus('Wallet disconnected', 'Connect a wallet to set owner/operator again.');
+      });
+      walletMenu.appendChild(provider);
+      walletMenu.appendChild(copy);
+      walletMenu.appendChild(disconnect);
+      document.body.appendChild(walletMenu);
+      window.setTimeout(() => document.addEventListener('click', onWalletDocClick, true), 0);
+    }
+
+    async function connectWithMenuProvider(entry) {
+      closeWalletMenu();
+      state.walletConnecting = true;
+      render();
+      try {
+        await connectToProvider(entry);
+        setStatus('Wallet connected', state.walletAccount);
+      } catch (error) {
+        openWalletNotice(error?.message || 'Could not connect wallet.', true);
+      } finally {
+        state.walletConnecting = false;
+        render();
+      }
+    }
+
+    async function openWalletPicker() {
+      closeWalletMenu();
+      let providers = getProviders();
+      if (!providers.length) {
+        openWalletNotice('Looking for wallet...');
+        providers = await refreshProviders(500);
+        if (!providers.length) {
+          openWalletNotice('No wallet detected in this browser. Open this page in a wallet app browser, or install a browser wallet.', true);
+          return;
+        }
+      }
+      if (providers.length === 1) {
+        await connectWithMenuProvider(providers[0]);
         return;
       }
-      try {
-        const accounts = await provider.request({ method: 'eth_requestAccounts' });
-        state.wallet = accounts?.[0] || '';
+      walletMenu = document.createElement('div');
+      walletMenu.className = 'wallet-menu';
+      positionWalletMenu();
+      providers.forEach((entry) => {
+        const item = document.createElement('button');
+        item.type = 'button';
+        item.className = 'wallet-menu-item wallet-pick';
+        if (entry.info?.icon) {
+          const icon = document.createElement('img');
+          icon.className = 'wallet-pick-icon';
+          icon.src = entry.info.icon;
+          icon.alt = '';
+          item.appendChild(icon);
+        }
+        const name = document.createElement('span');
+        name.textContent = entry.info?.name || 'Wallet';
+        item.appendChild(name);
+        item.addEventListener('click', () => connectWithMenuProvider(entry));
+        walletMenu.appendChild(item);
+      });
+      document.body.appendChild(walletMenu);
+      window.setTimeout(() => document.addEventListener('click', onWalletDocClick, true), 0);
+    }
+
+    function handleImageUpload() {
+      const file = els.projectImageUpload.files?.[0];
+      if (!file) {
+        state.imageDataUrl = '';
+        state.imageName = '';
+        els.imageLabel.textContent = 'Using the template image until one is uploaded.';
         applyForm();
-        setStatus('Wallet connected', state.wallet);
-      } catch (error) {
-        setStatus('Wallet rejected', error.message || 'Connection was not approved.', true);
+        return;
       }
+      if (!file.type.startsWith('image/')) {
+        setStatus('Image unavailable', 'Choose an image file.', true);
+        return;
+      }
+      const reader = new FileReader();
+      reader.addEventListener('load', () => {
+        state.imageDataUrl = String(reader.result || '');
+        state.imageName = file.name;
+        els.imageLabel.textContent = `${file.name} selected. The deploy flow should pin it before transaction generation.`;
+        applyForm();
+      });
+      reader.addEventListener('error', () => {
+        setStatus('Image unavailable', 'Could not read that image file.', true);
+      });
+      reader.readAsDataURL(file);
     }
 
     async function copyDraft() {
@@ -607,16 +1002,26 @@
 
     els.loadLeague.addEventListener('click', loadLeague);
     els.resetDraft.addEventListener('click', resetDraft);
-    els.connectWallet.addEventListener('click', connectWallet);
+    els.connectWallet.addEventListener('click', () => {
+      if (!state.walletAccount) {
+        if (walletMenu) closeWalletMenu();
+        else openWalletPicker();
+        return;
+      }
+      if (walletMenu) closeWalletMenu();
+      else openConnectedWalletMenu();
+    });
     els.copyDraft.addEventListener('click', copyDraft);
     els.downloadDraft.addEventListener('click', downloadDraft);
-    [els.projectName, els.projectDescription, els.projectImage, els.membershipPrice].forEach((input) => {
+    els.projectImageUpload.addEventListener('change', handleImageUpload);
+    [els.projectName, els.projectDescription, els.membershipPrice].forEach((input) => {
       input.addEventListener('input', applyForm);
     });
 
     loadTemplate().catch((error) => {
       setStatus('Template unavailable', error.message, true);
     });
+    eagerConnect().catch(() => {});
   </script>
 </body>
 </html>
