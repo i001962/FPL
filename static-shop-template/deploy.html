@@ -364,7 +364,7 @@
     <header>
       <div>
         <h1>Deploy FPL League Shop</h1>
-        <p class="subtitle">Configure the league shop, then pay the separate $2.00 USDC deploy checkout on Base Sepolia. The deploy payment memo is the loaded classic league ID.</p>
+        <p class="subtitle">Configure the league shop, pin its metadata, then deploy the Juicebox project directly on Base Sepolia.</p>
       </div>
       <div class="status" id="status">
         <strong>Load a league</strong>
@@ -383,7 +383,7 @@
           <div class="actions">
             <button class="button primary" id="loadLeague" type="button">Load league</button>
           </div>
-          <p class="muted">Loading the league fills the default project name and description. The $2.00 checkout pays for deploying this configured project; it is not the membership NFT price.</p>
+          <p class="muted">Loading the league fills the default project name and description used in the deploy transaction.</p>
         </div>
 
         <h2 style="margin-top: 26px;">Project Being Deployed</h2>
@@ -400,6 +400,7 @@
             <div class="field upload-box">
               <label for="projectImageUpload">Project image upload</label>
               <input id="projectImageUpload" type="file" accept="image/*">
+              <input id="pinataJwt" type="password" placeholder="Pinata JWT required only for uploaded images" autocomplete="off">
               <p class="muted" id="imageLabel">Using slopsshop.png as the default deploy image.</p>
             </div>
             <div class="field">
@@ -407,25 +408,25 @@
               <input id="membershipPrice" type="number" min="0" step="0.01" value="5.00" autocomplete="off">
             </div>
           </div>
-          <p class="muted">The membership NFT price belongs to the league shop being deployed. It is separate from the fixed $2.00 deploy checkout.</p>
+          <p class="muted">The membership NFT price is written into the first NFT tier in the deploy template.</p>
         </div>
         <img class="checkout-image" id="imagePreview" src="assets/slopsshop.png" alt="FPL Shop">
       </section>
 
-      <aside aria-label="Payment summary">
-        <h2>Checkout</h2>
+      <aside aria-label="Deploy summary">
+        <h2>Deploy</h2>
         <div class="summary">
           <div class="summary-row"><span>League</span><strong id="leagueLabel">Not loaded</strong></div>
           <div class="summary-row"><span>Configured shop</span><strong id="shopLabel">Not configured</strong></div>
           <div class="summary-row"><span>Membership NFT</span><strong id="membershipLabel">$5.00</strong></div>
-          <div class="summary-row"><span>Checkout project</span><strong>basesep:12</strong></div>
-          <div class="summary-row"><span>Deploy fee</span><strong>$2.00 USDC</strong></div>
-          <div class="summary-row"><span>Payment memo</span><strong id="memoLabel">Load league</strong></div>
+          <div class="summary-row"><span>Network</span><strong>Base Sepolia</strong></div>
+          <div class="summary-row"><span>Template</span><strong>.jb direct deploy</strong></div>
+          <div class="summary-row"><span>Metadata</span><strong id="memoLabel">Pin on deploy</strong></div>
           <div class="summary-row"><span>Wallet</span><strong id="walletLabel">Not connected</strong></div>
         </div>
         <div class="actions">
           <button class="button full" id="connectWallet" type="button">Connect wallet</button>
-          <button class="button primary full" id="payButton" type="button" disabled>Pay $2.00 USDC</button>
+          <button class="button primary full" id="payButton" type="button" disabled>Pin and deploy</button>
         </div>
         <div class="tx-status" id="txStatus" aria-live="polite"></div>
       </aside>
@@ -433,22 +434,29 @@
   </main>
 
   <script type="module">
-    import { encodeFunctionData, parseUnits } from 'https://esm.sh/viem@2.21.55';
+    import { decodeEventLog, encodeFunctionData, keccak256, parseUnits, stringToHex } from 'https://esm.sh/viem@2.21.55';
 
     const DEFAULT_API_BASE = 'https://fc-footy.vercel.app/api/fpl-league?leagueId=';
+    const TEMPLATE_PATHS = ['assets/fpl-insert-league-name-shop.jb', '../assets/fpl-insert-league-name-shop.jb'];
+    const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000';
+    const NATIVE_TOKEN = '0x000000000000000000000000000000000000EEEe';
+    const UINT224_MAX = (1n << 224n) - 1n;
+    const SPLITS_TOTAL = 1000000000;
+    const TIER_UNLIMITED_SUPPLY = 999999999;
     const PROJECT = {
       chainSlug: 'basesep',
-      projectId: 12n,
-      amountUsd: '2.00',
       chain: {
         chainId: 84532,
         chainHex: '0x14a34',
         name: 'Base Sepolia',
         rpcUrls: ['https://sepolia.base.org'],
         blockExplorerUrls: ['https://sepolia.basescan.org'],
+        deployer721: '0x3ffdc94e7f1de4b74c52158ec9dd3b965585f451',
+        controller: '0x3fcec3572e84b624477bcff4e2cf1f7deab648f1',
+        projects: '0x6017d1fba9dc279bfa0b03fd931c22e242ab3691',
         terminal: '0x130f5dd2bd8805443cf41755253d778a75a67f53',
-        approvalGasLimit: 100000n,
-        payGasLimit: 1000000n,
+        routerTerminal: '0xe0427f250fdb0379c8e98e884ee4570521208cbc',
+        deployGasLimit: 8000000n,
         token: { symbol: 'USDC', address: '0x036CbD53842c5426634e7929541eC2318f3dCF7e', decimals: 6 }
       }
     };
@@ -457,38 +465,130 @@
     const WALLET_PROVIDER_FALLBACK = { info: { uuid: 'injected-0', name: 'Browser wallet', rdns: 'injected', icon: '' }, provider: window.ethereum };
     const discoveredProviders = [];
 
-    const PAY_ABI = [{
+    const SPLIT_COMPONENTS = [
+      { name: 'percent', type: 'uint32' },
+      { name: 'projectId', type: 'uint64' },
+      { name: 'beneficiary', type: 'address' },
+      { name: 'preferAddToBalance', type: 'bool' },
+      { name: 'lockedUntil', type: 'uint48' },
+      { name: 'hook', type: 'address' }
+    ];
+    const SPLIT_GROUP_COMPONENTS = [
+      { name: 'groupId', type: 'uint256' },
+      { name: 'splits', type: 'tuple[]', components: SPLIT_COMPONENTS }
+    ];
+    const FUND_ACCESS_COMPONENTS = [
+      { name: 'terminal', type: 'address' },
+      { name: 'token', type: 'address' },
+      { name: 'payoutLimits', type: 'tuple[]', components: [
+        { name: 'amount', type: 'uint224' },
+        { name: 'currency', type: 'uint32' }
+      ] },
+      { name: 'surplusAllowances', type: 'tuple[]', components: [
+        { name: 'amount', type: 'uint224' },
+        { name: 'currency', type: 'uint32' }
+      ] }
+    ];
+    const PAY_DATA_HOOK_RULESET_COMPONENTS = [
+      { name: 'mustStartAtOrAfter', type: 'uint48' },
+      { name: 'duration', type: 'uint32' },
+      { name: 'weight', type: 'uint112' },
+      { name: 'weightCutPercent', type: 'uint32' },
+      { name: 'approvalHook', type: 'address' },
+      { name: 'metadata', type: 'tuple', components: [
+        { name: 'reservedPercent', type: 'uint16' },
+        { name: 'cashOutTaxRate', type: 'uint16' },
+        { name: 'baseCurrency', type: 'uint32' },
+        { name: 'pausePay', type: 'bool' },
+        { name: 'pauseCreditTransfers', type: 'bool' },
+        { name: 'allowOwnerMinting', type: 'bool' },
+        { name: 'allowSetCustomToken', type: 'bool' },
+        { name: 'allowTerminalMigration', type: 'bool' },
+        { name: 'allowSetTerminals', type: 'bool' },
+        { name: 'allowSetController', type: 'bool' },
+        { name: 'allowAddAccountingContext', type: 'bool' },
+        { name: 'allowAddPriceFeed', type: 'bool' },
+        { name: 'ownerMustSendPayouts', type: 'bool' },
+        { name: 'holdFees', type: 'bool' },
+        { name: 'scopeCashOutsToLocalBalances', type: 'bool' },
+        { name: 'useDataHookForCashOut', type: 'bool' },
+        { name: 'metadata', type: 'uint16' }
+      ] },
+      { name: 'splitGroups', type: 'tuple[]', components: SPLIT_GROUP_COMPONENTS },
+      { name: 'fundAccessLimitGroups', type: 'tuple[]', components: FUND_ACCESS_COMPONENTS }
+    ];
+    const TIER_FLAGS = [
+      { name: 'allowOwnerMint', type: 'bool' },
+      { name: 'useReserveBeneficiaryAsDefault', type: 'bool' },
+      { name: 'transfersPausable', type: 'bool' },
+      { name: 'useVotingUnits', type: 'bool' },
+      { name: 'cantBeRemoved', type: 'bool' },
+      { name: 'cantIncreaseDiscountPercent', type: 'bool' },
+      { name: 'cantBuyWithCredits', type: 'bool' }
+    ];
+    const TIER_COMPONENTS = [
+      { name: 'price', type: 'uint104' },
+      { name: 'initialSupply', type: 'uint32' },
+      { name: 'votingUnits', type: 'uint32' },
+      { name: 'reserveFrequency', type: 'uint16' },
+      { name: 'reserveBeneficiary', type: 'address' },
+      { name: 'encodedIpfsUri', type: 'bytes32' },
+      { name: 'category', type: 'uint24' },
+      { name: 'discountPercent', type: 'uint8' },
+      { name: 'flags', type: 'tuple', components: TIER_FLAGS },
+      { name: 'splitPercent', type: 'uint32' },
+      { name: 'splits', type: 'tuple[]', components: SPLIT_COMPONENTS }
+    ];
+    const DEPLOY_721_COMPONENTS = [
+      { name: 'name', type: 'string' },
+      { name: 'symbol', type: 'string' },
+      { name: 'baseUri', type: 'string' },
+      { name: 'tokenUriResolver', type: 'address' },
+      { name: 'contractUri', type: 'string' },
+      { name: 'tiersConfig', type: 'tuple', components: [
+        { name: 'tiers', type: 'tuple[]', components: TIER_COMPONENTS },
+        { name: 'currency', type: 'uint32' },
+        { name: 'decimals', type: 'uint8' }
+      ] },
+      { name: 'flags', type: 'tuple', components: [
+        { name: 'noNewTiersWithReserves', type: 'bool' },
+        { name: 'noNewTiersWithVotes', type: 'bool' },
+        { name: 'noNewTiersWithOwnerMinting', type: 'bool' },
+        { name: 'preventOverspending', type: 'bool' },
+        { name: 'issueTokensForSplits', type: 'bool' }
+      ] }
+    ];
+    const DEPLOYER_721_ABI = [{
       type: 'function',
-      name: 'pay',
+      name: 'launchProjectFor',
       stateMutability: 'payable',
       inputs: [
-        { name: 'projectId', type: 'uint256' },
-        { name: 'token', type: 'address' },
-        { name: 'amount', type: 'uint256' },
-        { name: 'beneficiary', type: 'address' },
-        { name: 'minReturnedTokens', type: 'uint256' },
-        { name: 'memo', type: 'string' },
-        { name: 'metadata', type: 'bytes' }
+        { name: 'owner', type: 'address' },
+        { name: 'deployTiersHookConfig', type: 'tuple', components: DEPLOY_721_COMPONENTS },
+        { name: 'launchProjectConfig', type: 'tuple', components: [
+          { name: 'projectUri', type: 'string' },
+          { name: 'rulesetConfigurations', type: 'tuple[]', components: PAY_DATA_HOOK_RULESET_COMPONENTS },
+          { name: 'terminalConfigurations', type: 'tuple[]', components: [
+            { name: 'terminal', type: 'address' },
+            { name: 'accountingContextsToAccept', type: 'tuple[]', components: [
+              { name: 'token', type: 'address' },
+              { name: 'decimals', type: 'uint8' },
+              { name: 'currency', type: 'uint32' }
+            ] }
+          ] },
+          { name: 'memo', type: 'string' }
+        ] },
+        { name: 'controller', type: 'address' },
+        { name: 'salt', type: 'bytes32' }
       ],
-      outputs: [{ name: 'beneficiaryTokenCount', type: 'uint256' }]
+      outputs: [{ name: 'projectId', type: 'uint256' }, { name: 'hook', type: 'address' }]
     }];
-
-    const ERC20_ABI = [
-      {
-        type: 'function',
-        name: 'allowance',
-        stateMutability: 'view',
-        inputs: [{ name: 'owner', type: 'address' }, { name: 'spender', type: 'address' }],
-        outputs: [{ name: '', type: 'uint256' }]
-      },
-      {
-        type: 'function',
-        name: 'approve',
-        stateMutability: 'nonpayable',
-        inputs: [{ name: 'spender', type: 'address' }, { name: 'amount', type: 'uint256' }],
-        outputs: [{ name: '', type: 'bool' }]
-      }
-    ];
+    const CREATION_FEE_ABI = [{ type: 'function', name: 'creationFee', stateMutability: 'view', inputs: [], outputs: [{ name: '', type: 'uint256' }] }];
+    const PROJECT_CREATE_EVENT = [{ type: 'event', name: 'Create', inputs: [
+      { name: 'projectId', type: 'uint256', indexed: true },
+      { name: 'owner', type: 'address', indexed: true },
+      { name: 'caller', type: 'address', indexed: false }
+    ] }];
 
     const state = {
       leagueId: '',
@@ -497,6 +597,8 @@
       projectDescription: '',
       imageDataUrl: '',
       imageName: 'slopsshop.png',
+      imageFile: null,
+      pinnedImageUri: '',
       membershipPrice: '5.00',
       walletAccount: '',
       walletChainId: '',
@@ -521,6 +623,7 @@
       projectName: document.querySelector('#projectName'),
       projectDescription: document.querySelector('#projectDescription'),
       projectImageUpload: document.querySelector('#projectImageUpload'),
+      pinataJwt: document.querySelector('#pinataJwt'),
       imageLabel: document.querySelector('#imageLabel'),
       membershipPrice: document.querySelector('#membershipPrice'),
       imagePreview: document.querySelector('#imagePreview'),
@@ -649,6 +752,8 @@
       if (!file) {
         state.imageDataUrl = '';
         state.imageName = 'slopsshop.png';
+        state.imageFile = null;
+        state.pinnedImageUri = '';
         els.imageLabel.textContent = 'Using slopsshop.png as the default deploy image.';
         els.imagePreview.src = 'assets/slopsshop.png';
         return;
@@ -661,7 +766,9 @@
       reader.addEventListener('load', () => {
         state.imageDataUrl = String(reader.result || '');
         state.imageName = file.name;
-        els.imageLabel.textContent = `${file.name} selected for the configured shop.`;
+        state.imageFile = file;
+        state.pinnedImageUri = '';
+        els.imageLabel.textContent = `${file.name} selected. It will be pinned before deploy.`;
         els.imagePreview.src = state.imageDataUrl;
       });
       reader.addEventListener('error', () => {
@@ -967,37 +1074,6 @@
       state.walletChainId = chain.chainHex;
     }
 
-    async function readAllowance(owner, spender) {
-      const data = encodeFunctionData({
-        abi: ERC20_ABI,
-        functionName: 'allowance',
-        args: [owner, spender]
-      });
-      const result = await state.activeProvider.request({
-        method: 'eth_call',
-        params: [{ to: PROJECT.chain.token.address, data }, 'latest']
-      });
-      return BigInt(result || '0x0');
-    }
-
-    async function approveToken(spender, amount) {
-      const data = encodeFunctionData({
-        abi: ERC20_ABI,
-        functionName: 'approve',
-        args: [spender, amount]
-      });
-      return state.activeProvider.request({
-        method: 'eth_sendTransaction',
-        params: [{
-          from: state.walletAccount,
-          to: PROJECT.chain.token.address,
-          data,
-          value: '0x0',
-          gas: toHexQuantity(PROJECT.chain.approvalGasLimit)
-        }]
-      });
-    }
-
     async function waitForReceipt(txHash) {
       for (let i = 0; i < 60; i += 1) {
         const receipt = await state.activeProvider.request({
@@ -1013,45 +1089,508 @@
       throw new Error(`Timed out waiting for transaction: ${txHash}`);
     }
 
+    async function loadJbTemplate() {
+      let lastError = null;
+      for (const path of TEMPLATE_PATHS) {
+        try {
+          const response = await fetch(path, { cache: 'no-store' });
+          if (!response.ok) throw new Error(`${response.status} ${response.statusText}`);
+          return response.json();
+        } catch (error) {
+          lastError = error;
+        }
+      }
+      throw new Error(`Could not load .jb template: ${lastError?.message || 'not found'}`);
+    }
+
+    function cloneJson(value) {
+      return JSON.parse(JSON.stringify(value));
+    }
+
+    function isAddress(value) {
+      return /^0x[a-fA-F0-9]{40}$/.test(String(value || ''));
+    }
+
+    function addrOrZero(value) {
+      return isAddress(value) ? value : ZERO_ADDRESS;
+    }
+
+    function uint32FromAddress(address) {
+      return Number(BigInt(address) & 0xffffffffn);
+    }
+
+    function uint256FromAddress(address) {
+      return BigInt(address).toString();
+    }
+
+    function parsePriceUnits(value, decimals) {
+      const text = String(value == null ? '' : value).trim();
+      if (!text) return 0n;
+      return parseUnits(text, decimals);
+    }
+
+    function fillSplits(rawShares) {
+      if (!rawShares.length) return rawShares;
+      const sum = rawShares.reduce((total, value) => total + value, 0);
+      const delta = SPLITS_TOTAL - sum;
+      if (delta !== 0) {
+        let maxIndex = 0;
+        for (let index = 1; index < rawShares.length; index += 1) {
+          if (rawShares[index] > rawShares[maxIndex]) maxIndex = index;
+        }
+        rawShares[maxIndex] = Math.max(0, rawShares[maxIndex] + delta);
+      }
+      return rawShares;
+    }
+
+    function splitSharesFromAmounts(amounts) {
+      if (!amounts.length) return [];
+      const total = amounts.reduce((sum, amount) => sum + BigInt(amount), 0n);
+      if (total === 0n) return amounts.map(() => 0);
+      return fillSplits(amounts.map((amount) => Number(BigInt(amount) * BigInt(SPLITS_TOTAL) / total)));
+    }
+
+    function buildStoreCategories(categories) {
+      return (categories || []).map((entry, index) => {
+        if (typeof entry === 'string') return { id: index, name: entry };
+        return { id: Number(entry?.id ?? index), name: String(entry?.name || '').trim() };
+      }).filter((entry) => entry.name);
+    }
+
+    function buildProjectMetadata(draft) {
+      const details = draft.details || {};
+      const metadata = {
+        version: 1,
+        name: details.name || '',
+        projectTagline: details.tagline || '',
+        description: details.description || '',
+        logoUri: details.logoUri || '',
+        payDisclosure: details.payDisclosure || '',
+        infoUri: details.website || '',
+        twitter: String(details.twitter || '').replace(/^@/, ''),
+        discord: details.discord || '',
+        telegram: details.telegram || '',
+        tags: details.tags || [],
+        fpl: { leagueId: state.leagueId }
+      };
+      if (details.ticker) metadata.symbol = details.ticker;
+      if (details.coverImageUri) metadata.coverImageUri = details.coverImageUri;
+      const categoryMap = {};
+      for (const category of buildStoreCategories(draft.storeCategories)) {
+        if (category.id > 0) categoryMap[category.id] = category.name;
+      }
+      if (Object.keys(categoryMap).length) metadata.storeCategories = categoryMap;
+      return metadata;
+    }
+
+    function tierMetadataFor(draft, nft, index) {
+      const category = buildStoreCategories(draft.storeCategories).find((entry) => entry.id === Number(nft.category || 0));
+      const metadata = {
+        name: String(nft.name || `Item #${index + 1}`).trim(),
+        description: nft.description || '',
+        image: nft.imageUri || draft.details?.logoUri || ''
+      };
+      if (category?.name) metadata.categoryName = category.name;
+      if (nft.mediaType) metadata.mediaType = nft.mediaType;
+      return metadata;
+    }
+
+    async function pinJson(name, json) {
+      const response = await fetch('https://fc-footy.vercel.app/api/ipfs/pin-json', {
+        method: 'POST',
+        headers: {
+          Authorization: 'Bearer madeskills',
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ name, json })
+      });
+      const text = await response.text();
+      if (!response.ok) throw new Error(`Metadata pin failed: ${response.status} ${text.slice(0, 160)}`);
+      const body = JSON.parse(text || '{}');
+      const uri = body.uri || body.url || (body.IpfsHash ? `ipfs://${body.IpfsHash}` : '');
+      if (!uri) throw new Error('Metadata pin returned no uri.');
+      return uri;
+    }
+
+    async function pinImageFile(file) {
+      const jwt = (els.pinataJwt.value || localStorage.getItem('jb-pinata-jwt') || '').trim();
+      if (!jwt) throw new Error('Uploaded images need a Pinata JWT so the image can be pinned before deploy.');
+      localStorage.setItem('jb-pinata-jwt', jwt);
+      const form = new FormData();
+      form.append('file', file, file.name || 'fpl-shop-image');
+      form.append('network', 'public');
+      form.append('name', `${state.leagueId || 'fpl'}-${file.name || 'shop-image'}`);
+      const response = await fetch('https://uploads.pinata.cloud/v3/files', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${jwt}` },
+        body: form
+      });
+      const text = await response.text();
+      if (!response.ok) throw new Error(`Image pin failed: ${response.status} ${text.slice(0, 160)}`);
+      const body = JSON.parse(text || '{}');
+      const cid = body?.data?.cid || body.IpfsHash;
+      if (!cid) throw new Error('Image pin returned no CID.');
+      return `ipfs://${cid}`;
+    }
+
+    function bareCid(uri) {
+      let value = String(uri || '').trim();
+      if (value.startsWith('ipfs://')) value = value.slice(7);
+      else if (/^https?:\/\//i.test(value)) {
+        const url = new URL(value);
+        const match = url.pathname.match(/\/ipfs\/([^/?#]+)/i);
+        if (match) return match[1];
+        const subdomain = url.hostname.split('.')[0];
+        if (/^(Qm|ba)/i.test(subdomain)) return subdomain;
+      }
+      return value.split('/')[0];
+    }
+
+    const B58_ALPHABET = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
+    const B32_ALPHABET = 'abcdefghijklmnopqrstuvwxyz234567';
+
+    function base58Decode(str) {
+      const bytes = [0];
+      for (const char of str) {
+        const value = B58_ALPHABET.indexOf(char);
+        if (value === -1) throw new Error(`Invalid base58 character: ${char}`);
+        let carry = value;
+        for (let index = 0; index < bytes.length; index += 1) {
+          carry += bytes[index] * 58;
+          bytes[index] = carry & 0xff;
+          carry >>= 8;
+        }
+        while (carry > 0) {
+          bytes.push(carry & 0xff);
+          carry >>= 8;
+        }
+      }
+      for (let index = 0; index < str.length && str[index] === '1'; index += 1) bytes.push(0);
+      return new Uint8Array(bytes.reverse());
+    }
+
+    function base32Decode(str) {
+      let value = String(str || '').trim();
+      if (!value || value[0].toLowerCase() !== 'b') throw new Error('Unsupported CIDv1 multibase.');
+      value = value.slice(1).toLowerCase().replace(/=+$/, '');
+      const out = [];
+      let bits = 0;
+      let held = 0;
+      for (const char of value) {
+        const index = B32_ALPHABET.indexOf(char);
+        if (index === -1) throw new Error(`Invalid base32 character: ${char}`);
+        held = (held << 5) | index;
+        bits += 5;
+        if (bits >= 8) {
+          out.push((held >> (bits - 8)) & 0xff);
+          bits -= 8;
+        }
+      }
+      return new Uint8Array(out);
+    }
+
+    function readVarint(bytes, offset) {
+      let value = 0;
+      let shift = 0;
+      for (let index = offset; index < bytes.length; index += 1) {
+        const byte = bytes[index];
+        value += (byte & 0x7f) * Math.pow(2, shift);
+        if ((byte & 0x80) === 0) return { value, offset: index + 1 };
+        shift += 7;
+      }
+      throw new Error('Truncated CID varint.');
+    }
+
+    function cidV1Parts(cid) {
+      const raw = base32Decode(cid);
+      const version = readVarint(raw, 0);
+      if (version.value !== 1) throw new Error(`Unsupported CID version: ${version.value}`);
+      const codec = readVarint(raw, version.offset);
+      const mhCode = readVarint(raw, codec.offset);
+      const mhLen = readVarint(raw, mhCode.offset);
+      if (mhCode.value !== 0x12 || mhLen.value !== 32) throw new Error('Only sha2-256 IPFS hashes are supported.');
+      if (mhLen.offset + mhLen.value !== raw.length) throw new Error('Unexpected CIDv1 multihash length.');
+      return { codec: codec.value, digest: raw.slice(mhLen.offset, mhLen.offset + mhLen.value) };
+    }
+
+    function bytesToHex(bytes) {
+      return `0x${Array.from(bytes).map((byte) => byte.toString(16).padStart(2, '0')).join('')}`;
+    }
+
+    function encodeIpfsUriToBytes32(uri) {
+      const cid = bareCid(uri);
+      if (!cid) return `0x${'0'.repeat(64)}`;
+      let digest;
+      if (cid.startsWith('Qm')) {
+        const raw = base58Decode(cid);
+        if (raw.length !== 34 || raw[0] !== 0x12 || raw[1] !== 0x20) throw new Error('Unexpected CIDv0 multihash.');
+        digest = raw.slice(2);
+      } else if (cid[0]?.toLowerCase() === 'b') {
+        const parts = cidV1Parts(cid);
+        if (parts.codec !== 0x70) throw new Error('Raw CIDv1 metadata cannot be stored in the NFT tier bytes32 slot.');
+        digest = parts.digest;
+      } else {
+        throw new Error(`Unsupported IPFS CID: ${cid.slice(0, 8)}`);
+      }
+      return bytesToHex(digest);
+    }
+
+    function mutateDraft(template, imageUri) {
+      const draft = cloneJson(template);
+      draft.details = draft.details || {};
+      draft.details.name = state.projectName;
+      draft.details.description = state.projectDescription;
+      draft.details.logoUri = imageUri;
+      draft.details.owner = state.walletAccount;
+      draft.details.tags = Array.from(new Set([...(draft.details.tags || []), 'fpl', `fpl-league:${state.leagueId}`]));
+      draft.revOperator = state.walletAccount;
+      draft.accepts = ['usdc'];
+      draft.swapRouter = draft.swapRouter !== false;
+      draft.storePricingCurrency = 2;
+      draft.network = 'testnet';
+      draft.chainIds = [PROJECT.chain.chainId];
+      draft.shopEnabled = true;
+      draft.tos = true;
+      draft.collection = draft.collection || {};
+      draft.collection.issueTokensForSplits = false;
+      for (const stage of draft.stages || []) {
+        stage.tokenMode = 'none';
+        stage.weight = '0';
+        stage.baseCurrency = 2;
+        stage.payoutCurrency = 2;
+      }
+      for (const [index, nft] of (draft.nfts || []).entries()) {
+        nft.imageUri = imageUri;
+        nft.mediaType = nft.mediaType || 'image/png';
+        nft.metaUri = '';
+        nft.encodedIpfsUri = '';
+        nft.flags = nft.flags || {};
+        nft.flags.allowCredits = false;
+        if (index === 0) nft.price = state.membershipPrice || '0';
+      }
+      return draft;
+    }
+
+    async function prepareDeployDraft() {
+      const template = await loadJbTemplate();
+      let imageUri = template?.details?.logoUri || '';
+      if (state.imageFile) {
+        setTxStatus('Pinning uploaded image...');
+        imageUri = await pinImageFile(state.imageFile);
+        state.pinnedImageUri = imageUri;
+      }
+      if (!imageUri) throw new Error('The deploy template needs a pinned project image URI.');
+      const draft = mutateDraft(template, imageUri);
+      setTxStatus('Pinning project metadata...');
+      const projectUri = await pinJson(`fpl-${state.leagueId}-project.json`, buildProjectMetadata(draft));
+      for (const [index, nft] of (draft.nfts || []).entries()) {
+        setTxStatus(`Pinning NFT metadata: ${nft.name || `Item ${index + 1}`}...`);
+        nft.metaUri = await pinJson(`fpl-${state.leagueId}-tier-${index + 1}.json`, tierMetadataFor(draft, nft, index));
+        nft.encodedIpfsUri = encodeIpfsUriToBytes32(nft.metaUri);
+      }
+      return { draft, projectUri };
+    }
+
+    function buildTerminalConfigs() {
+      const usdcCurrency = uint32FromAddress(PROJECT.chain.token.address);
+      const configs = [{
+        terminal: PROJECT.chain.terminal,
+        accountingContextsToAccept: [{
+          token: PROJECT.chain.token.address,
+          decimals: PROJECT.chain.token.decimals,
+          currency: usdcCurrency
+        }]
+      }];
+      if (PROJECT.chain.routerTerminal) configs.push({ terminal: PROJECT.chain.routerTerminal, accountingContextsToAccept: [] });
+      return configs;
+    }
+
+    function buildSplit(recipient, percent, projectId = 0) {
+      return {
+        percent,
+        projectId: BigInt(projectId || 0),
+        beneficiary: addrOrZero(recipient),
+        preferAddToBalance: false,
+        lockedUntil: 0,
+        hook: ZERO_ADDRESS
+      };
+    }
+
+    function buildRulesetConfigs(draft) {
+      return (draft.stages || []).map((stage) => {
+        const acct = { token: PROJECT.chain.token.address, decimals: PROJECT.chain.token.decimals, currency: uint32FromAddress(PROJECT.chain.token.address) };
+        const payoutRows = stage.payoutMode !== 'none'
+          ? (stage.payoutRecipients || []).map((recipient, index) => ({
+            recipient,
+            amount: parsePriceUnits(recipient.amountEth || '0', acct.decimals),
+            index
+          })).filter((row) => row.amount > 0n)
+          : [];
+        const payoutLimits = [];
+        const splitGroups = [];
+        if (stage.payoutMode === 'unlimited') {
+          payoutLimits.push({ amount: UINT224_MAX, currency: acct.currency });
+          const splits = (stage.payoutRecipients || []).map((recipient) => buildSplit(
+            recipient.address,
+            Math.round((Number(recipient.percent) || 0) / 100 * SPLITS_TOTAL),
+            recipient.type === 'project' ? recipient.projectId : 0
+          )).filter((split) => split.percent > 0);
+          if (splits.length) splitGroups.push({ groupId: uint256FromAddress(acct.token), splits });
+        } else if (payoutRows.length) {
+          const total = payoutRows.reduce((sum, row) => sum + row.amount, 0n);
+          payoutLimits.push({ amount: total, currency: Number(stage.payoutCurrency || 2) });
+          const shares = splitSharesFromAmounts(payoutRows.map((row) => row.amount));
+          const splits = payoutRows.map((row, shareIndex) => buildSplit(
+            row.recipient.address,
+            shares[shareIndex],
+            row.recipient.type === 'project' ? row.recipient.projectId : 0
+          ));
+          if (splits.length) splitGroups.push({ groupId: uint256FromAddress(acct.token), splits });
+        }
+        const fundAccessLimitGroups = payoutLimits.length ? [{
+          terminal: PROJECT.chain.terminal,
+          token: acct.token,
+          payoutLimits,
+          surplusAllowances: []
+        }] : [];
+        const noSurplus = stage.payoutMode === 'unlimited';
+        return {
+          mustStartAtOrAfter: 0n,
+          duration: Number(stage.durationSeconds || 0),
+          weight: 0n,
+          weightCutPercent: Math.round((Number(stage.weightCutPercent) || 0) * 10000000),
+          approvalHook: ZERO_ADDRESS,
+          metadata: {
+            reservedPercent: Math.round((Number(stage.reservedPercent) || 0) * 100),
+            cashOutTaxRate: stage.cashOutEnabled && !noSurplus ? Math.round((Number(stage.cashOutTaxRate) || 0) * 100) : 10000,
+            baseCurrency: Number(stage.baseCurrency || 2),
+            pausePay: !!stage.pausePay,
+            pauseCreditTransfers: !!stage.pauseTransfers,
+            allowOwnerMinting: !!stage.allowOwnerMinting,
+            allowSetCustomToken: !!stage.allowSetCustomToken,
+            allowTerminalMigration: !!stage.allowTerminalMigration,
+            allowSetTerminals: !!stage.allowSetTerminals,
+            allowSetController: !!stage.allowSetController,
+            allowAddAccountingContext: !!stage.allowAddAccountingContext,
+            allowAddPriceFeed: !!stage.allowAddPriceFeed,
+            ownerMustSendPayouts: !!stage.ownerMustSendPayouts,
+            holdFees: !!stage.holdFees,
+            scopeCashOutsToLocalBalances: !stage.useTotalSurplusForCashOuts,
+            useDataHookForCashOut: false,
+            metadata: Number(stage.metadataExtra || 0)
+          },
+          splitGroups,
+          fundAccessLimitGroups
+        };
+      });
+    }
+
+    function build721Config(draft, projectUri) {
+      const decimals = Number(draft.storePricingCurrency || 2) === 2 ? 6 : 18;
+      const collection = draft.collection || {};
+      const tiers = (draft.nfts || []).map((nft) => ({
+        price: parsePriceUnits(nft.price || '0', decimals),
+        initialSupply: nft.limited ? Number(nft.supply || 0) : TIER_UNLIMITED_SUPPLY,
+        votingUnits: nft.votingOn ? Number(nft.votingUnits || 0) : 0,
+        reserveFrequency: nft.reserveOn ? Number(nft.reserveFrequency || 0) : 0,
+        reserveBeneficiary: ZERO_ADDRESS,
+        encodedIpfsUri: nft.encodedIpfsUri || encodeIpfsUriToBytes32(nft.metaUri),
+        category: Number(nft.category || 0),
+        discountPercent: 0,
+        flags: {
+          allowOwnerMint: !!nft.flags?.allowOwnerMint,
+          useReserveBeneficiaryAsDefault: false,
+          transfersPausable: !!nft.flags?.transfersPausable,
+          useVotingUnits: !!nft.votingOn,
+          cantBeRemoved: !!nft.flags?.cantBeRemoved,
+          cantIncreaseDiscountPercent: !(nft.flags?.ownerCanEditDiscount !== false),
+          cantBuyWithCredits: !(nft.flags?.allowCredits !== false)
+        },
+        splitPercent: 0,
+        splits: []
+      }));
+      return {
+        name: collection.nameTouched ? collection.name : draft.details.name,
+        symbol: collection.symbolTouched ? collection.symbol : (draft.details.ticker || ''),
+        baseUri: 'ipfs://',
+        tokenUriResolver: ZERO_ADDRESS,
+        contractUri: projectUri || '',
+        tiersConfig: { tiers, currency: Number(draft.storePricingCurrency || 2), decimals },
+        flags: {
+          noNewTiersWithReserves: !!collection.noNewTiersWithReserves,
+          noNewTiersWithVotes: !!collection.noNewTiersWithVotes,
+          noNewTiersWithOwnerMinting: !!collection.noNewTiersWithOwnerMinting,
+          preventOverspending: !!collection.preventOverspending,
+          issueTokensForSplits: !!collection.issueTokensForSplits
+        }
+      };
+    }
+
+    async function creationFeeOf() {
+      const data = encodeFunctionData({ abi: CREATION_FEE_ABI, functionName: 'creationFee', args: [] });
+      const result = await state.activeProvider.request({
+        method: 'eth_call',
+        params: [{ to: PROJECT.chain.projects, data }, 'latest']
+      });
+      return BigInt(result || '0x0');
+    }
+
+    function buildLaunchTransaction(draft, projectUri, creationFee) {
+      const salt = keccak256(stringToHex(`${draft.details.name || 'project'}:${state.walletAccount.toLowerCase()}`));
+      const args = [
+        state.walletAccount,
+        build721Config(draft, projectUri),
+        {
+          projectUri,
+          rulesetConfigurations: buildRulesetConfigs(draft),
+          terminalConfigurations: buildTerminalConfigs(),
+          memo: ''
+        },
+        PROJECT.chain.controller,
+        salt
+      ];
+      const data = encodeFunctionData({ abi: DEPLOYER_721_ABI, functionName: 'launchProjectFor', args });
+      return {
+        to: PROJECT.chain.deployer721,
+        data,
+        value: toHexQuantity(creationFee),
+        gas: toHexQuantity(PROJECT.chain.deployGasLimit)
+      };
+    }
+
+    function deployedProjectRoute(receipt) {
+      for (const log of receipt.logs || []) {
+        if (String(log.address || '').toLowerCase() !== PROJECT.chain.projects.toLowerCase()) continue;
+        try {
+          const decoded = decodeEventLog({ abi: PROJECT_CREATE_EVENT, data: log.data, topics: log.topics });
+          if (decoded.eventName === 'Create') return `#${PROJECT.chainSlug}:${decoded.args.projectId.toString()}`;
+        } catch (_) {}
+      }
+      return '';
+    }
+
     async function payCheckout() {
       try {
         if (!state.leagueId) throw new Error('Load a league first.');
-        setTxStatus('Connecting wallet...');
+        if (!state.projectName || !state.projectDescription) throw new Error('Project name and description are required.');
+        setTxStatus('Preparing deploy...');
         await ensureWalletChain();
-        const amount = parseUnits(PROJECT.amountUsd, PROJECT.chain.token.decimals);
-        const allowance = await readAllowance(state.walletAccount, PROJECT.chain.terminal);
-        if (allowance < amount) {
-          setTxStatus(`Approve ${PROJECT.amountUsd} USDC for Juicebox...`);
-          const approveHash = await approveToken(PROJECT.chain.terminal, amount);
-          setTxStatus(`Waiting for approval: ${approveHash}`);
-          await waitForReceipt(approveHash);
-        }
-
-        setTxStatus('Confirm payment...');
-        const data = encodeFunctionData({
-          abi: PAY_ABI,
-          functionName: 'pay',
-          args: [
-            PROJECT.projectId,
-            PROJECT.chain.token.address,
-            amount,
-            state.walletAccount,
-            0n,
-            state.leagueId,
-            '0x'
-          ]
-        });
+        const { draft, projectUri } = await prepareDeployDraft();
+        setTxStatus('Reading Juicebox project creation fee...');
+        const creationFee = await creationFeeOf();
+        const tx = buildLaunchTransaction(draft, projectUri, creationFee);
+        setTxStatus('Confirm project deploy in wallet...');
         const txHash = await state.activeProvider.request({
           method: 'eth_sendTransaction',
           params: [{
             from: state.walletAccount,
-            to: PROJECT.chain.terminal,
-            data,
-            value: '0x0',
-            gas: toHexQuantity(PROJECT.chain.payGasLimit)
+            ...tx
           }]
         });
-        setTxStatus(`Payment sent: ${txHash}`);
+        setTxStatus(`Deploy sent: ${txHash}`);
+        const receipt = await waitForReceipt(txHash);
+        const route = deployedProjectRoute(receipt);
+        setTxStatus(route ? `Project deployed: ${route}` : `Deploy confirmed: ${txHash}`);
       } catch (error) {
         setTxStatus(error?.message || String(error), true);
       }

@@ -4,7 +4,7 @@ This is a copyable project-specific static app template for FPL league NFT shops
 
 `find.html` preserves the previous league registry concept and copy as an orphaned reference page. It is not part of the supported project-specific buyer app. Its directory lookup expects a separate registry API/proxy to provide its shop list.
 
-`deploy.html` is a lightweight deploy checkout page for paying `basesep:12`. It asks for a league ID, loads league data through the configured browser-readable FPL API, lets the user confirm the project being deployed, connects a wallet, approves USDC when needed, and pays a separate `$2.00` USDC deploy fee to the Juicebox project with the payment memo set to the loaded league ID. The membership NFT price shown on the page belongs to the project being deployed; it is not the checkout amount.
+`deploy.html` is a lightweight direct deploy page. It asks for a league ID, loads league data through the configured browser-readable FPL API, mutates the bundled `.jb` template with the project name, description, image, owner, and first membership NFT price, pins project and tier metadata, then sends `JB721TiersHookProjectDeployer.launchProjectFor(...)` on Base Sepolia from the connected wallet. It does not pay project `basesep:12`.
 
 ## Publishing
 
