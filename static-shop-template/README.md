@@ -4,7 +4,7 @@ This is a copyable project-specific static app template for FPL league NFT shops
 
 `find.html` preserves the previous league registry concept and copy as an orphaned reference page. It is not part of the supported project-specific buyer app. Its directory lookup expects a separate registry API/proxy to provide its shop list.
 
-`deploy.html` is a lightweight browser helper for preparing a league-specific `.jb` draft from the default template. It asks for a league ID, loads league data through the configured browser-readable FPL API, lets the user edit only the project name, description, uploaded image, and first membership NFT price, and uses the connected wallet as owner/operator. The hosted page loads `assets/fpl-insert-league-name-shop.jb`, a mirrored copy of the repo-level deploy template. Uploaded images are embedded into the preview draft so an agent can pin them before transaction generation.
+`deploy.html` is a lightweight browser helper for preparing a league-specific `.jb` draft from the default template. It asks for a league ID, loads league data through the configured browser-readable FPL API, lets the user edit only the project name, description, uploaded image, and first membership NFT price, and uses the connected wallet as owner/operator. The hosted page loads `assets/fpl-insert-league-name-shop.jb`, a mirrored copy of the repo-level deploy template. It uses `assets/slopsshop.png` as the default browser-visible image. Uploaded or default local images are embedded into the preview draft so an agent can pin them before transaction generation; the final deploy metadata should use an IPFS URI.
 
 ## Publishing
 

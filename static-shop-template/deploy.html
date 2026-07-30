@@ -471,7 +471,8 @@
       '../assets/fpl-insert-league-name-shop.jb'
     ];
     const DEFAULT_API_BASE = 'https://fc-footy.vercel.app/api/fpl-league?leagueId=';
-    const DEFAULT_IMAGE = 'ipfs://bafkreib3a2bk2ufpr2dwolmwzxb7zkgvgcry65qmyicvqmnnbvtwhifjri';
+    const TEMPLATE_IMAGE_URI = 'ipfs://bafkreib3a2bk2ufpr2dwolmwzxb7zkgvgcry65qmyicvqmnnbvtwhifjri';
+    const DEFAULT_IMAGE_PATH = 'assets/slopsshop.png';
     const WALLET_FLAG = 'fpl-shop-deploy-wallet-connected';
     const WALLET_RDNS = 'fpl-shop-deploy-wallet-rdns';
     const WALLET_PROVIDER_FALLBACK = { info: { uuid: 'injected-0', name: 'Browser wallet', rdns: 'injected', icon: '' }, provider: window.ethereum };
@@ -483,7 +484,8 @@
       leagueId: '',
       leagueName: '',
       imageDataUrl: '',
-      imageName: '',
+      imageName: 'slopsshop.png',
+      useDefaultImage: true,
       walletAccount: '',
       walletChainId: '',
       activeProvider: window.ethereum || null,
@@ -588,7 +590,8 @@
       state.leagueId = '';
       state.leagueName = '';
       state.imageDataUrl = '';
-      state.imageName = '';
+      state.imageName = 'slopsshop.png';
+      state.useDefaultImage = true;
       if (state.walletAccount) applyWallet();
       hydrateFields();
       render();
@@ -599,7 +602,7 @@
       els.projectName.value = draft?.details?.name || '';
       els.projectDescription.value = draft?.details?.description || '';
       els.projectImageUpload.value = '';
-      els.imageLabel.textContent = 'Using the template image until one is uploaded.';
+      els.imageLabel.textContent = 'Using slopsshop.png as the default image. It must be pinned before deploy.';
       els.membershipPrice.value = draft?.nfts?.[0]?.price || '';
     }
 
@@ -650,7 +653,7 @@
     function applyForm() {
       if (!state.draft) return;
       const draft = state.draft;
-      const imageUri = state.imageDataUrl || draft.details.logoUri || DEFAULT_IMAGE;
+      const imageUri = state.imageDataUrl || (state.useDefaultImage ? DEFAULT_IMAGE_PATH : draft.details.logoUri || TEMPLATE_IMAGE_URI);
       draft.details.name = els.projectName.value.trim();
       draft.details.description = els.projectDescription.value.trim();
       draft.details.logoUri = imageUri;
@@ -667,7 +670,7 @@
     function render() {
       const draft = state.draft;
       const nft = draft?.nfts?.[0] || {};
-      const imageUri = draft?.details?.logoUri || DEFAULT_IMAGE;
+      const imageUri = draft?.details?.logoUri || DEFAULT_IMAGE_PATH;
       els.leagueLabel.textContent = state.leagueName ? `${state.leagueName} #${state.leagueId}` : 'Not loaded';
       els.ownerLabel.textContent = state.walletAccount || 'Not set';
       els.walletLabel.textContent = state.walletAccount
@@ -961,8 +964,9 @@
       const file = els.projectImageUpload.files?.[0];
       if (!file) {
         state.imageDataUrl = '';
-        state.imageName = '';
-        els.imageLabel.textContent = 'Using the template image until one is uploaded.';
+        state.imageName = 'slopsshop.png';
+        state.useDefaultImage = true;
+        els.imageLabel.textContent = 'Using slopsshop.png as the default image. It must be pinned before deploy.';
         applyForm();
         return;
       }
@@ -974,6 +978,7 @@
       reader.addEventListener('load', () => {
         state.imageDataUrl = String(reader.result || '');
         state.imageName = file.name;
+        state.useDefaultImage = false;
         els.imageLabel.textContent = `${file.name} selected. The deploy flow should pin it before transaction generation.`;
         applyForm();
       });
