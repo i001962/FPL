@@ -1,11 +1,11 @@
 ---
 name: fpl-league-nft-shop-deployer
-description: Create a reviewable txlink.stupidtech.net URL for deploying or maintaining a minimal Fantasy Premier League league NFT shop. Use when a user wants an agent to prepare a wallet-signable Juicebox V6 deploy txlink, use a .jb Juicebox draft only as internal deploy settings, set the project owner/operator to the deployer's wallet, default to Base, generate the resulting static shop URL, or add/remove NFT tiers in an existing shop.
+description: Deploy, inspect, or maintain a Fantasy Premier League league NFT shop. Use when a user wants an agent to read live Juicebox V6 NFT tiers, prepare a wallet-signable deploy or tier-adjustment txlink, set project owner/operator, default to Base, generate a static shop URL, or add/remove NFT tiers.
 ---
 
 # FPL League NFT Shop Deployer
 
-Use this skill to prepare reviewable `txlink.stupidtech.net` URLs for FPL league NFT shop deploys and existing-shop NFT tier maintenance. The shop itself is a static site; this skill does not create a backend and does not generate or design a frontend during deploy work.
+Use this skill to inspect live FPL shop inventory and to prepare reviewable `txlink.stupidtech.net` URLs for FPL league NFT shop deploys and existing-shop NFT tier maintenance. The shop itself is a static site; this skill does not create a backend and does not generate or design a frontend during deploy work.
 
 The deliverable is either a completed wallet transaction sent by the acting agent from an authorized wallet, or a txlink URL the deployer/operator can open with their own wallet. The `.jb` draft is only an internal source of deploy settings and an optional review artifact; do not stop by handing the user a `.jb` file when an exact txlink can be built.
 
@@ -245,6 +245,14 @@ Default to the existing-shop path for requests like "add Game Week 3" unless the
     - `value` is `0x0`.
     - `chainId` is the target chain.
     - Omit `from` in the txlink params so the connected wallet supplies the signer.
+
+## Inspect Existing Shop Inventory
+
+Use this read-only path when the user asks which NFTs a league shop sells, its live prices/supply, whether an NFT can be bought with credits, or whether a buy-in is currently available. Do not stop after locating a project in Bendystraw. The required result is the tier inventory.
+
+Read [references/inspect-existing-shop.md](references/inspect-existing-shop.md) before inspecting a project. It contains the required completion criteria, the active-hook resolution sequence, RPC fallbacks, metadata resolution, and the known Base Sepolia project/league examples.
+
+Do not ask the user to copy item cards from a frontend. Query the chain directly; use a public Juicebox page or explorer only as a read-only fallback when the runtime cannot reach all listed RPC endpoints.
 
 ## Source Draft
 
