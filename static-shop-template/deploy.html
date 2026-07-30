@@ -1378,31 +1378,12 @@
       draft.details.name = state.projectName;
       draft.details.description = state.projectDescription;
       draft.details.logoUri = imageUri;
-      draft.details.owner = state.walletAccount;
-      draft.details.tags = Array.from(new Set([...(draft.details.tags || []), 'fpl', `fpl-league:${state.leagueId}`]));
-      draft.revOperator = state.walletAccount;
-      draft.accepts = ['usdc'];
-      draft.swapRouter = draft.swapRouter !== false;
-      draft.storePricingCurrency = 2;
-      draft.network = 'testnet';
-      draft.chainIds = [PROJECT.chain.chainId];
-      draft.shopEnabled = true;
-      draft.tos = true;
-      draft.collection = draft.collection || {};
-      draft.collection.issueTokensForSplits = false;
-      for (const stage of draft.stages || []) {
-        stage.tokenMode = 'none';
-        stage.weight = '0';
-        stage.baseCurrency = 2;
-        stage.payoutCurrency = 2;
-      }
+      if (draft.details.coverImageUri) draft.details.coverImageUri = imageUri;
       for (const [index, nft] of (draft.nfts || []).entries()) {
         nft.imageUri = imageUri;
-        nft.mediaType = nft.mediaType || 'image/png';
+        nft.mediaType = state.imageFile?.type || nft.mediaType || 'image/png';
         nft.metaUri = '';
         nft.encodedIpfsUri = '';
-        nft.flags = nft.flags || {};
-        nft.flags.allowCredits = false;
         if (index === 0) nft.price = state.membershipPrice || '0';
       }
       return draft;
@@ -1428,17 +1409,36 @@
       return { draft, projectUri };
     }
 
-    function buildTerminalConfigs() {
+    function buildTerminalConfigs(draft) {
       const usdcCurrency = uint32FromAddress(PROJECT.chain.token.address);
-      const configs = [{
-        terminal: PROJECT.chain.terminal,
-        accountingContextsToAccept: [{
+      const accepts = Array.isArray(draft?.accepts) ? draft.accepts : ['usdc'];
+      const contexts = [];
+      if (accepts.includes('usdc')) {
+        contexts.push({
           token: PROJECT.chain.token.address,
           decimals: PROJECT.chain.token.decimals,
           currency: usdcCurrency
-        }]
+        });
+      }
+      if (accepts.includes('eth')) {
+        contexts.push({
+          token: NATIVE_TOKEN,
+          decimals: 18,
+          currency: uint32FromAddress(NATIVE_TOKEN)
+        });
+      }
+      if (!contexts.length) {
+        contexts.push({
+          token: PROJECT.chain.token.address,
+          decimals: PROJECT.chain.token.decimals,
+          currency: usdcCurrency
+        });
+      }
+      const configs = [{
+        terminal: PROJECT.chain.terminal,
+        accountingContextsToAccept: contexts
       }];
-      if (PROJECT.chain.routerTerminal) configs.push({ terminal: PROJECT.chain.routerTerminal, accountingContextsToAccept: [] });
+      if (draft?.swapRouter !== false && PROJECT.chain.routerTerminal) configs.push({ terminal: PROJECT.chain.routerTerminal, accountingContextsToAccept: [] });
       return configs;
     }
 
@@ -1453,9 +1453,21 @@
       };
     }
 
+    function accountingTokenForDraft(draft) {
+      const accepts = Array.isArray(draft?.accepts) ? draft.accepts : ['usdc'];
+      if (accepts.includes('eth') && !accepts.includes('usdc')) {
+        return { token: NATIVE_TOKEN, decimals: 18, currency: uint32FromAddress(NATIVE_TOKEN) };
+      }
+      return {
+        token: PROJECT.chain.token.address,
+        decimals: PROJECT.chain.token.decimals,
+        currency: uint32FromAddress(PROJECT.chain.token.address)
+      };
+    }
+
     function buildRulesetConfigs(draft) {
       return (draft.stages || []).map((stage) => {
-        const acct = { token: PROJECT.chain.token.address, decimals: PROJECT.chain.token.decimals, currency: uint32FromAddress(PROJECT.chain.token.address) };
+        const acct = accountingTokenForDraft(draft);
         const payoutRows = stage.payoutMode !== 'none'
           ? (stage.payoutRecipients || []).map((recipient, index) => ({
             recipient,
@@ -1586,14 +1598,15 @@
     }
 
     function buildLaunchTransaction(draft, projectUri, creationFee) {
-      const salt = keccak256(stringToHex(`${draft.details.name || 'project'}:${state.walletAccount.toLowerCase()}`));
+      const owner = addrOrZero(draft.details?.owner) !== ZERO_ADDRESS ? draft.details.owner : state.walletAccount;
+      const salt = keccak256(stringToHex(`${draft.details.name || 'project'}:${owner.toLowerCase()}`));
       const args = [
-        state.walletAccount,
+        owner,
         build721Config(draft, projectUri),
         {
           projectUri,
           rulesetConfigurations: buildRulesetConfigs(draft),
-          terminalConfigurations: buildTerminalConfigs(),
+          terminalConfigurations: buildTerminalConfigs(draft),
           memo: ''
         },
         PROJECT.chain.controller,
