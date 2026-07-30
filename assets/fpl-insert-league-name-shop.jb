@@ -3,10 +3,10 @@
   "projectType": "custom",
   "details": {
     "name": "FPL [insert league name] Shop",
-    "ticker": "",
+    "ticker": "FPL-0000",
     "tagline": "Buy in for more fun",
     "description": "This shop is a companion to Fantasy Premier League team #[insert] - [insert name] ",
-    "logoUri": "ipfs://bafkreib3a2bk2ufpr2dwolmwzxb7zkgvgcry65qmyicvqmnnbvtwhifjri",
+    "logoUri": "ipfs://bafybeigv4dnqc2tr45s4k3frf3qgwa2yssi6fan4t5vzwcvik5j6bde3zu",
     "logoUploading": false,
     "website": "",
     "twitter": "",
@@ -110,15 +110,21 @@
       "advOpen": true,
       "name": "Full Season",
       "description": "Full season buy-in is eligible for end of season rewards split.",
-      "imageUri": "ipfs://bafkreib3a2bk2ufpr2dwolmwzxb7zkgvgcry65qmyicvqmnnbvtwhifjri",
+      "imageUri": "ipfs://bafybeigv4dnqc2tr45s4k3frf3qgwa2yssi6fan4t5vzwcvik5j6bde3zu",
       "mediaType": "image/png",
       "metaUri": "",
       "encodedIpfsUri": "",
-      "price": "5",
+      "price": "0.1",
       "limited": false,
       "supply": "",
-      "splitOn": false,
-      "splitRecipients": [],
+      "splitOn": true,
+      "splitRecipients": [
+        {
+          "pct": "1",
+          "recip": "12",
+          "benef": "0x59733c7cd78d08dab90368ad2cc09c8c81f097c0"
+        }
+      ],
       "discountOn": false,
       "discountPct": "",
       "category": 0,
@@ -137,10 +143,15 @@
     }
   ],
   "perChain": {},
-  "storeCategories": [],
+  "storeCategories": [
+    "Buy-ins",
+    "Contests",
+    "Collectibles",
+    "Rewards"
+  ],
   "collection": {
     "name": "",
-    "symbol": "",
+    "symbol": "FPL-0000",
     "nameTouched": false,
     "symbolTouched": false,
     "extrasOpen": false,

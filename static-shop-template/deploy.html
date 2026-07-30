@@ -714,6 +714,10 @@
       return /^fpl\b/i.test(withoutShop) ? `${withoutShop} Shop` : `FPL ${withoutShop} Shop`;
     }
 
+    function leagueSymbol() {
+      return `FPL-${state.leagueId || '0000'}`;
+    }
+
     function formatUsd(value) {
       const amount = Number(value || 0);
       if (!Number.isFinite(amount)) return '$0.00';
@@ -1152,6 +1156,12 @@
       return isAddress(value) ? value : ZERO_ADDRESS;
     }
 
+    function operatorAddressForDraft(draft) {
+      if (isAddress(draft?.revOperator)) return draft.revOperator;
+      if (isAddress(draft?.details?.owner)) return draft.details.owner;
+      return state.walletAccount || ZERO_ADDRESS;
+    }
+
     function uint32FromAddress(address) {
       return Number(BigInt(address) & 0xffffffffn);
     }
@@ -1376,15 +1386,30 @@
       const draft = cloneJson(template);
       draft.details = draft.details || {};
       draft.details.name = state.projectName;
+      draft.details.ticker = leagueSymbol();
       draft.details.description = state.projectDescription;
       draft.details.logoUri = imageUri;
+      draft.details.tags = Array.from(new Set([...(draft.details.tags || []), 'fpl', `fpl-league:${state.leagueId}`]));
       if (draft.details.coverImageUri) draft.details.coverImageUri = imageUri;
+      draft.collection = draft.collection || {};
+      draft.collection.name = state.projectName;
+      draft.collection.symbol = leagueSymbol();
+      draft.collection.nameTouched = true;
+      draft.collection.symbolTouched = true;
+      const operator = operatorAddressForDraft(draft);
       for (const [index, nft] of (draft.nfts || []).entries()) {
         nft.imageUri = imageUri;
         nft.mediaType = state.imageFile?.type || nft.mediaType || 'image/png';
         nft.metaUri = '';
         nft.encodedIpfsUri = '';
         if (index === 0) nft.price = state.membershipPrice || '0';
+        if (nft.splitOn && Array.isArray(nft.splitRecipients)) {
+          for (const recipient of nft.splitRecipients) {
+            if (/^\d+$/.test(String(recipient.recip || '')) && Number(recipient.recip) === Number(PROJECT.project12Id)) {
+              recipient.benef = operator;
+            }
+          }
+        }
       }
       return draft;
     }
@@ -1463,14 +1488,38 @@
       return configs;
     }
 
-    function buildSplit(recipient, percent, projectId = 0) {
+    function buildSplit(recipient, percent, projectId = 0, beneficiary = recipient) {
       return {
         percent,
         projectId: BigInt(projectId || 0),
-        beneficiary: addrOrZero(recipient),
+        beneficiary: addrOrZero(beneficiary),
         preferAddToBalance: false,
         lockedUntil: 0,
         hook: ZERO_ADDRESS
+      };
+    }
+
+    function buildTierSplits(nft) {
+      if (!nft?.splitOn || !Array.isArray(nft.splitRecipients)) return { splitPercent: 0, splits: [] };
+      const rows = nft.splitRecipients
+        .map((recipient) => ({ recipient, pct: Number(recipient.pct || 0) }))
+        .filter((row) => row.pct > 0 && String(row.recipient.recip || '').trim());
+      const totalPct = rows.reduce((sum, row) => sum + row.pct, 0);
+      if (!totalPct) return { splitPercent: 0, splits: [] };
+      const shares = fillSplits(rows.map((row) => Math.round(row.pct / totalPct * SPLITS_TOTAL)));
+      const splits = rows.map((row, index) => {
+        const recip = String(row.recipient.recip || '').trim();
+        const isProject = /^\d+$/.test(recip) && Number(recip) > 0;
+        return buildSplit(
+          isProject ? row.recipient.benef : recip,
+          shares[index],
+          isProject ? Number(recip) : 0,
+          isProject ? row.recipient.benef : recip
+        );
+      });
+      return {
+        splitPercent: Math.round(totalPct / 100 * SPLITS_TOTAL),
+        splits
       };
     }
 
@@ -1558,27 +1607,30 @@
     function build721Config(draft, projectUri) {
       const decimals = Number(draft.storePricingCurrency || 2) === 2 ? 6 : 18;
       const collection = draft.collection || {};
-      const tiers = (draft.nfts || []).map((nft) => ({
-        price: parsePriceUnits(nft.price || '0', decimals),
-        initialSupply: nft.limited ? Number(nft.supply || 0) : TIER_UNLIMITED_SUPPLY,
-        votingUnits: nft.votingOn ? Number(nft.votingUnits || 0) : 0,
-        reserveFrequency: nft.reserveOn ? Number(nft.reserveFrequency || 0) : 0,
-        reserveBeneficiary: ZERO_ADDRESS,
-        encodedIpfsUri: nft.encodedIpfsUri || encodeIpfsUriToBytes32(nft.metaUri),
-        category: Number(nft.category || 0),
-        discountPercent: 0,
-        flags: {
-          allowOwnerMint: !!nft.flags?.allowOwnerMint,
-          useReserveBeneficiaryAsDefault: false,
-          transfersPausable: !!nft.flags?.transfersPausable,
-          useVotingUnits: !!nft.votingOn,
-          cantBeRemoved: !!nft.flags?.cantBeRemoved,
-          cantIncreaseDiscountPercent: !(nft.flags?.ownerCanEditDiscount !== false),
-          cantBuyWithCredits: !(nft.flags?.allowCredits !== false)
-        },
-        splitPercent: 0,
-        splits: []
-      }));
+      const tiers = (draft.nfts || []).map((nft) => {
+        const tierSplits = buildTierSplits(nft);
+        return {
+          price: parsePriceUnits(nft.price || '0', decimals),
+          initialSupply: nft.limited ? Number(nft.supply || 0) : TIER_UNLIMITED_SUPPLY,
+          votingUnits: nft.votingOn ? Number(nft.votingUnits || 0) : 0,
+          reserveFrequency: nft.reserveOn ? Number(nft.reserveFrequency || 0) : 0,
+          reserveBeneficiary: ZERO_ADDRESS,
+          encodedIpfsUri: nft.encodedIpfsUri || encodeIpfsUriToBytes32(nft.metaUri),
+          category: Number(nft.category || 0),
+          discountPercent: 0,
+          flags: {
+            allowOwnerMint: !!nft.flags?.allowOwnerMint,
+            useReserveBeneficiaryAsDefault: false,
+            transfersPausable: !!nft.flags?.transfersPausable,
+            useVotingUnits: !!nft.votingOn,
+            cantBeRemoved: !!nft.flags?.cantBeRemoved,
+            cantIncreaseDiscountPercent: !(nft.flags?.ownerCanEditDiscount !== false),
+            cantBuyWithCredits: !(nft.flags?.allowCredits !== false)
+          },
+          splitPercent: tierSplits.splitPercent,
+          splits: tierSplits.splits
+        };
+      });
       return {
         name: collection.nameTouched ? collection.name : draft.details.name,
         symbol: collection.symbolTouched ? collection.symbol : (draft.details.ticker || ''),

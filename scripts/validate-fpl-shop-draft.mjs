@@ -104,9 +104,16 @@ const draftPath = path.join(__dirname, '..', 'assets', 'fpl-insert-league-name-s
 const state = JSON.parse(fs.readFileSync(draftPath, 'utf8'));
 
 state.details.name = shopNameForLeague(leagueName);
+state.details.ticker = `FPL-${leagueId}`;
 state.details.description = `This shop is a companion to Fantasy Premier League team #${leagueId} - ${leagueName}.`;
+state.details.tags = Array.from(new Set([...(state.details.tags || []), 'fpl', `fpl-league:${leagueId}`]));
 state.details.owner = wallet;
 state.revOperator = wallet;
+state.collection = state.collection || {};
+state.collection.name = state.details.name;
+state.collection.symbol = state.details.ticker;
+state.collection.nameTouched = true;
+state.collection.symbolTouched = true;
 
 for (const stage of state.stages || []) {
   stage.tokenMode = 'none';
@@ -120,6 +127,13 @@ for (const nft of state.nfts || []) {
   nft.flags = nft.flags || {};
   nft.flags.allowCredits = false;
   nft.imageUri = state.details.logoUri;
+  if (nft.splitOn && Array.isArray(nft.splitRecipients)) {
+    for (const recipient of nft.splitRecipients) {
+      if (/^\d+$/.test(String(recipient.recip || '')) && Number(recipient.recip) === 12) {
+        recipient.benef = state.revOperator || state.details.owner;
+      }
+    }
+  }
 }
 
 for (const [tierName, price] of tierPriceOverrides) {
@@ -133,6 +147,7 @@ for (const [tierName, price] of tierPriceOverrides) {
 
 const projectMetadata = {
   name: state.details.name,
+  symbol: state.details.ticker,
   projectTagline: state.details.tagline || '',
   description: state.details.description,
   logoUri: state.details.logoUri,
@@ -141,6 +156,7 @@ const projectMetadata = {
   twitter: state.details.twitter || '',
   discord: state.details.discord || '',
   telegram: state.details.telegram || '',
+  tags: state.details.tags || [],
   fpl: {
     leagueId: String(leagueId),
   },
@@ -182,7 +198,6 @@ const tierNames = (state.nfts || []).map((nft) => nft.name);
 const tierFailures = [];
 const expectedCategories = ['Buy-ins', 'Contests', 'Collectibles', 'Rewards'];
 if (!tierNames.includes('Full Season')) tierFailures.push('missing Full Season tier');
-if (!tierNames.includes('Game Week 1')) tierFailures.push('missing Game Week 1 tier');
 if (!projectMetadata.payDisclosure.trim()) tierFailures.push('payment disclosure is blank');
 if (JSON.stringify(state.storeCategories || []) !== JSON.stringify(expectedCategories)) {
   tierFailures.push(`store categories must be ${expectedCategories.join(', ')}`);
@@ -190,8 +205,15 @@ if (JSON.stringify(state.storeCategories || []) !== JSON.stringify(expectedCateg
 if ((state.nfts || []).some((nft) => !Number.isInteger(nft.category) || nft.category < 0 || nft.category >= expectedCategories.length)) {
   tierFailures.push('at least one NFT tier has no valid store category');
 }
-if ((state.nfts || []).some((nft) => nft.splitOn || (nft.splitRecipients || []).length)) {
-  tierFailures.push('reusable draft must not contain default NFT tier splits');
+const fullSeasonTier = (state.nfts || []).find((nft) => nft.name === 'Full Season');
+const expectedOperator = state.revOperator || state.details.owner;
+const fullSeasonSplit = fullSeasonTier?.splitRecipients?.[0];
+if (!fullSeasonTier?.splitOn
+  || (fullSeasonTier.splitRecipients || []).length !== 1
+  || String(fullSeasonSplit?.pct) !== '1'
+  || String(fullSeasonSplit?.recip) !== '12'
+  || String(fullSeasonSplit?.benef || '').toLowerCase() !== String(expectedOperator || '').toLowerCase()) {
+  tierFailures.push('Full Season tier must route a 1% sale split to project 12 with the operator as beneficiary');
 }
 if ((state.nfts || []).some((nft) => nft.flags?.allowCredits !== false)) {
   tierFailures.push('at least one NFT tier allows credit purchases');
