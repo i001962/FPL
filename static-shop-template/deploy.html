@@ -1,0 +1,622 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Deploy FPL League Shop</title>
+  <meta name="description" content="Configure a project-specific FPL league NFT shop draft.">
+  <link rel="icon" href="data:,">
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #14213d;
+      --muted: #5f6876;
+      --line: #d9dee8;
+      --panel: #ffffff;
+      --bg: #f6f7f9;
+      --accent: #08a88a;
+      --accent-dark: #067761;
+      --warn: #b45309;
+      --error: #b42318;
+      --shadow: 0 18px 45px rgba(20, 33, 61, 0.12);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      color: var(--ink);
+      background:
+        linear-gradient(135deg, rgba(8, 168, 138, 0.10), transparent 38%),
+        linear-gradient(315deg, rgba(244, 196, 48, 0.14), transparent 42%),
+        var(--bg);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      letter-spacing: 0;
+    }
+
+    button,
+    input,
+    textarea {
+      font: inherit;
+    }
+
+    .shell {
+      width: min(1120px, calc(100% - 32px));
+      margin: 0 auto;
+      padding: 28px 0 36px;
+    }
+
+    header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 24px;
+      margin-bottom: 24px;
+    }
+
+    h1 {
+      margin: 0;
+      max-width: 760px;
+      font-size: clamp(2rem, 5vw, 4.4rem);
+      line-height: 0.96;
+      letter-spacing: 0;
+    }
+
+    .subtitle {
+      margin: 14px 0 0;
+      max-width: 680px;
+      color: var(--muted);
+      font-size: 1rem;
+      line-height: 1.55;
+    }
+
+    .header-side {
+      display: grid;
+      justify-items: end;
+      gap: 12px;
+      flex: 0 0 min(100%, 360px);
+    }
+
+    .status {
+      width: 100%;
+      padding: 14px 16px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.74);
+      color: var(--muted);
+      box-shadow: var(--shadow);
+      line-height: 1.4;
+    }
+
+    .status strong {
+      display: block;
+      margin-bottom: 3px;
+      color: var(--ink);
+    }
+
+    .status.error {
+      border-color: rgba(180, 35, 24, 0.32);
+      color: var(--error);
+    }
+
+    .layout {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 420px;
+      gap: 18px;
+      align-items: start;
+    }
+
+    section,
+    aside {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.86);
+      box-shadow: var(--shadow);
+    }
+
+    section {
+      padding: 22px;
+    }
+
+    aside {
+      position: sticky;
+      top: 18px;
+      padding: 18px;
+    }
+
+    h2 {
+      margin: 0 0 14px;
+      font-size: 1.18rem;
+    }
+
+    .grid {
+      display: grid;
+      gap: 14px;
+    }
+
+    .field {
+      display: grid;
+      gap: 7px;
+    }
+
+    .field label {
+      color: var(--muted);
+      font-size: 0.78rem;
+      font-weight: 800;
+      text-transform: uppercase;
+    }
+
+    .field input,
+    .field textarea {
+      width: 100%;
+      border: 1px solid var(--line);
+      border-radius: 7px;
+      background: #fff;
+      color: var(--ink);
+      outline: none;
+    }
+
+    .field input {
+      min-height: 44px;
+      padding: 0 12px;
+    }
+
+    .field textarea {
+      min-height: 94px;
+      padding: 12px;
+      resize: vertical;
+      line-height: 1.45;
+    }
+
+    .field input:focus,
+    .field textarea:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(8, 168, 138, 0.16);
+    }
+
+    .row {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(160px, 0.36fr);
+      gap: 12px;
+    }
+
+    .actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 16px;
+    }
+
+    .button {
+      display: inline-flex;
+      min-height: 44px;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 0 14px;
+      border: 1px solid var(--line);
+      border-radius: 7px;
+      background: #fff;
+      color: var(--ink);
+      font-weight: 800;
+      cursor: pointer;
+      text-decoration: none;
+    }
+
+    .button.primary {
+      border-color: var(--accent);
+      background: var(--accent);
+      color: #fff;
+    }
+
+    .button:disabled {
+      cursor: not-allowed;
+      opacity: 0.52;
+    }
+
+    .wallet-card,
+    .preview-card {
+      display: grid;
+      gap: 12px;
+      margin-bottom: 14px;
+      padding: 14px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.72);
+    }
+
+    .wallet-card strong,
+    .preview-card strong {
+      display: block;
+      font-size: 0.92rem;
+    }
+
+    .muted {
+      margin: 0;
+      color: var(--muted);
+      font-size: 0.86rem;
+      line-height: 1.45;
+    }
+
+    .summary {
+      display: grid;
+      gap: 10px;
+      margin-top: 4px;
+    }
+
+    .summary-row {
+      display: flex;
+      justify-content: space-between;
+      gap: 14px;
+      padding-bottom: 10px;
+      border-bottom: 1px solid var(--line);
+      color: var(--muted);
+      font-size: 0.88rem;
+    }
+
+    .summary-row strong {
+      max-width: 58%;
+      color: var(--ink);
+      text-align: right;
+      overflow-wrap: anywhere;
+    }
+
+    .draft-preview {
+      width: 100%;
+      min-height: 320px;
+      margin-top: 14px;
+      padding: 12px;
+      border: 1px solid var(--line);
+      border-radius: 7px;
+      background: #101827;
+      color: #e5edf8;
+      font: 0.78rem/1.45 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      resize: vertical;
+    }
+
+    .image-preview {
+      width: 100%;
+      aspect-ratio: 1;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      object-fit: cover;
+      background: rgba(8, 168, 138, 0.08);
+    }
+
+    @media (max-width: 900px) {
+      header,
+      .layout,
+      .row {
+        grid-template-columns: 1fr;
+      }
+
+      header {
+        display: grid;
+      }
+
+      .header-side {
+        justify-items: stretch;
+      }
+
+      aside {
+        position: static;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="shell">
+    <header>
+      <div>
+        <h1>Deploy FPL League Shop</h1>
+        <p class="subtitle">Prepare a league-specific Juicebox draft from the default FPL shop template. Only the league, owner, project copy, image, and membership price are edited here.</p>
+      </div>
+      <div class="header-side">
+        <div class="status" id="status">
+          <strong>Load a league</strong>
+          Enter a classic league ID or standings URL.
+        </div>
+      </div>
+    </header>
+
+    <div class="layout">
+      <section aria-label="Deploy configuration">
+        <h2>League</h2>
+        <div class="grid">
+          <div class="field">
+            <label for="leagueInput">League ID or standings URL</label>
+            <input id="leagueInput" type="text" placeholder="143466 or https://fantasy.premierleague.com/en/leagues/143466/standings/c" autocomplete="off">
+          </div>
+          <div class="actions">
+            <button class="button primary" id="loadLeague" type="button">Load league</button>
+            <button class="button" id="resetDraft" type="button">Reset draft</button>
+          </div>
+        </div>
+
+        <h2 style="margin-top: 26px;">Project Fields</h2>
+        <div class="grid">
+          <div class="field">
+            <label for="projectName">Project name</label>
+            <input id="projectName" type="text" autocomplete="off">
+          </div>
+          <div class="field">
+            <label for="projectDescription">Project description</label>
+            <textarea id="projectDescription"></textarea>
+          </div>
+          <div class="row">
+            <div class="field">
+              <label for="projectImage">Project image URI</label>
+              <input id="projectImage" type="text" placeholder="ipfs://..." autocomplete="off">
+            </div>
+            <div class="field">
+              <label for="membershipPrice">Membership price</label>
+              <input id="membershipPrice" type="number" min="0" step="0.01" autocomplete="off">
+            </div>
+          </div>
+          <p class="muted">The project image also becomes the first NFT membership image. Other NFT tiers, categories, payment settings, token settings, and split defaults stay unchanged from the `.jb` template.</p>
+        </div>
+      </section>
+
+      <aside aria-label="Draft summary">
+        <div class="wallet-card">
+          <strong>Owner wallet</strong>
+          <p class="muted" id="walletLabel">Not connected</p>
+          <button class="button primary" id="connectWallet" type="button">Connect wallet</button>
+        </div>
+        <div class="preview-card">
+          <strong>Template summary</strong>
+          <div class="summary">
+            <div class="summary-row"><span>League</span><strong id="leagueLabel">Not loaded</strong></div>
+            <div class="summary-row"><span>Owner/operator</span><strong id="ownerLabel">Not set</strong></div>
+            <div class="summary-row"><span>First NFT</span><strong id="nftLabel">Full Season</strong></div>
+            <div class="summary-row"><span>Price</span><strong id="priceLabel">5</strong></div>
+            <div class="summary-row"><span>Splits</span><strong id="splitsLabel">None</strong></div>
+          </div>
+        </div>
+        <img class="image-preview" id="imagePreview" alt="Project image preview">
+        <div class="actions">
+          <button class="button primary" id="copyDraft" type="button">Copy draft JSON</button>
+          <button class="button" id="downloadDraft" type="button">Download .jb</button>
+        </div>
+        <textarea class="draft-preview" id="draftPreview" readonly aria-readonly="true"></textarea>
+      </aside>
+    </div>
+  </main>
+
+  <script>
+    const DRAFT_PATHS = [
+      'assets/fpl-insert-league-name-shop.jb',
+      '../assets/fpl-insert-league-name-shop.jb'
+    ];
+    const DEFAULT_API_BASE = 'https://fc-footy.vercel.app/api/fpl-league?leagueId=';
+    const DEFAULT_IMAGE = 'ipfs://bafkreib3a2bk2ufpr2dwolmwzxb7zkgvgcry65qmyicvqmnnbvtwhifjri';
+
+    const state = {
+      template: null,
+      draft: null,
+      leagueId: '',
+      leagueName: '',
+      wallet: ''
+    };
+
+    const els = {
+      status: document.querySelector('#status'),
+      leagueInput: document.querySelector('#leagueInput'),
+      loadLeague: document.querySelector('#loadLeague'),
+      resetDraft: document.querySelector('#resetDraft'),
+      projectName: document.querySelector('#projectName'),
+      projectDescription: document.querySelector('#projectDescription'),
+      projectImage: document.querySelector('#projectImage'),
+      membershipPrice: document.querySelector('#membershipPrice'),
+      connectWallet: document.querySelector('#connectWallet'),
+      walletLabel: document.querySelector('#walletLabel'),
+      leagueLabel: document.querySelector('#leagueLabel'),
+      ownerLabel: document.querySelector('#ownerLabel'),
+      nftLabel: document.querySelector('#nftLabel'),
+      priceLabel: document.querySelector('#priceLabel'),
+      splitsLabel: document.querySelector('#splitsLabel'),
+      imagePreview: document.querySelector('#imagePreview'),
+      copyDraft: document.querySelector('#copyDraft'),
+      downloadDraft: document.querySelector('#downloadDraft'),
+      draftPreview: document.querySelector('#draftPreview')
+    };
+
+    function setStatus(title, text, isError = false) {
+      els.status.classList.toggle('error', isError);
+      els.status.innerHTML = `<strong>${escapeHtml(title)}</strong>${escapeHtml(text)}`;
+    }
+
+    function escapeHtml(value) {
+      return String(value || '').replace(/[&<>"']/g, (char) => ({
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#39;'
+      }[char]));
+    }
+
+    function clone(value) {
+      return JSON.parse(JSON.stringify(value));
+    }
+
+    function parseLeagueId(value) {
+      const text = String(value || '').trim();
+      if (/^\d{3,9}$/.test(text)) return text;
+      return text.match(/(?:leagues\/)?(\d{3,9})(?:\/standings|\/|$)/i)?.[1] || '';
+    }
+
+    function shopNameForLeague(name) {
+      const trimmed = String(name || '').trim();
+      const withoutShop = trimmed.replace(/\s+shop$/i, '').trim();
+      return /^fpl\b/i.test(withoutShop) ? `${withoutShop} Shop` : `FPL ${withoutShop} Shop`;
+    }
+
+    function ipfsToGateway(uri) {
+      const text = String(uri || '').trim();
+      if (!text.startsWith('ipfs://')) return text;
+      return `https://ipfs.io/ipfs/${text.slice('ipfs://'.length)}`;
+    }
+
+    async function loadTemplate() {
+      let lastError = null;
+      for (const path of DRAFT_PATHS) {
+        try {
+          const response = await fetch(path, { cache: 'no-store' });
+          if (!response.ok) throw new Error(`${path}: ${response.status}`);
+          state.template = await response.json();
+          break;
+        } catch (error) {
+          lastError = error;
+        }
+      }
+      if (!state.template) throw new Error(`Could not load the .jb template. ${lastError?.message || ''}`.trim());
+      resetDraft();
+      setStatus('Template ready', 'Enter a league ID to create a configured draft.');
+    }
+
+    function resetDraft() {
+      if (!state.template) return;
+      state.draft = clone(state.template);
+      state.leagueId = '';
+      state.leagueName = '';
+      if (state.wallet) applyWallet();
+      hydrateFields();
+      render();
+    }
+
+    function hydrateFields() {
+      const draft = state.draft;
+      els.projectName.value = draft?.details?.name || '';
+      els.projectDescription.value = draft?.details?.description || '';
+      els.projectImage.value = draft?.details?.logoUri || DEFAULT_IMAGE;
+      els.membershipPrice.value = draft?.nfts?.[0]?.price || '';
+    }
+
+    async function fetchLeague(leagueId) {
+      const params = new URLSearchParams(window.location.search);
+      const apiBase = params.get('apiBase') || DEFAULT_API_BASE;
+      const endpoint = apiBase.includes('{leagueId}')
+        ? apiBase.replace('{leagueId}', encodeURIComponent(leagueId))
+        : `${apiBase}${encodeURIComponent(leagueId)}`;
+      const response = await fetch(`${endpoint}${endpoint.includes('?') ? '&' : '?'}includeManagersInfo=1`);
+      if (!response.ok) throw new Error(`League request failed: ${response.status}`);
+      return response.json();
+    }
+
+    async function loadLeague() {
+      const leagueId = parseLeagueId(els.leagueInput.value);
+      if (!leagueId) {
+        setStatus('League ID needed', 'Paste a classic league ID or standings URL.', true);
+        return;
+      }
+      if (!state.draft) {
+        setStatus('Template not ready', 'The .jb template has not loaded yet.', true);
+        return;
+      }
+      setStatus('Loading league', `Reading league ${leagueId}.`);
+      try {
+        const league = await fetchLeague(leagueId);
+        const leagueName = league?.league?.name || `League ${leagueId}`;
+        const name = shopNameForLeague(leagueName);
+        const description = `This shop is a companion to Fantasy Premier League team #${leagueId} - ${leagueName}.`;
+        state.leagueId = String(leagueId);
+        state.leagueName = leagueName;
+        els.projectName.value = name;
+        els.projectDescription.value = description;
+        applyForm();
+        setStatus('League loaded', `${leagueName} is ready to configure.`);
+      } catch (error) {
+        setStatus('Could not load league', error.message, true);
+      }
+    }
+
+    function applyWallet() {
+      if (!state.draft || !state.wallet) return;
+      state.draft.details.owner = state.wallet;
+      state.draft.revOperator = state.wallet;
+    }
+
+    function applyForm() {
+      if (!state.draft) return;
+      const draft = state.draft;
+      const imageUri = els.projectImage.value.trim() || DEFAULT_IMAGE;
+      draft.details.name = els.projectName.value.trim();
+      draft.details.description = els.projectDescription.value.trim();
+      draft.details.logoUri = imageUri;
+      draft.details.tags = state.leagueId ? ['fpl', `fpl-league:${state.leagueId}`] : draft.details.tags;
+      draft.details.fpl = state.leagueId ? { leagueId: state.leagueId } : draft.details.fpl;
+      if (draft.nfts?.[0]) {
+        draft.nfts[0].imageUri = imageUri;
+        draft.nfts[0].price = String(els.membershipPrice.value || '0');
+      }
+      applyWallet();
+      render();
+    }
+
+    function render() {
+      const draft = state.draft;
+      const nft = draft?.nfts?.[0] || {};
+      const imageUri = draft?.details?.logoUri || DEFAULT_IMAGE;
+      els.leagueLabel.textContent = state.leagueName ? `${state.leagueName} #${state.leagueId}` : 'Not loaded';
+      els.ownerLabel.textContent = state.wallet || 'Not set';
+      els.walletLabel.textContent = state.wallet || 'Not connected';
+      els.connectWallet.textContent = state.wallet ? 'Wallet connected' : 'Connect wallet';
+      els.nftLabel.textContent = nft.name || 'Full Season';
+      els.priceLabel.textContent = nft.price || '0';
+      els.splitsLabel.textContent = nft.splitOn || nft.splitRecipients?.length ? 'Custom' : 'None';
+      els.imagePreview.src = ipfsToGateway(imageUri);
+      els.draftPreview.value = draft ? JSON.stringify(draft, null, 2) : '';
+    }
+
+    async function connectWallet() {
+      const provider = window.ethereum;
+      if (!provider?.request) {
+        setStatus('Wallet unavailable', 'Open this page in a browser with an injected wallet.', true);
+        return;
+      }
+      try {
+        const accounts = await provider.request({ method: 'eth_requestAccounts' });
+        state.wallet = accounts?.[0] || '';
+        applyForm();
+        setStatus('Wallet connected', state.wallet);
+      } catch (error) {
+        setStatus('Wallet rejected', error.message || 'Connection was not approved.', true);
+      }
+    }
+
+    async function copyDraft() {
+      if (!state.draft) return;
+      await navigator.clipboard.writeText(JSON.stringify(state.draft, null, 2));
+      setStatus('Draft copied', 'The configured .jb JSON is on the clipboard.');
+    }
+
+    function downloadDraft() {
+      if (!state.draft) return;
+      const namePart = state.leagueId || 'league';
+      const blob = new Blob([JSON.stringify(state.draft, null, 2)], { type: 'application/json' });
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = `fpl-${namePart}-shop.jb`;
+      link.click();
+      URL.revokeObjectURL(link.href);
+    }
+
+    els.loadLeague.addEventListener('click', loadLeague);
+    els.resetDraft.addEventListener('click', resetDraft);
+    els.connectWallet.addEventListener('click', connectWallet);
+    els.copyDraft.addEventListener('click', copyDraft);
+    els.downloadDraft.addEventListener('click', downloadDraft);
+    [els.projectName, els.projectDescription, els.projectImage, els.membershipPrice].forEach((input) => {
+      input.addEventListener('input', applyForm);
+    });
+
+    loadTemplate().catch((error) => {
+      setStatus('Template unavailable', error.message, true);
+    });
+  </script>
+</body>
+</html>

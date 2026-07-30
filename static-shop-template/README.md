@@ -4,6 +4,8 @@ This is a copyable project-specific static app template for FPL league NFT shops
 
 `find.html` preserves the previous league registry concept and copy as an orphaned reference page. It is not part of the supported project-specific buyer app. Its directory lookup expects a separate registry API/proxy to provide its shop list.
 
+`deploy.html` is a lightweight browser helper for preparing a league-specific `.jb` draft from the default template. It asks for a league ID, loads league data through the configured browser-readable FPL API, lets the user edit only the project name, description, image, and first membership NFT price, and uses the connected wallet as owner/operator. The hosted page loads `assets/fpl-insert-league-name-shop.jb`, a mirrored copy of the repo-level deploy template.
+
 ## Publishing
 
 Pushing changes to `main` publishes the entire template directory through GitHub Actions. Configure the repository Actions secrets `QSTORAGE_ACCESS_KEY_ID` and `QSTORAGE_SECRET_ACCESS_KEY` first. The workflow uses path-style S3 requests and mirrors `static-shop-template/` to `s3://footy/static-shop-template/` with `--delete`, so QStorage exactly matches the local template folder without affecting any other bucket prefix.
