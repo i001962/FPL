@@ -1,0 +1,3081 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>FPL League Registry</title>
+  <meta name="description" content="An orphaned FPL league shop registry concept preserved from the static buyer app.">
+  <link rel="icon" href="data:,">
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #14213d;
+      --muted: #5f6876;
+      --line: #d9dee8;
+      --panel: #ffffff;
+      --bg: #f6f7f9;
+      --accent: #08a88a;
+      --accent-dark: #067761;
+      --warn: #b45309;
+      --error: #b42318;
+      --shadow: 0 18px 45px rgba(20, 33, 61, 0.12);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      color: var(--ink);
+      background:
+        linear-gradient(135deg, rgba(8, 168, 138, 0.10), transparent 38%),
+        linear-gradient(315deg, rgba(244, 196, 48, 0.14), transparent 42%),
+        var(--bg);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      letter-spacing: 0;
+    }
+
+    button,
+    input,
+    select {
+      font: inherit;
+    }
+
+    .shell {
+      width: min(1180px, calc(100% - 32px));
+      margin: 0 auto;
+      padding: 28px 0 36px;
+    }
+
+    header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 24px;
+      margin-bottom: 24px;
+    }
+
+    .header-side {
+      display: grid;
+      justify-items: end;
+      gap: 12px;
+      flex: 0 0 min(100%, 440px);
+    }
+
+    h1 {
+      margin: 0;
+      max-width: 760px;
+      font-size: clamp(2rem, 5vw, 4.4rem);
+      line-height: 0.96;
+      letter-spacing: 0;
+    }
+
+    .subtitle {
+      margin: 14px 0 0;
+      max-width: 620px;
+      color: var(--muted);
+      font-size: 1rem;
+      line-height: 1.55;
+    }
+
+    .status {
+      min-width: min(100%, 320px);
+      padding: 14px 16px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.72);
+      color: var(--muted);
+      box-shadow: var(--shadow);
+    }
+
+    .status strong {
+      display: block;
+      margin-bottom: 3px;
+      color: var(--ink);
+    }
+
+    .ownership {
+      display: none;
+      justify-items: end;
+      gap: 8px;
+      width: 100%;
+      text-align: right;
+    }
+
+    .ownership.visible {
+      display: grid;
+    }
+
+    .ownership-meta {
+      display: grid;
+      gap: 2px;
+      color: var(--muted);
+      font-size: 0.82rem;
+      line-height: 1.3;
+    }
+
+    .ownership-meta strong {
+      color: var(--ink);
+      font-size: 0.92rem;
+    }
+
+    .ownership-list {
+      display: flex;
+      justify-content: flex-end;
+      flex-wrap: wrap;
+      gap: 8px;
+      max-width: 100%;
+    }
+
+    .ownership-item {
+      position: relative;
+      width: 42px;
+      height: 42px;
+      border-radius: 7px;
+      overflow: hidden;
+      border: 1px solid var(--line);
+      background: rgba(255, 255, 255, 0.82);
+    }
+
+    .ownership-item img {
+      display: block;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    .ownership-count {
+      position: absolute;
+      right: 0;
+      bottom: 0;
+      min-width: 18px;
+      padding: 1px 4px;
+      border-radius: 6px 0 0 0;
+      background: rgba(15, 23, 42, 0.86);
+      color: #fff;
+      font-size: 0.68rem;
+      font-weight: 800;
+      line-height: 1.2;
+    }
+
+    .layout {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 360px;
+      gap: 18px;
+      align-items: start;
+    }
+
+    section,
+    aside {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.86);
+      box-shadow: var(--shadow);
+    }
+
+    section {
+      overflow: hidden;
+    }
+
+    .toolbar {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 180px;
+      gap: 12px;
+      padding: 16px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .field {
+      display: grid;
+      gap: 6px;
+    }
+
+    label {
+      color: var(--muted);
+      font-size: 0.78rem;
+      font-weight: 700;
+      text-transform: uppercase;
+    }
+
+    input,
+    select {
+      width: 100%;
+      height: 42px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: #fff;
+      color: var(--ink);
+      padding: 0 12px;
+      outline: none;
+    }
+
+    input:focus,
+    select:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(8, 168, 138, 0.16);
+    }
+
+    .table-wrap {
+      overflow: auto;
+      max-height: 620px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      min-width: 680px;
+    }
+
+    th,
+    td {
+      padding: 12px 14px;
+      border-bottom: 1px solid var(--line);
+      text-align: left;
+      vertical-align: middle;
+      font-size: 0.92rem;
+    }
+
+    th {
+      position: sticky;
+      top: 0;
+      z-index: 1;
+      background: #fafdff;
+      color: var(--muted);
+      font-size: 0.74rem;
+      text-transform: uppercase;
+    }
+
+    tr {
+      cursor: pointer;
+    }
+
+    tr:hover td {
+      background: rgba(8, 168, 138, 0.06);
+    }
+
+    tr.selected td {
+      background: rgba(8, 168, 138, 0.13);
+    }
+
+    .rank {
+      width: 66px;
+      color: var(--muted);
+      font-variant-numeric: tabular-nums;
+    }
+
+    .manager {
+      font-weight: 750;
+    }
+
+    .manager-cell {
+      display: inline-flex;
+      align-items: center;
+      gap: 9px;
+      min-width: 0;
+    }
+
+    .manager-badge {
+      width: 24px;
+      height: 24px;
+      flex: 0 0 auto;
+      border: 1px solid var(--line);
+      border-radius: 5px;
+      background:
+        linear-gradient(135deg, rgba(8, 168, 138, 0.10), rgba(244, 196, 48, 0.10)),
+        #f7fafb;
+      object-fit: contain;
+    }
+
+    .team {
+      color: var(--muted);
+    }
+
+    aside {
+      padding: 18px;
+    }
+
+    h2 {
+      margin: 0 0 14px;
+      font-size: 1.1rem;
+      letter-spacing: 0;
+    }
+
+    .choice {
+      display: grid;
+      gap: 10px;
+      margin-bottom: 18px;
+    }
+
+    .tier {
+      display: grid;
+      grid-template-columns: 52px minmax(0, 1fr) auto;
+      gap: 10px;
+      align-items: center;
+      min-height: 72px;
+      padding: 12px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+    }
+
+    .tier.selected {
+      border-color: rgba(8, 168, 138, 0.55);
+      background: rgba(8, 168, 138, 0.06);
+    }
+
+    .tier-thumb {
+      width: 52px;
+      height: 52px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background:
+        linear-gradient(135deg, rgba(8, 168, 138, 0.12), rgba(244, 196, 48, 0.12)),
+        #f7fafb;
+      object-fit: cover;
+      overflow: hidden;
+    }
+
+    .tier-thumb img {
+      display: block;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    .tier strong {
+      display: block;
+      margin-bottom: 2px;
+    }
+
+    .tier span {
+      color: var(--muted);
+      font-size: 0.86rem;
+    }
+
+    .tier-main {
+      min-width: 0;
+    }
+
+    .tier-meta {
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+
+    .tier-detail-toggle {
+      border: 0;
+      background: transparent;
+      color: var(--accent-dark);
+      cursor: pointer;
+      font: inherit;
+      font-size: 0.78rem;
+      font-weight: 800;
+      padding: 0;
+      text-decoration: underline;
+      text-underline-offset: 2px;
+    }
+
+    .tier-description {
+      grid-column: 2 / -1;
+      margin-top: -4px;
+      color: var(--muted);
+      font-size: 0.82rem;
+      line-height: 1.42;
+    }
+
+    .price {
+      font-weight: 800;
+      color: var(--accent-dark);
+      white-space: nowrap;
+    }
+
+    .qty {
+      display: grid;
+      grid-template-columns: 28px 30px 28px;
+      align-items: center;
+      justify-content: end;
+      gap: 4px;
+      grid-column: 1 / -1;
+    }
+
+    .qty button {
+      width: 28px;
+      height: 28px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: #fff;
+      color: var(--ink);
+      cursor: pointer;
+      font-weight: 800;
+      line-height: 1;
+    }
+
+    .qty button:disabled {
+      opacity: 0.45;
+      cursor: default;
+    }
+
+    .qty span {
+      color: var(--ink);
+      font-weight: 800;
+      text-align: center;
+    }
+
+    .summary {
+      display: grid;
+      gap: 10px;
+      padding: 14px;
+      border-radius: 8px;
+      background: #f7fafb;
+      border: 1px solid var(--line);
+      margin-bottom: 14px;
+    }
+
+    .summary-row {
+      display: flex;
+      justify-content: space-between;
+      gap: 16px;
+      color: var(--muted);
+      font-size: 0.9rem;
+    }
+
+    .summary-row strong {
+      color: var(--ink);
+      text-align: right;
+      overflow-wrap: anywhere;
+    }
+
+    .memo {
+      width: 100%;
+      min-height: 76px;
+      resize: vertical;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 12px;
+      color: var(--ink);
+      background: #fff;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 0.86rem;
+      line-height: 1.45;
+    }
+
+    .memo-block {
+      display: none;
+    }
+
+    .memo-block.visible {
+      display: none;
+    }
+
+    .assertion {
+      margin: 0 0 14px;
+      padding: 12px;
+      border: 1px solid rgba(180, 83, 9, 0.32);
+      border-radius: 8px;
+      background: rgba(180, 83, 9, 0.08);
+      color: #7c4a03;
+      font-size: 0.84rem;
+      line-height: 1.45;
+    }
+
+    .assertion strong {
+      color: var(--ink);
+    }
+
+    .confirm-entry {
+      display: none;
+      align-items: flex-start;
+      gap: 10px;
+      margin: 0 0 14px;
+      color: var(--ink);
+      font-size: 0.86rem;
+      line-height: 1.4;
+      cursor: pointer;
+    }
+
+    .confirm-entry.visible {
+      display: flex;
+    }
+
+    .confirm-entry input {
+      width: 18px;
+      height: 18px;
+      margin-top: 1px;
+      flex: 0 0 auto;
+    }
+
+    .actions {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-top: 12px;
+    }
+
+    .button {
+      display: inline-flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 42px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: #fff;
+      color: var(--ink);
+      font-weight: 750;
+      text-decoration: none;
+      cursor: pointer;
+      padding: 0 12px;
+    }
+
+    .button.primary {
+      border-color: var(--accent);
+      background: var(--accent);
+      color: #fff;
+    }
+
+    .button.primary:hover {
+      background: var(--accent-dark);
+    }
+
+    .button.connected {
+      border-color: rgba(8, 168, 138, 0.5);
+      background: rgba(8, 168, 138, 0.08);
+    }
+
+    .button.full {
+      grid-column: 1 / -1;
+    }
+
+    .button:disabled,
+    .button.disabled {
+      opacity: 0.48;
+      pointer-events: none;
+    }
+
+    .tx-status {
+      min-height: 20px;
+      margin-top: 10px;
+      color: var(--muted);
+      font-size: 0.82rem;
+      line-height: 1.45;
+      overflow-wrap: anywhere;
+    }
+
+    .tx-status.error {
+      color: var(--error);
+    }
+
+    .wallet-menu {
+      position: fixed;
+      z-index: 20;
+      min-width: 220px;
+      padding: 6px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+      box-shadow: 0 18px 45px rgba(20, 33, 61, 0.18);
+    }
+
+    .wallet-menu-item,
+    .wallet-menu-note {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      width: 100%;
+      min-height: 36px;
+      padding: 8px 10px;
+      border: 0;
+      border-radius: 6px;
+      background: transparent;
+      color: var(--ink);
+      font: inherit;
+      font-size: 0.88rem;
+      text-align: left;
+      text-decoration: none;
+    }
+
+    .wallet-menu-item {
+      cursor: pointer;
+    }
+
+    .wallet-menu-item:hover {
+      background: rgba(8, 168, 138, 0.08);
+    }
+
+    .wallet-menu-danger {
+      color: var(--error);
+    }
+
+    .wallet-menu-note {
+      color: var(--muted);
+      cursor: default;
+    }
+
+    .wallet-menu-error {
+      color: var(--error);
+    }
+
+    .wallet-pick-icon {
+      width: 18px;
+      height: 18px;
+      border-radius: 4px;
+    }
+
+    .notice {
+      margin-top: 14px;
+      color: var(--muted);
+      font-size: 0.82rem;
+      line-height: 1.45;
+    }
+
+    .notice strong {
+      display: block;
+      margin-bottom: 4px;
+      color: var(--ink);
+    }
+
+    .skill-link {
+      display: block;
+      margin-top: 10px;
+      color: var(--muted);
+      font-size: 0.82rem;
+      line-height: 1.4;
+    }
+
+    .skill-link a {
+      color: var(--accent-dark);
+      font-weight: 750;
+      text-decoration: none;
+    }
+
+    .skill-link a:hover {
+      text-decoration: underline;
+    }
+
+    .directory-link {
+      display: inline-flex;
+      align-items: center;
+      min-height: 34px;
+      color: var(--accent-dark);
+      font-size: 0.88rem;
+      font-weight: 750;
+      text-decoration: none;
+    }
+
+    .directory-link:hover {
+      text-decoration: underline;
+    }
+
+    .discovery-view {
+      display: none;
+      max-width: 1120px;
+      margin: 30px auto 0;
+    }
+
+    .discovery-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      align-items: start;
+      margin-top: 20px;
+    }
+
+    .discovery-panel {
+      min-height: 100%;
+      padding: 26px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.84);
+      box-shadow: var(--shadow);
+    }
+
+    .discovery-panel.create-panel {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(260px, 320px);
+      gap: 28px;
+      align-items: start;
+      border-color: rgba(8, 168, 138, 0.42);
+      background: rgba(8, 168, 138, 0.05);
+    }
+
+    .discovery-kicker {
+      margin: 0 0 9px;
+      color: var(--accent-dark);
+      font-size: 0.78rem;
+      font-weight: 800;
+      text-transform: uppercase;
+    }
+
+    .discovery-panel h2 {
+      margin: 0;
+      font-size: 1.55rem;
+    }
+
+    .discovery-panel > p {
+      margin: 8px 0 20px;
+      color: var(--muted);
+      line-height: 1.5;
+    }
+
+    .league-url-help {
+      margin: 12px 0 0;
+      padding: 0;
+      border: 0;
+      border-radius: 0;
+      background: transparent;
+      color: var(--muted);
+      font-size: 0.87rem;
+    }
+
+    .league-url-help strong {
+      display: inline;
+      margin: 0;
+      color: var(--ink);
+      font-weight: 750;
+    }
+
+    .league-url-help p {
+      margin: 0;
+      line-height: 1.45;
+    }
+
+    .league-url-help code {
+      display: block;
+      width: fit-content;
+      margin-top: 5px;
+      padding: 2px 0;
+      border-radius: 0;
+      background: transparent;
+      color: var(--accent-dark);
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 0.75rem;
+      overflow-wrap: anywhere;
+    }
+
+    .league-url-link {
+      display: inline;
+      margin: 0;
+      color: var(--accent-dark);
+      font-size: 0.84rem;
+      font-weight: 750;
+      text-decoration: none;
+    }
+
+    .league-url-link:hover {
+      text-decoration: underline;
+    }
+
+    .discovery-form {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 10px;
+    }
+
+    .discovery-form .button {
+      min-width: 124px;
+    }
+
+    .discovery-result {
+      display: grid;
+      gap: 12px;
+      margin-top: 20px;
+    }
+
+    .discovery-message {
+      margin: 0;
+      color: var(--muted);
+      line-height: 1.5;
+    }
+
+    .discovery-message.error {
+      color: var(--error);
+    }
+
+    .shop-result {
+      display: grid;
+      grid-template-columns: 44px minmax(0, 1fr) auto;
+      align-items: center;
+      gap: 12px;
+      padding: 14px;
+      border: 1px solid var(--line);
+      border-radius: 7px;
+      background: rgba(8, 168, 138, 0.05);
+    }
+
+    .shop-result img,
+    .shop-result-placeholder {
+      width: 44px;
+      height: 44px;
+      border-radius: 6px;
+      object-fit: cover;
+      background: rgba(8, 168, 138, 0.13);
+    }
+
+    .shop-result h3,
+    .shop-result p {
+      margin: 0;
+    }
+
+    .shop-result h3 {
+      font-size: 1rem;
+    }
+
+    .shop-result p {
+      margin-top: 3px;
+      color: var(--muted);
+      font-size: 0.84rem;
+    }
+
+    .discovery-footnote {
+      margin-top: 20px;
+      padding-top: 0;
+    }
+
+    .discovery-footnote p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 0.88rem;
+      line-height: 1.45;
+    }
+
+    .create-benefits {
+      margin: 14px 0 18px;
+      padding: 0;
+      color: var(--muted);
+      font-size: 0.9rem;
+      line-height: 1.45;
+    }
+
+    .create-benefits li {
+      display: inline;
+    }
+
+    .create-benefits li:not(:last-child)::after {
+      content: " · ";
+      color: var(--accent-dark);
+    }
+
+    .create-panel .button {
+      width: 100%;
+    }
+
+    .agent-actions {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 10px;
+    }
+
+    .agent-actions .button {
+      min-height: 44px;
+    }
+
+    .agent-copy {
+      grid-column: auto;
+      color: var(--accent-dark);
+    }
+
+    .agent-repository {
+      display: inline-block;
+      margin-top: 14px;
+      color: var(--accent-dark);
+      font-size: 0.84rem;
+      font-weight: 750;
+      text-decoration: none;
+    }
+
+    .agent-repository:hover {
+      text-decoration: underline;
+    }
+
+    .create-note {
+      margin: 12px 0 0;
+      color: var(--muted);
+      font-size: 0.82rem;
+      line-height: 1.45;
+    }
+
+    .league-directory {
+      margin: 0;
+      padding: 26px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.84);
+      box-shadow: var(--shadow);
+    }
+
+    .league-directory-header {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(240px, 320px);
+      gap: 18px;
+      align-items: end;
+      margin-bottom: 16px;
+    }
+
+    .league-directory h2 {
+      margin: 0;
+      font-size: 1.35rem;
+    }
+
+    .league-directory-header p,
+    .league-directory-message {
+      margin: 6px 0 0;
+      color: var(--muted);
+      line-height: 1.45;
+    }
+
+    .directory-filter {
+      display: grid;
+      gap: 7px;
+    }
+
+    .directory-filter-row {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 8px;
+    }
+
+    .directory-prompt {
+      align-self: center;
+      color: var(--muted);
+      font-size: 0.84rem;
+      font-weight: 750;
+      text-decoration: none;
+      white-space: nowrap;
+    }
+
+    .directory-prompt:hover,
+    .directory-prompt.copied {
+      color: var(--accent-dark);
+    }
+
+    .directory-filter label {
+      color: var(--muted);
+      font-size: 0.74rem;
+      font-weight: 800;
+      text-transform: uppercase;
+    }
+
+    .directory-help {
+      margin: 10px 0 0;
+      color: var(--muted);
+      font-size: 0.84rem;
+      line-height: 1.45;
+    }
+
+    .directory-help a {
+      color: var(--accent-dark);
+      font-weight: 750;
+      text-decoration: none;
+    }
+
+    .directory-help a:hover {
+      text-decoration: underline;
+    }
+
+    .league-directory-table-wrap {
+      overflow-x: auto;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.72);
+    }
+
+    .league-directory-table {
+      width: 100%;
+      min-width: 720px;
+      border-collapse: collapse;
+      text-align: left;
+    }
+
+    .league-directory-table th,
+    .league-directory-table td {
+      padding: 14px;
+      border-bottom: 1px solid var(--line);
+      vertical-align: top;
+    }
+
+    .league-directory-table tr:last-child td {
+      border-bottom: 0;
+    }
+
+    .league-directory-table th {
+      color: var(--muted);
+      font-size: 0.74rem;
+      font-weight: 800;
+      text-transform: uppercase;
+    }
+
+    .league-directory-table td {
+      font-size: 0.9rem;
+    }
+
+    .league-directory-name {
+      display: block;
+      max-width: 280px;
+      color: var(--ink);
+      font-weight: 750;
+    }
+
+    .league-directory-description {
+      max-width: 340px;
+      color: var(--muted);
+      line-height: 1.4;
+    }
+
+    .league-directory-link {
+      color: var(--accent-dark);
+      font-weight: 750;
+      text-decoration: none;
+    }
+
+    .project-deployments {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      min-height: 22px;
+    }
+
+    .project-chain-link {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      transition: opacity 120ms ease, transform 120ms ease;
+    }
+
+    .project-chain-link:hover {
+      opacity: 0.72;
+      transform: translateY(-1px);
+    }
+
+    .project-chain-logo {
+      display: block;
+      width: 18px;
+      height: 18px;
+    }
+
+    .project-chain-logo svg {
+      display: block;
+      width: 18px;
+      height: 18px;
+    }
+
+    .project-chain-fallback {
+      display: inline-flex;
+      width: 18px;
+      height: 18px;
+      align-items: center;
+      justify-content: center;
+      border-radius: 50%;
+      background: var(--line);
+      color: var(--muted);
+      font-size: 0.7rem;
+      font-weight: 800;
+    }
+
+    .league-directory-link:hover {
+      text-decoration: underline;
+    }
+
+    body.discovery-mode .discovery-view {
+      display: block;
+    }
+
+    body.discovery-mode .shop-view,
+    body.discovery-mode .ownership,
+    body.discovery-mode .header-side {
+      display: none;
+    }
+
+    body.discovery-mode h1 {
+      max-width: 700px;
+      font-size: clamp(2.6rem, 4vw, 3.9rem);
+      line-height: 1;
+    }
+
+    body.discovery-mode .subtitle {
+      max-width: 640px;
+      margin-top: 12px;
+      font-size: 1.05rem;
+    }
+
+    .discovery-hero-image {
+      display: none;
+    }
+
+    body.discovery-mode header {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(150px, 230px);
+      gap: 26px;
+      align-items: start;
+    }
+
+    body.discovery-mode .discovery-hero-image {
+      display: block;
+      width: min(220px, 100%);
+      height: auto;
+      justify-self: end;
+      margin-top: -12px;
+      border-radius: 8px;
+      pointer-events: none;
+      user-select: none;
+    }
+
+    .error {
+      color: var(--error);
+    }
+
+    @media (max-width: 900px) {
+      header,
+      .layout {
+        grid-template-columns: 1fr;
+      }
+
+      header {
+        display: grid;
+      }
+
+      .header-side,
+      .ownership {
+        justify-items: stretch;
+      }
+
+      .ownership {
+        text-align: left;
+      }
+
+      .ownership-list {
+        justify-content: flex-start;
+      }
+
+      .toolbar {
+        grid-template-columns: 1fr;
+      }
+
+      .discovery-view {
+        margin-top: 20px;
+      }
+
+      .discovery-grid {
+        grid-template-columns: 1fr;
+        gap: 26px;
+      }
+
+      .discovery-panel {
+        padding: 20px;
+      }
+
+      .discovery-panel.create-panel {
+        grid-template-columns: 1fr;
+        gap: 20px;
+      }
+
+      .discovery-form,
+      .shop-result {
+        grid-template-columns: 1fr;
+      }
+
+      .league-directory-header {
+        display: block;
+      }
+
+      .directory-filter {
+        margin-top: 16px;
+      }
+
+      .directory-filter-row {
+        grid-template-columns: 1fr;
+      }
+
+      .directory-prompt {
+        width: 100%;
+        text-align: right;
+      }
+
+      .league-directory {
+        padding: 20px;
+      }
+
+      body.discovery-mode header {
+        grid-template-columns: minmax(0, 1fr) 118px;
+        gap: 14px;
+      }
+
+      body.discovery-mode .discovery-hero-image {
+        width: 118px;
+        margin-top: 0;
+      }
+
+      .shop-result .button {
+        width: 100%;
+      }
+
+      aside {
+        position: static;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="shell">
+    <header>
+      <div>
+        <h1 id="title">FPL League NFT Shop</h1>
+        <p class="subtitle" id="subtitle">Select your Fantasy Premier League manager, choose items, and buy through the league's Juicebox project.</p>
+      </div>
+      <div class="header-side">
+        <div class="status" id="status">
+          <strong>Loading league</strong>
+          Reading the app route.
+        </div>
+        <div class="ownership" id="ownershipSummary" aria-live="polite"></div>
+        <a class="directory-link" id="directoryLink" href="./">Find a league</a>
+      </div>
+      <img class="discovery-hero-image" src="assets/jblogo.gif" alt="Animated peach logo">
+    </header>
+
+    <section class="discovery-view" id="discoveryView" aria-label="FPL league shops">
+      <section class="league-directory" aria-labelledby="leagueDirectoryTitle">
+        <div class="league-directory-header">
+          <div>
+            <p class="discovery-kicker">League Register</p>
+            <h2 id="leagueDirectoryTitle">Find a league shop</h2>
+            <p>Search deployed FPL shops by league ID, project, or description.</p>
+          </div>
+          <div class="directory-filter">
+            <label for="directoryFilter">Search league shops</label>
+            <div class="directory-filter-row">
+              <input id="directoryFilter" type="search" placeholder="FPL URL, league ID, project, or description" autocomplete="off">
+              <a class="directory-prompt" id="copyDiscoveryPrompt" href="#copy-discovery-prompt">[prompt]</a>
+            </div>
+          </div>
+        </div>
+        <p class="directory-help">Need a league ID? Open your FPL standings and copy the number after <strong>/leagues/</strong>. <a href="https://fantasy.premierleague.com/en/leagues/143466/standings/c" target="_blank" rel="noopener">Open FPL standings</a></p>
+        <div id="leagueDirectory" aria-live="polite"><p class="league-directory-message">Loading indexed league shops...</p></div>
+      </section>
+
+      <div class="discovery-grid">
+        <article class="discovery-panel create-panel">
+          <div>
+            <p class="discovery-kicker">Create with an agent</p>
+            <h2>Set up a league shop with an agent</h2>
+            <p>Tell the agent about the league. It can configure the shop and give everyone one place to use.</p>
+            <ul class="create-benefits">
+              <li>Buy-ins</li>
+              <li>Prizes</li>
+              <li>Items</li>
+              <li>Public rules</li>
+            </ul>
+            <p class="create-note">The FPL deploy skill sets the required project metadata, NFT rules, and shop route.</p>
+          </div>
+          <div class="discovery-footnote">
+            <div class="agent-actions" aria-label="Create a shop with an AI agent">
+              <a class="button primary" id="openClaude" href="https://claude.ai/new" target="_blank" rel="noopener">Open in Claude</a>
+              <a class="button primary" id="openChatgpt" href="https://chatgpt.com/" target="_blank" rel="noopener">Open in ChatGPT</a>
+              <button class="button agent-copy" id="copyDeployPrompt" type="button">Copy agent instructions</button>
+            </div>
+            <a class="agent-repository" href="https://github.com/i001962/FPL/" target="_blank" rel="noopener">View the FPL deploy skill</a>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <div class="layout shop-view" id="shopView">
+      <section aria-label="League managers">
+        <div class="toolbar">
+          <div class="field">
+            <label for="search">Find Manager</label>
+            <input id="search" type="search" placeholder="Manager, team, or entry ID" autocomplete="off">
+          </div>
+          <div class="field">
+            <label for="sort">Sort</label>
+            <select id="sort">
+              <option value="rank">League rank</option>
+              <option value="entry">Team name</option>
+              <option value="player">Manager name</option>
+            </select>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th class="rank">Rank</th>
+                <th>Manager</th>
+                <th>Team</th>
+                <th>Entry</th>
+                <th>Total</th>
+              </tr>
+            </thead>
+            <tbody id="managerRows"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <aside aria-label="Purchase memo">
+        <h2>Buy-In</h2>
+        <div class="choice" id="tiers"></div>
+        <div class="summary">
+          <div class="summary-row"><span>Project</span><strong id="projectLabel">-</strong></div>
+          <div class="summary-row"><span>Wallet</span><strong id="walletLabel">Not connected</strong></div>
+          <div class="summary-row"><span>Manager</span><strong id="managerLabel">Select one</strong></div>
+          <div class="summary-row"><span>Amount</span><strong id="amountLabel">-</strong></div>
+        </div>
+        <p class="assertion" id="managerAssertion">Select your manager above. Your payment backs that FPL entry.</p>
+        <label class="confirm-entry" id="confirmEntryWrap">
+          <input id="confirmEntry" type="checkbox">
+          <span id="confirmEntryText">I understand this payment backs the selected FPL entry.</span>
+        </label>
+        <div class="memo-block" id="memoBlock">
+          <label for="memo">Payment Memo</label>
+          <textarea class="memo" id="memo" readonly aria-readonly="true"></textarea>
+        </div>
+        <div class="actions">
+          <button class="button full" id="connectWallet" type="button">Connect Wallet</button>
+          <button class="button primary full" id="buyNft" type="button" disabled>Buy</button>
+          <a class="button full disabled" id="openProject" href="#" target="_blank" rel="noopener">Use on Juicebox</a>
+        </div>
+        <div class="tx-status" id="txStatus"></div>
+        <p class="notice" id="paymentNotice"><strong>Payment notice</strong><span>Loading project payment notice.</span></p>
+        <p class="skill-link">Create your own with <a href="https://claude.ai/new?q=Create%20a%20Juicebox%20agent%20skill%20using%20https%3A%2F%2Fgithub.com%2Fmejango%2Fjuicebox-skills" target="_blank" rel="noopener">Claude</a>.</p>
+      </aside>
+    </div>
+  </main>
+
+  <script type="module">
+    import { decodeFunctionResult, encodeAbiParameters, encodeFunctionData, formatUnits, keccak256, parseUnits } from 'https://esm.sh/viem@2.21.55';
+
+    const FALLBACK_TIERS = [
+      { id: 'full-season', tierId: 1, name: 'Full Season', price: '5', currency: 'USDC' },
+      { id: 'game-week-1', tierId: 2, name: 'Game Week 1', price: '1', currency: 'USDC' }
+    ];
+
+    const CHAIN_LABELS = {
+      base: 'Base',
+      basesep: 'Base Sepolia'
+    };
+
+    const CHAIN_CONFIG = {
+      base: {
+        chainId: 8453,
+        chainHex: '0x2105',
+        name: 'Base',
+        rpcUrls: ['https://mainnet.base.org'],
+        blockExplorerUrls: ['https://basescan.org'],
+        directory: '0x5aff29060e023e6fb87be5596652b33c65af535b',
+        omnichainDeployer: '0xb853758a70a6b4216c09f1d071ea2344aba0a34f',
+        prices: '0xad45e4627f068d1e6b21e5301870d807543a8401',
+        terminal: '0x130f5dd2bd8805443cf41755253d778a75a67f53',
+        tierMetadataTarget: '0xf4a5887170e4d7efb1c874ad88fc82ebf076b5ab',
+        approvalGasLimit: 100000n,
+        payGasLimit: 1500000n,
+        tokens: {
+          USDC: { address: '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913', decimals: 6 }
+        }
+      },
+      basesep: {
+        chainId: 84532,
+        chainHex: '0x14a34',
+        name: 'Base Sepolia',
+        rpcUrls: ['https://sepolia.base.org'],
+        blockExplorerUrls: ['https://sepolia.basescan.org'],
+        directory: '0x5aff29060e023e6fb87be5596652b33c65af535b',
+        omnichainDeployer: '0xb853758a70a6b4216c09f1d071ea2344aba0a34f',
+        prices: '0xad45e4627f068d1e6b21e5301870d807543a8401',
+        terminal: '0x130f5dd2bd8805443cf41755253d778a75a67f53',
+        tierMetadataTarget: '0xf4a5887170e4d7efb1c874ad88fc82ebf076b5ab',
+        approvalGasLimit: 100000n,
+        payGasLimit: 1500000n,
+        tokens: {
+          USDC: { address: '0x036CbD53842c5426634e7929541eC2318f3dCF7e', decimals: 6 }
+        }
+      }
+    };
+
+    const PAY_ABI = [{
+      type: 'function',
+      name: 'pay',
+      stateMutability: 'payable',
+      inputs: [
+        { name: 'projectId', type: 'uint256' },
+        { name: 'token', type: 'address' },
+        { name: 'amount', type: 'uint256' },
+        { name: 'beneficiary', type: 'address' },
+        { name: 'minReturnedTokens', type: 'uint256' },
+        { name: 'memo', type: 'string' },
+        { name: 'metadata', type: 'bytes' }
+      ],
+      outputs: [{ name: 'beneficiaryTokenCount', type: 'uint256' }]
+    }];
+
+    const ERC20_ABI = [
+      {
+        type: 'function',
+        name: 'allowance',
+        stateMutability: 'view',
+        inputs: [{ name: 'owner', type: 'address' }, { name: 'spender', type: 'address' }],
+        outputs: [{ name: '', type: 'uint256' }]
+      },
+      {
+        type: 'function',
+        name: 'approve',
+        stateMutability: 'nonpayable',
+        inputs: [{ name: 'spender', type: 'address' }, { name: 'amount', type: 'uint256' }],
+        outputs: [{ name: '', type: 'bool' }]
+      }
+    ];
+
+    const ERC721_OWNER_OF_ABI = [{
+      type: 'function',
+      name: 'ownerOf',
+      stateMutability: 'view',
+      inputs: [{ name: 'tokenId', type: 'uint256' }],
+      outputs: [{ name: '', type: 'address' }]
+    }];
+
+    const CONTROLLER_OF_ABI = [{
+      type: 'function',
+      name: 'controllerOf',
+      stateMutability: 'view',
+      inputs: [{ name: 'projectId', type: 'uint256' }],
+      outputs: [{ name: '', type: 'address' }]
+    }];
+
+    const CURRENT_RULESET_ABI = [{
+      type: 'function',
+      name: 'currentRulesetOf',
+      stateMutability: 'view',
+      inputs: [{ name: 'projectId', type: 'uint256' }],
+      outputs: [
+        { name: 'ruleset', type: 'tuple', components: [
+          { name: 'cycleNumber', type: 'uint256' },
+          { name: 'id', type: 'uint256' },
+          { name: 'basedOnId', type: 'uint256' },
+          { name: 'start', type: 'uint256' },
+          { name: 'duration', type: 'uint256' },
+          { name: 'weight', type: 'uint256' },
+          { name: 'weightCutPercent', type: 'uint256' },
+          { name: 'approvalHook', type: 'address' },
+          { name: 'metadata', type: 'uint256' }
+        ] },
+        { name: 'metadata', type: 'tuple', components: [
+          { name: 'reservedPercent', type: 'uint256' },
+          { name: 'cashOutTaxRate', type: 'uint256' },
+          { name: 'baseCurrency', type: 'uint256' },
+          { name: 'pausePay', type: 'bool' },
+          { name: 'pauseCreditTransfers', type: 'bool' },
+          { name: 'allowOwnerMinting', type: 'bool' },
+          { name: 'allowSetCustomToken', type: 'bool' },
+          { name: 'allowTerminalMigration', type: 'bool' },
+          { name: 'allowSetTerminals', type: 'bool' },
+          { name: 'allowSetController', type: 'bool' },
+          { name: 'allowAddAccountingContext', type: 'bool' },
+          { name: 'allowAddPriceFeed', type: 'bool' },
+          { name: 'ownerMustSendPayouts', type: 'bool' },
+          { name: 'holdFees', type: 'bool' },
+          { name: 'useTotalSurplusForCashOuts', type: 'bool' },
+          { name: 'useDataHookForPay', type: 'bool' },
+          { name: 'useDataHookForCashOut', type: 'bool' },
+          { name: 'dataHook', type: 'address' },
+          { name: 'metadata', type: 'uint256' }
+        ] }
+      ]
+    }];
+
+    const PROJECTS_OF_ABI = [{
+      type: 'function',
+      name: 'PROJECTS',
+      stateMutability: 'view',
+      inputs: [],
+      outputs: [{ name: '', type: 'address' }]
+    }];
+
+    const PROJECT_TOKEN_URI_ABI = [{
+      type: 'function',
+      name: 'tokenURI',
+      stateMutability: 'view',
+      inputs: [{ name: 'projectId', type: 'uint256' }],
+      outputs: [{ name: '', type: 'string' }]
+    }];
+
+    const PROJECT_URI_OF_ABI = [{
+      type: 'function',
+      name: 'uriOf',
+      stateMutability: 'view',
+      inputs: [{ name: 'projectId', type: 'uint256' }],
+      outputs: [{ name: '', type: 'string' }]
+    }];
+
+    const OMNI_TIERED_HOOK_ABI = [{
+      type: 'function',
+      name: 'tiered721HookOf',
+      stateMutability: 'view',
+      inputs: [{ name: 'projectId', type: 'uint256' }, { name: 'rulesetId', type: 'uint256' }],
+      outputs: [{ name: 'hook', type: 'address' }, { name: 'useDataHookForCashOut', type: 'bool' }]
+    }];
+
+    const HOOK_STORE_ABI = [{
+      type: 'function',
+      name: 'STORE',
+      stateMutability: 'view',
+      inputs: [],
+      outputs: [{ type: 'address' }]
+    }];
+
+    const HOOK_METADATA_ID_TARGET_ABI = [{
+      type: 'function',
+      name: 'METADATA_ID_TARGET',
+      stateMutability: 'view',
+      inputs: [],
+      outputs: [{ type: 'address' }]
+    }];
+
+    const TIER721_FLAGS = {
+      name: 'flags',
+      type: 'tuple',
+      components: [
+        { name: 'allowOwnerMint', type: 'bool' },
+        { name: 'transfersPausable', type: 'bool' },
+        { name: 'cantBeRemoved', type: 'bool' },
+        { name: 'cantIncreaseDiscountPercent', type: 'bool' },
+        { name: 'cantBuyWithCredits', type: 'bool' }
+      ]
+    };
+
+    const TIER721_TUPLE = {
+      type: 'tuple[]',
+      components: [
+        { name: 'id', type: 'uint32' },
+        { name: 'price', type: 'uint104' },
+        { name: 'remainingSupply', type: 'uint32' },
+        { name: 'initialSupply', type: 'uint32' },
+        { name: 'votingUnits', type: 'uint104' },
+        { name: 'reserveFrequency', type: 'uint16' },
+        { name: 'reserveBeneficiary', type: 'address' },
+        { name: 'encodedIpfsUri', type: 'bytes32' },
+        { name: 'category', type: 'uint24' },
+        { name: 'discountPercent', type: 'uint8' },
+        TIER721_FLAGS,
+        { name: 'splitPercent', type: 'uint32' },
+        { name: 'resolvedUri', type: 'string' }
+      ]
+    };
+
+    const TIER721_STORE_ABI = [
+      {
+        type: 'function',
+        name: 'tiersOf',
+        stateMutability: 'view',
+        inputs: [{ type: 'address' }, { type: 'uint256[]' }, { type: 'bool' }, { type: 'uint256' }, { type: 'uint256' }],
+        outputs: [TIER721_TUPLE]
+      },
+      {
+        type: 'function',
+        name: 'tokenUriResolverOf',
+        stateMutability: 'view',
+        inputs: [{ type: 'address' }],
+        outputs: [{ type: 'address' }]
+      }
+    ];
+
+    const TIER721_PRICING_CONTEXT_ABI = [{
+      type: 'function',
+      name: 'pricingContext',
+      stateMutability: 'view',
+      inputs: [],
+      outputs: [{ name: 'currency', type: 'uint256' }, { name: 'decimals', type: 'uint256' }]
+    }];
+
+    const TIER721_RESOLVER_ABI = [{
+      type: 'function',
+      name: 'tokenUriOf',
+      stateMutability: 'view',
+      inputs: [{ type: 'address' }, { type: 'uint256' }],
+      outputs: [{ type: 'string' }]
+    }];
+
+    const PRICE_PER_UNIT_ABI = [{
+      type: 'function',
+      name: 'pricePerUnitOf',
+      stateMutability: 'view',
+      inputs: [
+        { name: 'projectId', type: 'uint256' },
+        { name: 'pricingCurrency', type: 'uint256' },
+        { name: 'unitCurrency', type: 'uint256' },
+        { name: 'decimals', type: 'uint256' }
+      ],
+      outputs: [{ name: 'price', type: 'uint256' }]
+    }];
+
+    const ZERO_ADDRESS_RE = /^0x0+$/i;
+    const B58 = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
+    const B32 = 'abcdefghijklmnopqrstuvwxyz234567';
+    const MAX_OWNER_SCAN = 300;
+    const BADGE_CACHE_KEY = 'fpl-shop-entry-badges-v1';
+    const WALLET_FLAG = 'fpl-shop-wallet-connected';
+    const WALLET_RDNS = 'fpl-shop-wallet-rdns';
+    const WALLET_PROVIDER_FALLBACK = { info: { uuid: 'injected-0', name: 'Browser wallet', rdns: 'injected', icon: '' }, provider: window.ethereum };
+    const discoveredProviders = [];
+    // Set this when publishing a project-specific copy. A hash route still overrides it.
+    const DEFAULT_PROJECT_ROUTE = '';
+    // Orphaned registry concept: this endpoint is not provided by the project-specific template.
+    const DISCOVERY_API_PATH = '/api/shops';
+    const DEPLOY_REPOSITORY_URL = 'https://github.com/i001962/FPL/';
+    const DEPLOY_AGENT_PROMPT = `I want to create a Fantasy Premier League league shop. Read and use the FPL League NFT Shop deploy skill in ${DEPLOY_REPOSITORY_URL} before preparing anything. Ask me for my FPL league URL, buy-in price, NFT description, and image preference. Follow the repository defaults and rules, including the required Juicebox V6 metadata, fpl.leagueId, fpl and fpl-league:<leagueId> tags, social fields even when blank, payment notice, and NFT tiers that cannot be bought with credits. Prepare a wallet-signable transaction link or deploy through my wallet. Do not depend on fpl.d33m.com or another hosted directory for deployment, discovery, or payment: project metadata and onchain Juicebox data must be sufficient. A static shop frontend may be shared after deployment, but it is optional.`;
+    const DISCOVERY_AGENT_PROMPT = `Use the fpl-league-nft-shop-deployer skill to find a Fantasy Premier League (FPL) Juicebox shop and its current purchasable NFT tiers. Before inspecting, read its references/inspect-existing-shop.md workflow. If the skill is not installed, read https://github.com/i001962/FPL/blob/main/SKILL.md and https://github.com/i001962/FPL/blob/main/references/inspect-existing-shop.md. Do not rely on fpl.d33m.com or another hosted directory, and do not stop after finding project IDs. Completion requires a tier inventory for every matched project: name, tier ID, price and currency, initial supply, remaining supply, and availability; include image and description when metadata resolves.
+
+First, get the classic FPL league ID from a standings URL such as https://fantasy.premierleague.com/en/leagues/<leagueId>/standings/c. Query the public Juicebox V6 index directly at https://bendystraw.xyz/graphql and, when relevant, https://testnet.bendystraw.xyz/graphql. Search projects with version: 6 and tags_has: "fpl" or "fpl-league:<leagueId>". Request projectId, chainId, name, description, metadataUri, tags, and metadata. Keep only projects whose metadata.fpl.leagueId exactly equals the FPL league ID.
+
+For every matching project, read the active Juicebox V6 721 hook and its live tiers with eth_call. ${DEPLOY_REPOSITORY_URL}static-shop-template/index.html contains a reference implementation for these reads. Resolve JBDirectory.controllerOf(projectId), then the controller's currentRulesetOf(projectId). Use the current ruleset's dataHook; if it is the omnichain deployer, resolve tiered721HookOf(projectId, rulesetId). From the resolved hook read STORE(), METADATA_ID_TARGET(), pricingContext(), then call the store's tiersOf(hook, [], false, 0, 200). Exclude tiers with initialSupply = 0. Resolve each tier's metadata from tokenUriResolverOf(hook) / tokenUriOf(hook, tierId * 1_000_000_000), resolvedUri, or encodedIpfsUri. Convert tier price using pricingContext and the project's payment currency; retain the raw price too.
+
+Use the chain's direct RPC first. For Base Sepolia (84532), try https://sepolia.base.org, then https://sepolia-preconf.base.org, then https://base-sepolia-rpc.publicnode.com. If a runtime blocks direct RPC, use the direct Juicebox project UI or the chain explorer as a read-only fallback. Do not ask the user to copy item cards or transcribe tier data. Report an incomplete result only after these fallbacks fail, name the exact failed endpoint or call, and still return every tier value you could read.
+
+Direct Juicebox routes use: 1=eth, 11155111=sep, 42161=arb, 421614=arbsep, 8453=base, 84532=basesep, 10=op, 11155420=opsep. The direct UI URL is https://juicebox.money/v6/<chainSlug>:<projectId>. Inspect terms, payment notice, metadata, and onchain state before recommending a payment. If no project exists, offer to create one with the deploy skill at ${DEPLOY_REPOSITORY_URL}. fpl.d33m.com is only an optional human-facing frontend, never a required service.`;
+
+    const state = {
+      chainSlug: 'base',
+      projectId: '',
+      leagueId: '',
+      leagueName: '',
+      discoveryLeagueId: '',
+      paymentNotice: '',
+      isDiscovery: false,
+      projectMetadata: null,
+      shopHook: '',
+      directoryShops: [],
+      salesStats: { loading: false, scanned: false, customers: 0, itemsSold: 0, owned: [], scanLimitHit: false },
+      salesStatsRequest: 0,
+      managers: [],
+      badgeCache: loadBadgeCache(),
+      selectedManager: null,
+      managerConfirmed: false,
+      tiers: FALLBACK_TIERS,
+      cart: { [FALLBACK_TIERS[0].id]: 1 },
+      expandedTiers: new Set(),
+      walletAccount: '',
+      walletChainId: '',
+      activeProvider: window.ethereum || null,
+      activeProviderInfo: window.ethereum ? WALLET_PROVIDER_FALLBACK.info : null,
+      walletConnecting: false,
+      apiBase: 'https://fc-footy.vercel.app/api/fpl-league?leagueId=',
+      projectLeagueMap: {
+        'basesep:19': '143466'
+      }
+    };
+
+    window.addEventListener?.('eip6963:announceProvider', (event) => {
+      const detail = event?.detail;
+      if (!detail?.info || !detail?.provider) return;
+      if (!discoveredProviders.some((entry) => entry.info.uuid === detail.info.uuid)) {
+        discoveredProviders.push(detail);
+      }
+    });
+    try { window.dispatchEvent(new Event('eip6963:requestProvider')); } catch (_) {}
+
+    const els = {
+      title: document.querySelector('#title'),
+      subtitle: document.querySelector('#subtitle'),
+      status: document.querySelector('#status'),
+      ownershipSummary: document.querySelector('#ownershipSummary'),
+      search: document.querySelector('#search'),
+      sort: document.querySelector('#sort'),
+      rows: document.querySelector('#managerRows'),
+      tiers: document.querySelector('#tiers'),
+      projectLabel: document.querySelector('#projectLabel'),
+      walletLabel: document.querySelector('#walletLabel'),
+      managerLabel: document.querySelector('#managerLabel'),
+      amountLabel: document.querySelector('#amountLabel'),
+      managerAssertion: document.querySelector('#managerAssertion'),
+      confirmEntryWrap: document.querySelector('#confirmEntryWrap'),
+      confirmEntry: document.querySelector('#confirmEntry'),
+      confirmEntryText: document.querySelector('#confirmEntryText'),
+      memoBlock: document.querySelector('#memoBlock'),
+      memo: document.querySelector('#memo'),
+      connectWallet: document.querySelector('#connectWallet'),
+      buyNft: document.querySelector('#buyNft'),
+      txStatus: document.querySelector('#txStatus'),
+      openProject: document.querySelector('#openProject'),
+      paymentNotice: document.querySelector('#paymentNotice'),
+      directoryLink: document.querySelector('#directoryLink'),
+      leagueDirectory: document.querySelector('#leagueDirectory'),
+      directoryFilter: document.querySelector('#directoryFilter'),
+      copyDiscoveryPrompt: document.querySelector('#copyDiscoveryPrompt'),
+      openClaude: document.querySelector('#openClaude'),
+      openChatgpt: document.querySelector('#openChatgpt'),
+      copyDeployPrompt: document.querySelector('#copyDeployPrompt')
+    };
+
+    function parseRoute() {
+      const route = window.location.hash.replace(/^#/, '');
+      const match = route.match(/^([a-z0-9-]+):(\d+)(?:\/fpl\/(\d+))?/i);
+      const defaultMatch = DEFAULT_PROJECT_ROUTE.match(/^([a-z0-9-]+):(\d+)(?:\/fpl\/(\d+))?$/i);
+      const params = new URLSearchParams(window.location.search);
+      state.chainSlug = match?.[1] || params.get('chain') || defaultMatch?.[1] || 'base';
+      state.projectId = match?.[2] || params.get('projectId') || defaultMatch?.[2] || '';
+      state.leagueId = match?.[3] || params.get('leagueId') || defaultMatch?.[3] || '';
+      state.apiBase = params.get('apiBase') || state.apiBase;
+      state.isDiscovery = !state.projectId;
+
+      const tierParam = params.get('tiers');
+      if (tierParam) {
+        state.tiers = tierParam.split(',').map((part, index) => {
+          const [name, price, currency, tierId] = part.split(':');
+          return {
+            id: `tier-${index}`,
+            tierId: Number(tierId || index + 1),
+            name: decodeURIComponent(name || '').trim() || `Tier ${index + 1}`,
+            price: decodeURIComponent(price || '').trim() || '0',
+            currency: decodeURIComponent(currency || '').trim() || 'USDC'
+          };
+        });
+        state.cart = state.tiers[0] ? { [state.tiers[0].id]: 1 } : {};
+      }
+    }
+
+    function setStatus(title, body, isError = false) {
+      els.status.innerHTML = `<strong>${escapeHtml(title)}</strong><span class="${isError ? 'error' : ''}">${escapeHtml(body)}</span>`;
+    }
+
+    function setTxStatus(message, isError = false) {
+      els.txStatus.textContent = message;
+      els.txStatus.classList.toggle('error', isError);
+    }
+
+    function escapeHtml(value) {
+      return String(value).replace(/[&<>"']/g, (char) => ({
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#039;'
+      }[char]));
+    }
+
+    function loadBadgeCache() {
+      try {
+        const parsed = JSON.parse(localStorage.getItem(BADGE_CACHE_KEY) || '{}');
+        return parsed && typeof parsed === 'object' ? parsed : {};
+      } catch (_) {
+        return {};
+      }
+    }
+
+    function saveBadgeCache() {
+      try {
+        localStorage.setItem(BADGE_CACHE_KEY, JSON.stringify(state.badgeCache));
+      } catch (_) {}
+    }
+
+    function normalizeBadgeUrl(value) {
+      const url = String(value || '').trim();
+      if (!url) return '';
+      if (url.startsWith('//')) return `https:${url}`;
+      if (url.startsWith('/')) return `https://fantasy.premierleague.com${url}`;
+      return /^https?:\/\//i.test(url) ? url : '';
+    }
+
+    function badgeForManager(manager) {
+      return manager.badgeUrl || state.badgeCache[String(manager.entryId)] || '';
+    }
+
+    function normalizeManagers(data) {
+      const standings = data?.standings?.results || [];
+      const newEntries = data?.new_entries?.results || [];
+      const managers = [...standings, ...newEntries].map((row, index) => ({
+        rank: row.rank || row.entry_rank || index + 1,
+        entryId: row.entry || row.entry_id || row.id,
+        entryName: row.entry_name || row.name || 'Unnamed team',
+        playerName: row.player_name || (
+          row.player_first_name && row.player_last_name
+            ? `${row.player_first_name} ${row.player_last_name}`
+            : 'Unknown manager'
+        ),
+        total: row.total || row.event_total || 0,
+        badgeUrl: normalizeBadgeUrl(row.club_badge_src)
+      })).filter((row) => row.entryId);
+      managers.forEach((manager) => {
+        if (manager.badgeUrl) state.badgeCache[String(manager.entryId)] = manager.badgeUrl;
+      });
+      saveBadgeCache();
+      return managers;
+    }
+
+    function leagueApiUrl() {
+      let url = state.apiBase.includes('{leagueId}')
+        ? state.apiBase.replaceAll('{leagueId}', encodeURIComponent(state.leagueId))
+        : `${state.apiBase}${encodeURIComponent(state.leagueId)}`;
+      if (!/[?&]includeManagersInfo(?:=|&|$)/.test(url)) {
+        url += `${url.includes('?') ? '&' : '?'}includeManagersInfo=1`;
+      }
+      return url;
+    }
+
+    async function loadLeague() {
+      if (!state.leagueId && state.projectId) {
+        resolveProject();
+      }
+      if (!state.leagueId && state.projectId) {
+        await loadProjectMetadata().catch(() => null);
+        resolveProjectFromMetadata();
+      }
+      if (!state.leagueId) {
+        throw new Error('Could not resolve FPL league for this project. Add leagueId to the route or project metadata.');
+      }
+      const response = await fetch(leagueApiUrl());
+      if (!response.ok) throw new Error(`League fetch failed: ${response.status}`);
+      const data = await response.json();
+      state.leagueName = data?.league?.name || `League ${state.leagueId}`;
+      state.managers = normalizeManagers(data);
+      if (!state.managers.length) throw new Error('No managers found for this league.');
+    }
+
+    function resolveProject() {
+      const key = `${state.chainSlug}:${state.projectId}`;
+      state.leagueId = state.projectLeagueMap[key] || '';
+    }
+
+    function resolveProjectFromMetadata() {
+      if (state.leagueId) return;
+      const metadata = state.projectMetadata;
+      if (!metadata || typeof metadata !== 'object') return;
+      const direct = [
+        metadata.leagueId,
+        metadata.fplLeagueId,
+        metadata.fpl_league_id,
+        metadata.fpl?.leagueId,
+        metadata.fpl?.league_id,
+        metadata.details?.leagueId,
+        metadata.details?.fplLeagueId
+      ].find((value) => value && /^\d+$/.test(String(value).trim()));
+      if (direct) {
+        state.leagueId = String(direct).trim();
+        return;
+      }
+      const text = [
+        metadata.name,
+        metadata.description,
+        metadata.projectTagline,
+        metadata.payDisclosure,
+        metadata.website,
+        metadata.external_url,
+        metadata.url,
+        metadata.details?.name,
+        metadata.details?.description,
+        metadata.details?.website
+      ].filter(Boolean).join(' ');
+      const match = text.match(/(?:fpl[^0-9]{0,24}|league[^0-9]{0,24}|team[^0-9]{0,24}|#)(\d{3,9})/i);
+      if (match) state.leagueId = match[1];
+    }
+
+    function renderHeader() {
+      const chainLabel = CHAIN_LABELS[state.chainSlug] || state.chainSlug;
+      const providerName = state.activeProviderInfo?.name || 'Wallet';
+      els.title.textContent = `FPL ${state.leagueName} Shop`;
+      els.subtitle.textContent = `${chainLabel} project ${state.projectId || 'not set'} · FPL league ${state.leagueId}`;
+      els.projectLabel.textContent = state.projectId ? `${chainLabel}:${state.projectId}` : 'Project not set';
+      els.walletLabel.textContent = state.walletAccount ? `${providerName} ${shortAddress(state.walletAccount)}` : 'Not connected';
+    }
+
+    function showDiscovery() {
+      document.body.classList.add('discovery-mode');
+      els.title.textContent = 'Give the fantasy league something to play for.';
+      els.subtitle.textContent = 'Collect payments, accept tips, sell collectibles, fund prizes, and issue rewards—all through transparent rules your league can help shape.';
+      els.directoryLink.hidden = true;
+      els.openClaude.href = `https://claude.ai/new?q=${encodeURIComponent(DEPLOY_AGENT_PROMPT)}`;
+      els.openChatgpt.href = `https://chatgpt.com/?q=${encodeURIComponent(DEPLOY_AGENT_PROMPT)}`;
+    }
+
+    function extractLeagueId(value) {
+      const text = String(value || '').trim();
+      if (/^\d{3,9}$/.test(text)) return text;
+      return text.match(/(?:leagues\/)?(\d{3,9})(?:\/standings|\/|$)/i)?.[1] || '';
+    }
+
+    function chainLabelFromId(chainId) {
+      const labels = {
+        1: 'Ethereum',
+        10: 'Optimism',
+        8453: 'Base',
+        42161: 'Arbitrum',
+        11155111: 'Ethereum Sepolia',
+        11155420: 'Optimism Sepolia',
+        84532: 'Base Sepolia',
+        421614: 'Arbitrum Sepolia'
+      };
+      return labels[Number(chainId)] || `Chain ${chainId}`;
+    }
+
+    // Mirrors JuiceScan's compact chain marks. Testnets use their parent chain mark.
+    const CHAIN_LOGO_SVG = {
+      eth: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="12" fill="#627EEA"/><path d="M12 4v5.9l5 2.25z" fill="#fff" fill-opacity=".6"/><path d="M12 4L7 12.15l5-2.25z" fill="#fff"/><path d="M12 16v3.99l5-6.92z" fill="#fff" fill-opacity=".6"/><path d="M12 19.99V16l-5-3.07z" fill="#fff"/><path d="M12 15.07l5-2.92-5-2.24z" fill="#fff" fill-opacity=".2"/><path d="M7 12.15l5 2.92v-5.16z" fill="#fff" fill-opacity=".6"/></svg>',
+      op: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="12" fill="#FF0420"/><text x="12" y="15.6" font-size="8.5" font-weight="700" fill="#fff" text-anchor="middle" font-family="Helvetica,Arial,sans-serif">OP</text></svg>',
+      base: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="12" fill="#0052FF"/><path d="M12 6.2A5.8 5.8 0 0 0 12 17.8V6.2z" fill="#fff"/></svg>',
+      arb: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="12" fill="#2D374B"/><path d="M12 6l4.8 11h-2.4L12 11.2 9.6 17H7.2z" fill="#28A0F0"/><path d="M12 6l-1.05 2.45L12 11.2l1.05-2.75z" fill="#fff"/></svg>'
+    };
+
+    function chainLogoFamily(chainId) {
+      const id = Number(chainId);
+      if (id === 1 || id === 11155111) return 'eth';
+      if (id === 10 || id === 11155420) return 'op';
+      if (id === 8453 || id === 84532) return 'base';
+      if (id === 42161 || id === 421614) return 'arb';
+      return '';
+    }
+
+    function projectDeployments(shop) {
+      const deployments = Array.isArray(shop.deployments) && shop.deployments.length
+        ? shop.deployments
+        : [{ chainId: shop.chainId, projectId: shop.projectId, route: shop.route }];
+      return deployments.map((deployment) => {
+        const route = String(deployment.route || '').replace(/^#/, '');
+        const label = `${chainLabelFromId(deployment.chainId)} project ${deployment.projectId}`;
+        const family = chainLogoFamily(deployment.chainId);
+        const icon = family
+          ? `<span class="project-chain-logo">${CHAIN_LOGO_SVG[family]}</span>`
+          : `<span class="project-chain-fallback">?</span>`;
+        const content = icon;
+        return route
+          ? `<a class="project-chain-link" href="https://juicebox.money/v6/${escapeHtml(route)}" target="_blank" rel="noopener" aria-label="${escapeHtml(label)}" title="${escapeHtml(label)}">${content}</a>`
+          : `<span class="project-chain-link" role="img" aria-label="${escapeHtml(label)}" title="${escapeHtml(label)}">${content}</span>`;
+      }).join('');
+    }
+
+    function leagueStandingsUrl(leagueId) {
+      return `https://fantasy.premierleague.com/en/leagues/${encodeURIComponent(leagueId)}/standings/c`;
+    }
+
+    function plainProjectText(value) {
+      return String(value || '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+    }
+
+    function renderLeagueDirectory(shops) {
+      if (!shops.length) {
+        els.leagueDirectory.innerHTML = '<p class="league-directory-message">No indexed FPL shops are available yet.</p>';
+        return;
+      }
+      const rows = shops.map((shop) => {
+        const title = plainProjectText(shop.name) || `FPL project ${shop.projectId}`;
+        const description = plainProjectText(shop.description || shop.projectTagline) || 'No project description published.';
+        const leagueId = shop.leagueId || shop.metadata?.fpl?.leagueId || '';
+        const leagueLink = leagueId
+          ? `<a class="league-directory-link" href="${escapeHtml(leagueStandingsUrl(leagueId))}" target="_blank" rel="noopener">FPL league ${escapeHtml(leagueId)}</a>`
+          : 'League not specified';
+        const deployments = projectDeployments(shop);
+        return `<tr><td>${leagueLink}</td><td><span class="league-directory-name">${escapeHtml(title)}</span></td><td><span class="league-directory-description">${escapeHtml(description)}</span></td><td><span class="project-deployments">${deployments}</span></td><td><a class="button primary" href="${escapeHtml(shop.route)}">See items</a></td></tr>`;
+      }).join('');
+      els.leagueDirectory.innerHTML = `<div class="league-directory-table-wrap"><table class="league-directory-table"><thead><tr><th>League</th><th>Shop</th><th>Description</th><th>Project</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>`;
+    }
+
+    function filterLeagueDirectory() {
+      const rawQuery = String(els.directoryFilter.value || '').trim();
+      const query = (extractLeagueId(rawQuery) || rawQuery).toLowerCase();
+      if (!query) {
+        renderLeagueDirectory(state.directoryShops);
+        return;
+      }
+      const filtered = state.directoryShops.filter((shop) => [
+        shop.leagueId,
+        shop.projectId,
+        shop.name,
+        shop.description,
+        shop.projectTagline,
+        shop.chainId,
+        ...(shop.deployments || []).flatMap((deployment) => [deployment.chainId, deployment.projectId])
+      ].some((value) => plainProjectText(value).toLowerCase().includes(query)));
+      renderLeagueDirectory(filtered);
+    }
+
+    async function loadLeagueDirectory() {
+      try {
+        const response = await fetch(DISCOVERY_API_PATH);
+        if (!response.ok) throw new Error(`Directory request failed: ${response.status}`);
+        const data = await response.json();
+        state.directoryShops = Array.isArray(data?.shops) ? data.shops : [];
+        filterLeagueDirectory();
+      } catch (_) {
+        els.leagueDirectory.innerHTML = '<p class="league-directory-message">Could not load indexed league shops right now. You can still check a specific league above.</p>';
+      }
+    }
+
+    function renderPaymentNotice() {
+      const notice = state.paymentNotice || 'No project payment notice was found in metadata.';
+      els.paymentNotice.innerHTML = `<strong>Payment notice</strong><span>${escapeHtml(notice)}</span>`;
+    }
+
+    function tierSoldCount(tier) {
+      const initial = Number(tier.initialSupply || 0);
+      const remaining = Number(tier.remaining || 0);
+      return Math.max(0, initial - remaining);
+    }
+
+    function renderOwnershipSummary() {
+      const soldEntries = state.tiers
+        .map((tier) => ({ tier, qty: tierSoldCount(tier) }))
+        .filter((entry) => entry.qty > 0);
+      const fallbackItemsSold = soldEntries.reduce((sum, entry) => sum + entry.qty, 0);
+      const stats = state.salesStats || {};
+      const itemsSold = stats.itemsSold || fallbackItemsSold;
+      const ownedEntries = stats.owned?.filter((entry) => entry.qty > 0) || [];
+      const displayEntries = state.walletAccount ? ownedEntries : soldEntries;
+
+      if (!state.tiers.length || (!itemsSold && !state.walletAccount)) {
+        els.ownershipSummary.classList.remove('visible');
+        els.ownershipSummary.innerHTML = '';
+        return;
+      }
+
+      const ownedCount = ownedEntries.reduce((sum, entry) => sum + entry.qty, 0);
+      const customerText = stats.scanned
+        ? `${stats.customers} customer${stats.customers === 1 ? '' : 's'}`
+        : (stats.loading ? 'Loading customers' : 'Customers pending');
+      const soldText = `${itemsSold} item${itemsSold === 1 ? '' : 's'} sold${stats.scanLimitHit ? '+' : ''}`;
+      const title = state.walletAccount
+        ? `You own ${ownedCount} item${ownedCount === 1 ? '' : 's'}`
+        : soldText;
+      const emptyWalletText = state.walletAccount && !ownedCount ? '<span>No NFTs owned by this wallet.</span>' : '';
+      const thumbnails = displayEntries.map(({ tier, qty }) => `
+        <span class="ownership-item" title="${escapeHtml(tier.name)} x${escapeHtml(qty)}">
+          ${tier.image ? `<img src="${escapeHtml(tier.image)}" alt="">` : ''}
+          <span class="ownership-count">x${escapeHtml(qty)}</span>
+        </span>
+      `).join('');
+
+      els.ownershipSummary.innerHTML = `
+        <div class="ownership-meta">
+          <strong>${escapeHtml(title)}</strong>
+          <span>${escapeHtml(customerText)} · ${escapeHtml(soldText)}</span>
+          ${emptyWalletText}
+        </div>
+        <div class="ownership-list">${thumbnails}</div>
+      `;
+      els.ownershipSummary.classList.add('visible');
+    }
+
+    function renderTiers() {
+      els.tiers.innerHTML = state.tiers.map((tier) => `
+        <div class="tier ${cartQty(tier) > 0 ? 'selected' : ''}">
+          <span class="tier-thumb">${tier.image ? `<img src="${escapeHtml(tier.image)}" alt="">` : ''}</span>
+          <span class="tier-main">
+            <strong>${escapeHtml(tier.name)}</strong>
+            <span class="tier-meta">
+              ${tier.remaining === 0 ? '<span>Sold out</span>' : ''}
+              ${tier.description ? `<button class="tier-detail-toggle" type="button" data-tier-detail="${escapeHtml(tier.id)}" aria-expanded="${state.expandedTiers.has(tier.id) ? 'true' : 'false'}">${state.expandedTiers.has(tier.id) ? 'Hide details' : 'Details'}</button>` : ''}
+            </span>
+          </span>
+          <span class="price">${escapeHtml(displayTierPrice(tier))} ${escapeHtml(tier.currency)}</span>
+          ${tier.description && state.expandedTiers.has(tier.id) ? `<div class="tier-description">${escapeHtml(tier.description)}</div>` : ''}
+          <div class="qty" aria-label="${escapeHtml(tier.name)} quantity">
+            <button type="button" data-cart-action="dec" data-tier-id="${escapeHtml(tier.id)}" ${cartQty(tier) <= 0 ? 'disabled' : ''}>-</button>
+            <span>${escapeHtml(cartQty(tier))}</span>
+            <button type="button" data-cart-action="inc" data-tier-id="${escapeHtml(tier.id)}" ${tier.remaining === 0 || (tier.remaining && cartQty(tier) >= tier.remaining) ? 'disabled' : ''}>+</button>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function filteredManagers() {
+      const query = els.search.value.trim().toLowerCase();
+      const sorted = [...state.managers].sort((a, b) => {
+        if (els.sort.value === 'entry') return a.entryName.localeCompare(b.entryName);
+        if (els.sort.value === 'player') return a.playerName.localeCompare(b.playerName);
+        return Number(a.rank) - Number(b.rank);
+      });
+      if (!query) return sorted;
+      return sorted.filter((row) => [row.playerName, row.entryName, row.entryId].some((value) => String(value).toLowerCase().includes(query)));
+    }
+
+    function renderManagers() {
+      const rows = filteredManagers();
+      els.rows.innerHTML = rows.map((row) => `
+        <tr data-entry-id="${escapeHtml(row.entryId)}" class="${state.selectedManager?.entryId === row.entryId ? 'selected' : ''}" tabindex="0">
+          <td class="rank">${escapeHtml(row.rank)}</td>
+          <td class="manager">
+            <span class="manager-cell">
+              ${badgeForManager(row) ? `<img class="manager-badge" src="${escapeHtml(badgeForManager(row))}" alt="" aria-hidden="true">` : ''}
+              <span>${escapeHtml(row.playerName)}</span>
+            </span>
+          </td>
+          <td class="team">${escapeHtml(row.entryName)}</td>
+          <td>${escapeHtml(row.entryId)}</td>
+          <td>${escapeHtml(row.total)}</td>
+        </tr>
+      `).join('');
+    }
+
+    function buildMemo() {
+      if (!state.selectedManager) return '';
+      return String(state.selectedManager.entryId);
+    }
+
+    function cartQty(tier) {
+      return Number(state.cart[tier.id] || 0);
+    }
+
+    function cartEntries() {
+      return state.tiers
+        .map((tier) => ({ tier, qty: cartQty(tier) }))
+        .filter((entry) => entry.qty > 0);
+    }
+
+    function tierPaymentRaw(tier) {
+      const chain = chainConfig();
+      const token = chain?.tokens[String(tier.currency || 'USDC').toUpperCase()];
+      if (tier.paymentAmountRaw) return BigInt(tier.paymentAmountRaw);
+      if (!token) return 0n;
+      return parseUnits(String(tier.price), token.decimals);
+    }
+
+    function cartTotalRaw() {
+      return cartEntries().reduce((sum, entry) => sum + tierPaymentRaw(entry.tier) * BigInt(entry.qty), 0n);
+    }
+
+    function cartSummary() {
+      const entries = cartEntries();
+      const first = entries[0]?.tier;
+      const currency = first ? String(first.currency || 'USDC').toUpperCase() : 'USDC';
+      const chain = chainConfig();
+      const token = chain?.tokens[currency];
+      const total = cartTotalRaw();
+      return {
+        count: entries.reduce((sum, entry) => sum + entry.qty, 0),
+        currency,
+        amount: token ? displayPrice(total, token.decimals) : '0',
+        raw: total
+      };
+    }
+
+    function cartTierIds() {
+      const tierIds = [];
+      cartEntries().forEach(({ tier, qty }) => {
+        for (let i = 0; i < qty; i += 1) tierIds.push(Number(tier.tierId));
+      });
+      return tierIds;
+    }
+
+    function setCartQty(tier, nextQty) {
+      const max = tier.remaining ? Number(tier.remaining) : Number.MAX_SAFE_INTEGER;
+      const qty = Math.max(0, Math.min(max, Number(nextQty) || 0));
+      if (qty > 0) state.cart[tier.id] = qty;
+      else delete state.cart[tier.id];
+    }
+
+    function renderSummary() {
+      const memo = buildMemo();
+      const chain = chainConfig();
+      const cart = cartSummary();
+      els.managerLabel.textContent = state.selectedManager
+        ? `${state.selectedManager.entryName} (${state.selectedManager.entryId})`
+        : 'Select one';
+      els.amountLabel.textContent = cart.count
+        ? `${cart.count} item${cart.count === 1 ? '' : 's'} · ${cart.amount} ${cart.currency}`
+        : '-';
+      els.memo.value = memo;
+      els.memoBlock.classList.toggle('visible', !!memo);
+      els.managerAssertion.innerHTML = state.selectedManager
+        ? `By paying, you're backing FPL entry <strong>${escapeHtml(state.selectedManager.entryId)}</strong> for <strong>${escapeHtml(state.selectedManager.entryName)}</strong> but it is possible there are no rewards distributed.`
+        : 'Select your manager above. Your payment backs that FPL entry.';
+      els.confirmEntryWrap.classList.toggle('visible', !!state.selectedManager);
+      els.confirmEntry.checked = !!state.managerConfirmed;
+      els.confirmEntryText.textContent = state.selectedManager
+        ? `I understand I am backing entry ${state.selectedManager.entryId}.`
+        : 'I understand this payment backs the selected FPL entry.';
+      els.connectWallet.textContent = state.walletAccount
+        ? shortAddress(state.walletAccount)
+        : (state.walletConnecting ? 'Connecting...' : 'Connect Wallet');
+      els.connectWallet.classList.toggle('connected', !!state.walletAccount);
+      els.connectWallet.title = state.walletAccount || 'Connect a wallet';
+      els.connectWallet.disabled = state.walletConnecting;
+      els.buyNft.disabled = !state.projectId || !state.selectedManager || !state.managerConfirmed || !cart.count || !chain;
+
+      if (state.projectId && memo) {
+        const projectUrl = `https://juicebox.money/v6/${encodeURIComponent(state.chainSlug)}:${encodeURIComponent(state.projectId)}`;
+        els.openProject.href = projectUrl;
+        els.openProject.classList.remove('disabled');
+      } else {
+        els.openProject.href = '#';
+        els.openProject.classList.add('disabled');
+      }
+    }
+
+    function chainConfig() {
+      return CHAIN_CONFIG[state.chainSlug] || null;
+    }
+
+    function walletNameForProvider(provider) {
+      if (!provider) return 'Browser wallet';
+      if (provider.isMetaMask) return 'MetaMask';
+      if (provider.isCoinbaseWallet) return 'Coinbase Wallet';
+      if (provider.isRabby) return 'Rabby';
+      if (provider.isTrust) return 'Trust Wallet';
+      if (provider.isBraveWallet) return 'Brave Wallet';
+      return 'Browser wallet';
+    }
+
+    function walletRdnsForProvider(provider) {
+      if (!provider) return 'injected';
+      if (provider.isMetaMask) return 'io.metamask';
+      if (provider.isCoinbaseWallet) return 'com.coinbase.wallet';
+      if (provider.isRabby) return 'io.rabby';
+      if (provider.isTrust) return 'com.trustwallet.app';
+      if (provider.isBraveWallet) return 'com.brave.wallet';
+      return 'injected';
+    }
+
+    function legacyProviders() {
+      if (!window.ethereum) return [];
+      const list = Array.isArray(window.ethereum.providers) && window.ethereum.providers.length
+        ? window.ethereum.providers
+        : [window.ethereum];
+      const seen = [];
+      return list.filter((provider) => {
+        if (!provider || seen.includes(provider)) return false;
+        seen.push(provider);
+        return true;
+      }).map((provider, index) => ({
+        info: { uuid: `injected-${index}`, name: walletNameForProvider(provider), rdns: walletRdnsForProvider(provider), icon: '' },
+        provider
+      }));
+    }
+
+    function getProviders() {
+      return discoveredProviders.length ? [...discoveredProviders] : legacyProviders();
+    }
+
+    function refreshProviders(waitMs = 350) {
+      try { window.dispatchEvent(new Event('eip6963:requestProvider')); } catch (_) {}
+      return new Promise((resolve) => window.setTimeout(() => resolve(getProviders()), waitMs));
+    }
+
+    function walletDappUrl(href) {
+      const raw = String(href || '');
+      let url;
+      try { url = new URL(raw); } catch (_) { return raw; }
+      const suffix = '.ipfs.inbrowser.link';
+      const host = url.hostname.toLowerCase();
+      if (host.endsWith(suffix) && host.length > suffix.length) {
+        const cid = host.slice(0, -suffix.length);
+        return `https://ipfs.io/ipfs/${cid}${url.pathname || '/'}${url.search || ''}${url.hash || ''}`;
+      }
+      if (host === 'ipfs.inbrowser.link') {
+        const match = /^\/ipfs\/([^/]+)(\/.*)?$/.exec(url.pathname);
+        if (match) return `https://ipfs.io/ipfs/${match[1]}${match[2] || '/'}${url.search || ''}${url.hash || ''}`;
+      }
+      return raw;
+    }
+
+    function mobileWalletLinks(href) {
+      const full = walletDappUrl(href);
+      const dapp = encodeURIComponent(full.replace(/^https?:\/\//i, ''));
+      return [
+        { name: 'Open in MetaMask', href: `https://metamask.app.link/dapp/${dapp}` },
+        { name: 'Open in Coinbase Wallet', href: `https://go.cb-w.com/dapp?cb_url=${encodeURIComponent(full)}` },
+        { name: 'Open in Trust Wallet', href: `https://link.trustwallet.com/open_url?coin_id=60&url=${encodeURIComponent(full)}` }
+      ];
+    }
+
+    function bindProviderEvents(provider) {
+      if (!provider?.on) return;
+      try {
+        provider.on('accountsChanged', (accounts) => {
+          state.walletAccount = accounts?.[0] || '';
+          if (!state.walletAccount) {
+            localStorage.removeItem(WALLET_FLAG);
+            localStorage.removeItem(WALLET_RDNS);
+          }
+          renderHeader();
+          renderSummary();
+          refreshSalesStats().catch(() => {});
+        });
+        provider.on('chainChanged', (chainId) => {
+          state.walletChainId = chainId;
+          renderHeader();
+          renderSummary();
+        });
+      } catch (_) {}
+    }
+
+    async function connectToProvider(entry) {
+      if (entry?.provider) {
+        state.activeProvider = entry.provider;
+        state.activeProviderInfo = entry.info || { name: 'Wallet', rdns: 'injected' };
+        bindProviderEvents(state.activeProvider);
+        localStorage.setItem(WALLET_RDNS, state.activeProviderInfo.rdns || '');
+      }
+      if (!state.activeProvider) throw new Error('No wallet detected in this browser.');
+      const accounts = await state.activeProvider.request({ method: 'eth_requestAccounts' });
+      state.walletAccount = accounts?.[0] || '';
+      state.walletChainId = await state.activeProvider.request({ method: 'eth_chainId' }).catch(() => '');
+      localStorage.setItem(WALLET_FLAG, '1');
+      renderHeader();
+      renderSummary();
+      refreshSalesStats().catch(() => {});
+      return state.walletAccount;
+    }
+
+    async function disconnectWallet() {
+      try {
+        await state.activeProvider?.request?.({ method: 'wallet_revokePermissions', params: [{ eth_accounts: {} }] });
+      } catch (_) {}
+      state.walletAccount = '';
+      state.walletChainId = '';
+      localStorage.removeItem(WALLET_FLAG);
+      localStorage.removeItem(WALLET_RDNS);
+      renderHeader();
+      renderSummary();
+      refreshSalesStats().catch(() => {});
+    }
+
+    async function eagerConnect() {
+      if (localStorage.getItem(WALLET_FLAG) !== '1') return;
+      const rdns = localStorage.getItem(WALLET_RDNS) || '';
+      const providers = await refreshProviders(450);
+      const match = providers.find((entry) => entry.info?.rdns === rdns) || providers[0];
+      if (!match?.provider) return;
+      state.activeProvider = match.provider;
+      state.activeProviderInfo = match.info || null;
+      bindProviderEvents(state.activeProvider);
+      const accounts = await state.activeProvider.request({ method: 'eth_accounts' }).catch(() => []);
+      state.walletAccount = accounts?.[0] || '';
+      state.walletChainId = state.walletAccount ? await state.activeProvider.request({ method: 'eth_chainId' }).catch(() => '') : '';
+      renderHeader();
+      renderSummary();
+      refreshSalesStats().catch(() => {});
+    }
+
+    function isZeroAddress(value) {
+      return !value || ZERO_ADDRESS_RE.test(String(value));
+    }
+
+    function shortAddress(address) {
+      return address ? `${address.slice(0, 6)}...${address.slice(-4)}` : '';
+    }
+
+    function toHexQuantity(value) {
+      return `0x${BigInt(value).toString(16)}`;
+    }
+
+    function tier721MetadataId(idTarget) {
+      const hash = keccak256('0x706179');
+      const a = idTarget.slice(2, 10).toLowerCase();
+      const b = hash.slice(2, 10);
+      let out = '';
+      for (let i = 0; i < 8; i += 2) {
+        out += (parseInt(a.slice(i, i + 2), 16) ^ parseInt(b.slice(i, i + 2), 16)).toString(16).padStart(2, '0');
+      }
+      return out;
+    }
+
+    function buildTierMintMetadata(idTarget, tierIds) {
+      const data = encodeAbiParameters(
+        [{ type: 'bool' }, { type: 'uint16[]' }],
+        [true, tierIds.map((id) => Number(id))]
+      );
+      return `0x${'00'.repeat(32)}${tier721MetadataId(idTarget)}02${'00'.repeat(27)}${data.slice(2)}`;
+    }
+
+    async function rpcCall(chain, call) {
+      const response = await fetch(chain.rpcUrls[0], {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ jsonrpc: '2.0', id: Date.now(), method: 'eth_call', params: [call, 'latest'] })
+      });
+      const json = await response.json();
+      if (json.error) throw new Error(json.error.message || 'RPC call failed.');
+      return json.result;
+    }
+
+    async function readContract(chain, address, abi, functionName, args = []) {
+      const data = encodeFunctionData({ abi, functionName, args });
+      const result = await rpcCall(chain, { to: address, data });
+      return decodeFunctionResult({ abi, functionName, data: result });
+    }
+
+    function base58Encode(bytes) {
+      const digits = [0];
+      for (let i = 0; i < bytes.length; i += 1) {
+        let carry = bytes[i];
+        for (let j = 0; j < digits.length; j += 1) {
+          carry += digits[j] << 8;
+          digits[j] = carry % 58;
+          carry = (carry / 58) | 0;
+        }
+        while (carry) {
+          digits.push(carry % 58);
+          carry = (carry / 58) | 0;
+        }
+      }
+      for (let k = 0; k < bytes.length - 1 && bytes[k] === 0; k += 1) digits.push(0);
+      return digits.reverse().map((d) => B58[d]).join('');
+    }
+
+    function base32Encode(bytes) {
+      let bits = 0;
+      let value = 0;
+      let output = '';
+      for (const byte of bytes) {
+        value = (value << 8) | byte;
+        bits += 8;
+        while (bits >= 5) {
+          output += B32[(value >>> (bits - 5)) & 31];
+          bits -= 5;
+        }
+      }
+      if (bits > 0) output += B32[(value << (5 - bits)) & 31];
+      return output;
+    }
+
+    function encodedIpfsCandidates(bytes32) {
+      if (!bytes32 || /^0x0+$/i.test(bytes32)) return [];
+      const hex = bytes32.replace(/^0x/, '');
+      const bytes = new Uint8Array(hex.match(/.{1,2}/g).map((part) => parseInt(part, 16)));
+      return [
+        `ipfs://${base58Encode(new Uint8Array([0x12, 0x20, ...bytes]))}`,
+        `ipfs://b${base32Encode(new Uint8Array([0x01, 0x55, 0x12, 0x20, ...bytes]))}`
+      ];
+    }
+
+    function gatewayUrl(uri) {
+      if (!uri) return '';
+      if (uri.startsWith('ipfs://')) return `https://gateway.pinata.cloud/ipfs/${uri.replace('ipfs://', '')}`;
+      return uri;
+    }
+
+    function decodeDataJson(uri) {
+      const match = String(uri || '').match(/^data:application\/json(?:;charset=[^;,]+)?(;base64)?,(.*)$/i);
+      if (!match) return null;
+      const payload = decodeURIComponent(match[2] || '');
+      return JSON.parse(match[1] ? atob(payload) : payload);
+    }
+
+    async function fetchMetadata(uri) {
+      if (!uri) return null;
+      if (uri.startsWith('data:application/json')) return decodeDataJson(uri);
+      const response = await fetch(gatewayUrl(uri));
+      if (!response.ok) throw new Error(`Metadata fetch failed: ${response.status}`);
+      return response.json();
+    }
+
+    function paymentNoticeFromMetadata(metadata) {
+      if (!metadata || typeof metadata !== 'object') return '';
+      return [
+        metadata.payDisclosure,
+        metadata.details?.payDisclosure,
+        metadata.paymentNotice,
+        metadata.payment_notice,
+        metadata['Payment notice'],
+        metadata['Payment Notice'],
+        metadata.notice
+      ].find((value) => typeof value === 'string' && value.trim())?.trim() || '';
+    }
+
+    async function loadProjectMetadata() {
+      const chain = chainConfig();
+      if (!chain || !state.projectId) return null;
+      if (state.projectMetadata) return state.projectMetadata;
+      const projectId = BigInt(state.projectId);
+      let uri = '';
+      const controller = await readContract(chain, chain.directory, CONTROLLER_OF_ABI, 'controllerOf', [projectId]).catch(() => '');
+      if (!isZeroAddress(controller)) {
+        uri = await readContract(chain, controller, PROJECT_URI_OF_ABI, 'uriOf', [projectId]).catch(() => '');
+      }
+      if (!uri) {
+        const projects = await readContract(chain, chain.directory, PROJECTS_OF_ABI, 'PROJECTS');
+        if (isZeroAddress(projects)) throw new Error('Projects contract not found.');
+        uri = await readContract(chain, projects, PROJECT_TOKEN_URI_ABI, 'tokenURI', [projectId]);
+      }
+      if (!uri) throw new Error('Project metadata URI not found.');
+      const metadata = await fetchMetadata(uri);
+      state.projectMetadata = metadata || null;
+      state.paymentNotice = paymentNoticeFromMetadata(metadata);
+      resolveProjectFromMetadata();
+      renderPaymentNotice();
+      renderHeader();
+      return state.projectMetadata;
+    }
+
+    function tierTokenId(tierId, serial) {
+      return BigInt(tierId) * 1000000000n + BigInt(serial);
+    }
+
+    async function refreshSalesStats() {
+      const chain = chainConfig();
+      const hook = state.shopHook;
+      const requestId = ++state.salesStatsRequest;
+      if (!chain || !hook || isZeroAddress(hook)) return;
+
+      const soldEntries = state.tiers
+        .map((tier) => ({ tier, sold: tierSoldCount(tier) }))
+        .filter((entry) => entry.sold > 0);
+      const itemsSold = soldEntries.reduce((sum, entry) => sum + entry.sold, 0);
+      state.salesStats = {
+        loading: true,
+        scanned: false,
+        customers: state.salesStats.customers || 0,
+        itemsSold,
+        owned: [],
+        scanLimitHit: itemsSold > MAX_OWNER_SCAN
+      };
+      renderOwnershipSummary();
+
+      const owners = new Set();
+      const ownedByTier = new Map();
+      let scanned = 0;
+
+      for (const { tier, sold } of soldEntries) {
+        for (let serial = 1; serial <= sold && scanned < MAX_OWNER_SCAN; serial += 1) {
+          scanned += 1;
+          try {
+            const owner = await readContract(chain, hook, ERC721_OWNER_OF_ABI, 'ownerOf', [tierTokenId(tier.tierId, serial)]);
+            if (!owner || isZeroAddress(owner)) continue;
+            const normalized = owner.toLowerCase();
+            owners.add(normalized);
+            if (state.walletAccount && normalized === state.walletAccount.toLowerCase()) {
+              ownedByTier.set(tier.id, (ownedByTier.get(tier.id) || 0) + 1);
+            }
+          } catch (_) {}
+        }
+      }
+
+      if (requestId !== state.salesStatsRequest) return;
+      state.salesStats = {
+        loading: false,
+        scanned: true,
+        customers: owners.size,
+        itemsSold,
+        owned: state.tiers.map((tier) => ({ tier, qty: ownedByTier.get(tier.id) || 0 })),
+        scanLimitHit: itemsSold > MAX_OWNER_SCAN
+      };
+      renderOwnershipSummary();
+    }
+
+    async function resolveTierMedia(chain, shop, tier) {
+      const uris = [];
+      if (shop.resolver) {
+        try {
+          const tokenUri = await readContract(chain, shop.resolver, TIER721_RESOLVER_ABI, 'tokenUriOf', [shop.hook, BigInt(tier.tierId) * 1000000000n]);
+          if (tokenUri) uris.push(tokenUri);
+        } catch (_) {}
+      }
+      if (tier.resolvedUri) uris.push(tier.resolvedUri);
+      uris.push(...encodedIpfsCandidates(tier.encodedIpfsUri));
+
+      for (const uri of uris) {
+        try {
+          const metadata = await fetchMetadata(uri);
+          const image = metadata?.image || metadata?.image_url || metadata?.animation_url || '';
+          return {
+            name: metadata?.name || tier.name,
+            image: gatewayUrl(image),
+            description: metadata?.description || ''
+          };
+        } catch (_) {}
+      }
+      return { name: tier.name, image: '', description: '' };
+    }
+
+    function displayPrice(raw, decimals) {
+      const formatted = formatUnits(BigInt(raw || 0), decimals);
+      return formatted.replace(/\.0+$/, '').replace(/(\.\d*?)0+$/, '$1');
+    }
+
+    function displayTierPrice(tier) {
+      const currency = String(tier.currency || '').toUpperCase();
+      const amount = Number(tier.price || 0);
+      if (currency === 'USDC' && Number.isFinite(amount)) return amount.toFixed(2);
+      return tier.price;
+    }
+
+    function tokenCurrency(address) {
+      return Number(BigInt(address) & 0xffffffffn);
+    }
+
+    function paymentAmountFromPricing(pricingAmount, pricingDecimals, pricePerUnit) {
+      pricingAmount = BigInt(pricingAmount || 0);
+      pricePerUnit = BigInt(pricePerUnit || 0);
+      const denominator = 10n ** BigInt(Number(pricingDecimals));
+      return (pricingAmount * pricePerUnit + denominator - 1n) / denominator;
+    }
+
+    async function resolveShopHook(chain) {
+      const projectId = BigInt(state.projectId);
+      const controller = await readContract(chain, chain.directory, CONTROLLER_OF_ABI, 'controllerOf', [projectId]);
+      if (isZeroAddress(controller)) throw new Error('Project controller not found.');
+      const current = await readContract(chain, controller, CURRENT_RULESET_ABI, 'currentRulesetOf', [projectId]);
+      const ruleset = current?.[0];
+      const metadata = current?.[1];
+      if (!metadata?.useDataHookForPay || isZeroAddress(metadata.dataHook)) throw new Error('This project does not have an active pay data hook.');
+      if (metadata.dataHook.toLowerCase() === chain.omnichainDeployer.toLowerCase()) {
+        const omni = await readContract(chain, chain.omnichainDeployer, OMNI_TIERED_HOOK_ABI, 'tiered721HookOf', [projectId, BigInt(ruleset.id)]);
+        const hook = omni?.hook || omni?.[0];
+        if (isZeroAddress(hook)) throw new Error('721 hook not found for this ruleset.');
+        return hook;
+      }
+      return metadata.dataHook;
+    }
+
+    async function loadProjectTiers() {
+      const chain = chainConfig();
+      if (!chain || !state.projectId) return;
+      const hook = await resolveShopHook(chain);
+      const store = await readContract(chain, hook, HOOK_STORE_ABI, 'STORE');
+      const idTarget = await readContract(chain, hook, HOOK_METADATA_ID_TARGET_ABI, 'METADATA_ID_TARGET');
+      const pricing = await readContract(chain, hook, TIER721_PRICING_CONTEXT_ABI, 'pricingContext');
+      const resolver = await readContract(chain, store, TIER721_STORE_ABI, 'tokenUriResolverOf', [hook]).catch(() => '');
+      const rawTiers = await readContract(chain, store, TIER721_STORE_ABI, 'tiersOf', [hook, [], false, 0n, 200n]);
+      const decimals = Number(pricing?.decimals ?? pricing?.[1] ?? 6);
+      const currency = String(state.tiers[0]?.currency || 'USDC').toUpperCase();
+      const token = chain.tokens[currency];
+      if (!token) throw new Error(`${currency} is not configured for ${chain.name}.`);
+      const pricingCurrency = Number(pricing?.currency ?? pricing?.[0] ?? 2);
+      const paymentCurrency = tokenCurrency(token.address);
+      const pricePerUnit = paymentCurrency === pricingCurrency
+        ? 10n ** BigInt(token.decimals)
+        : await readContract(chain, chain.prices, PRICE_PER_UNIT_ABI, 'pricePerUnitOf', [
+          BigInt(state.projectId),
+          BigInt(paymentCurrency),
+          BigInt(pricingCurrency),
+          BigInt(token.decimals)
+        ]);
+      const shop = { hook, idTarget, resolver: isZeroAddress(resolver) ? '' : resolver };
+      const tiers = await Promise.all((rawTiers || [])
+        .filter((tier) => Number(tier.initialSupply ?? tier[3] ?? 0) > 0)
+        .map(async (tier) => {
+          const tierId = Number(tier.id ?? tier[0]);
+          const priceRaw = BigInt(tier.price ?? tier[1] ?? 0);
+          const baseTier = {
+            id: `tier-${tierId}`,
+            tierId,
+            name: `Tier ${tierId}`,
+            price: displayPrice(paymentAmountFromPricing(priceRaw, decimals, pricePerUnit), token.decimals),
+            currency,
+            paymentAmountRaw: paymentAmountFromPricing(priceRaw, decimals, pricePerUnit).toString(),
+            pricingPrice: `${displayPrice(priceRaw, decimals)} USD`,
+            pricingCurrency,
+            pricingDecimals: decimals,
+            encodedIpfsUri: tier.encodedIpfsUri ?? tier[7],
+            resolvedUri: tier.resolvedUri ?? tier[12],
+            initialSupply: Number(tier.initialSupply ?? tier[3] ?? 0),
+            remaining: Number(tier.remainingSupply ?? tier[2] ?? 0)
+          };
+          const media = await resolveTierMedia(chain, shop, baseTier);
+          return { ...baseTier, name: media.name || baseTier.name, image: media.image || '', description: media.description || '' };
+      }));
+      if (!tiers.length) throw new Error('No active NFT tiers found.');
+      state.tiers = tiers;
+      state.shopHook = hook;
+      const firstAvailable = tiers.find((tier) => tier.remaining !== 0) || tiers[0];
+      state.cart = firstAvailable ? { [firstAvailable.id]: 1 } : {};
+      chain.tierMetadataTarget = idTarget || chain.tierMetadataTarget;
+      renderAll();
+      refreshSalesStats().catch(() => {
+        state.salesStats = { loading: false, scanned: false, customers: 0, itemsSold: tiers.reduce((sum, tier) => sum + tierSoldCount(tier), 0), owned: [], scanLimitHit: false };
+        renderOwnershipSummary();
+      });
+      setStatus('League ready', `${state.managers.length} managers loaded. ${tiers.length} NFT tiers found.`);
+    }
+
+    async function ensureWalletChain() {
+      const chain = chainConfig();
+      if (!chain) throw new Error(`Unsupported chain: ${state.chainSlug}`);
+      if (!state.walletAccount) await connectToProvider();
+      const current = await state.activeProvider.request({ method: 'eth_chainId' });
+      if (current?.toLowerCase() === chain.chainHex.toLowerCase()) {
+        state.walletChainId = current;
+        return;
+      }
+      try {
+        await state.activeProvider.request({ method: 'wallet_switchEthereumChain', params: [{ chainId: chain.chainHex }] });
+      } catch (error) {
+        if (error?.code !== 4902) throw error;
+        await state.activeProvider.request({
+          method: 'wallet_addEthereumChain',
+          params: [{
+            chainId: chain.chainHex,
+            chainName: chain.name,
+            nativeCurrency: { name: 'Ether', symbol: 'ETH', decimals: 18 },
+            rpcUrls: chain.rpcUrls,
+            blockExplorerUrls: chain.blockExplorerUrls
+          }]
+        });
+      }
+      state.walletChainId = chain.chainHex;
+    }
+
+    async function readAllowance(token, owner, spender) {
+      const data = encodeFunctionData({
+        abi: ERC20_ABI,
+        functionName: 'allowance',
+        args: [owner, spender]
+      });
+      const result = await state.activeProvider.request({
+        method: 'eth_call',
+        params: [{ to: token, data }, 'latest']
+      });
+      return BigInt(result || '0x0');
+    }
+
+    async function approveToken(token, spender, amount, chain) {
+      const data = encodeFunctionData({
+        abi: ERC20_ABI,
+        functionName: 'approve',
+        args: [spender, amount]
+      });
+      return state.activeProvider.request({
+        method: 'eth_sendTransaction',
+        params: [{
+          from: state.walletAccount,
+          to: token,
+          data,
+          value: '0x0',
+          gas: toHexQuantity(chain.approvalGasLimit || 100000n)
+        }]
+      });
+    }
+
+    async function waitForReceipt(txHash) {
+      for (let i = 0; i < 60; i += 1) {
+        const receipt = await state.activeProvider.request({
+          method: 'eth_getTransactionReceipt',
+          params: [txHash]
+        });
+        if (receipt) {
+          if (receipt.status && receipt.status !== '0x1') throw new Error(`Transaction failed: ${txHash}`);
+          return receipt;
+        }
+        await new Promise((resolve) => window.setTimeout(resolve, 2000));
+      }
+      throw new Error(`Timed out waiting for transaction: ${txHash}`);
+    }
+
+    async function buyNft() {
+      try {
+        const chain = chainConfig();
+        const memo = buildMemo();
+        const cart = cartSummary();
+        const tierIds = cartTierIds();
+        if (!chain) throw new Error(`Unsupported chain: ${state.chainSlug}`);
+        if (!state.projectId) throw new Error('Missing project ID.');
+        if (!state.selectedManager) throw new Error('Select an FPL manager first.');
+        if (!state.managerConfirmed) throw new Error('Confirm the selected FPL entry before buying.');
+        if (!tierIds.length) throw new Error('Add at least one NFT to the cart first.');
+        if (!memo) throw new Error('Select an FPL entry first.');
+
+        const currency = cart.currency;
+        const token = chain.tokens[currency];
+        if (!token) throw new Error(`${currency} is not configured for ${chain.name}.`);
+
+        setTxStatus('Connecting wallet...');
+        await ensureWalletChain();
+
+        const amount = cart.raw;
+        if (amount <= 0n) throw new Error('Cart total is zero.');
+        if (tierIds.some((tierId) => !Number.isInteger(tierId) || tierId <= 0 || tierId > 65535)) {
+          throw new Error('A selected item is missing a valid Juicebox tier ID.');
+        }
+
+        const metadata = buildTierMintMetadata(chain.tierMetadataTarget, tierIds);
+        const allowance = await readAllowance(token.address, state.walletAccount, chain.terminal);
+        if (allowance < amount) {
+          setTxStatus(`Approve ${cart.amount} ${currency} for Juicebox...`);
+          const approveHash = await approveToken(token.address, chain.terminal, amount, chain);
+          setTxStatus(`Waiting for approval: ${approveHash}`);
+          await waitForReceipt(approveHash);
+        }
+
+        setTxStatus('Confirm NFT purchase...');
+        const data = encodeFunctionData({
+          abi: PAY_ABI,
+          functionName: 'pay',
+          args: [
+            BigInt(state.projectId),
+            token.address,
+            amount,
+            state.walletAccount,
+            0n,
+            memo,
+            metadata
+          ]
+        });
+        const txHash = await state.activeProvider.request({
+          method: 'eth_sendTransaction',
+          params: [{
+            from: state.walletAccount,
+            to: chain.terminal,
+            data,
+            value: '0x0',
+            gas: toHexQuantity(chain.payGasLimit || 1500000n)
+          }]
+        });
+        state.cart = {};
+        renderTiers();
+        renderSummary();
+        refreshSalesStats().catch(() => {});
+        setTxStatus(`Purchase sent: ${txHash}`);
+      } catch (error) {
+        setTxStatus(error?.message || String(error), true);
+      }
+    }
+
+    function renderAll() {
+      renderHeader();
+      renderTiers();
+      renderManagers();
+      renderSummary();
+      renderPaymentNotice();
+      renderOwnershipSummary();
+    }
+
+    let walletMenu = null;
+
+    function closeWalletMenu() {
+      if (!walletMenu) return;
+      walletMenu.remove();
+      walletMenu = null;
+      document.removeEventListener('click', onWalletDocClick, true);
+    }
+
+    function onWalletDocClick(event) {
+      if (walletMenu && event.target !== els.connectWallet && !walletMenu.contains(event.target)) closeWalletMenu();
+    }
+
+    function positionWalletMenu() {
+      const rect = els.connectWallet.getBoundingClientRect();
+      walletMenu.style.top = `${rect.bottom + 6}px`;
+      walletMenu.style.right = `${Math.max(8, window.innerWidth - rect.right)}px`;
+    }
+
+    function openWalletNotice(message, isError = false) {
+      closeWalletMenu();
+      walletMenu = document.createElement('div');
+      walletMenu.className = 'wallet-menu';
+      positionWalletMenu();
+      const note = document.createElement('div');
+      note.className = `wallet-menu-note${isError ? ' wallet-menu-error' : ''}`;
+      note.textContent = message;
+      walletMenu.appendChild(note);
+      if (!getProviders().length) {
+        mobileWalletLinks(window.location.href).forEach((link) => {
+          const anchor = document.createElement('a');
+          anchor.className = 'wallet-menu-item wallet-menu-link';
+          anchor.href = link.href;
+          anchor.textContent = link.name;
+          walletMenu.appendChild(anchor);
+        });
+        if (typeof navigator.share === 'function') {
+          const share = document.createElement('button');
+          share.type = 'button';
+          share.className = 'wallet-menu-item';
+          share.textContent = 'Open another wallet...';
+          share.addEventListener('click', () => {
+            navigator.share({ title: document.title, url: walletDappUrl(window.location.href) }).catch((error) => {
+              if (!error || error.name !== 'AbortError') openWalletNotice(error?.message || 'Could not open wallet apps.', true);
+            });
+          });
+          walletMenu.appendChild(share);
+        }
+      }
+      document.body.appendChild(walletMenu);
+      window.setTimeout(() => document.addEventListener('click', onWalletDocClick, true), 0);
+    }
+
+    function openConnectedWalletMenu() {
+      closeWalletMenu();
+      walletMenu = document.createElement('div');
+      walletMenu.className = 'wallet-menu';
+      positionWalletMenu();
+      const provider = document.createElement('div');
+      provider.className = 'wallet-menu-note';
+      provider.textContent = state.activeProviderInfo?.name || 'Connected wallet';
+      const copy = document.createElement('button');
+      copy.type = 'button';
+      copy.className = 'wallet-menu-item';
+      copy.textContent = 'Copy address';
+      copy.addEventListener('click', async () => {
+        try { await navigator.clipboard.writeText(state.walletAccount); } catch (_) {}
+        closeWalletMenu();
+      });
+      const disconnect = document.createElement('button');
+      disconnect.type = 'button';
+      disconnect.className = 'wallet-menu-item wallet-menu-danger';
+      disconnect.textContent = 'Disconnect';
+      disconnect.addEventListener('click', async () => {
+        closeWalletMenu();
+        await disconnectWallet();
+        setTxStatus('Wallet disconnected.');
+      });
+      walletMenu.appendChild(provider);
+      walletMenu.appendChild(copy);
+      walletMenu.appendChild(disconnect);
+      document.body.appendChild(walletMenu);
+      window.setTimeout(() => document.addEventListener('click', onWalletDocClick, true), 0);
+    }
+
+    async function connectWithMenuProvider(entry) {
+      closeWalletMenu();
+      state.walletConnecting = true;
+      renderSummary();
+      try {
+        await connectToProvider(entry);
+        await ensureWalletChain();
+        setTxStatus('Wallet connected.');
+      } catch (error) {
+        openWalletNotice(error?.message || 'Could not connect wallet.', true);
+      } finally {
+        state.walletConnecting = false;
+        renderHeader();
+        renderSummary();
+      }
+    }
+
+    async function openWalletPicker() {
+      closeWalletMenu();
+      let providers = getProviders();
+      if (!providers.length) {
+        openWalletNotice('Looking for wallet...');
+        providers = await refreshProviders(500);
+        if (!providers.length) {
+          openWalletNotice('No wallet detected in this browser. Open this page in a wallet app browser, or install a browser wallet.', true);
+          return;
+        }
+      }
+      if (providers.length === 1) {
+        await connectWithMenuProvider(providers[0]);
+        return;
+      }
+      walletMenu = document.createElement('div');
+      walletMenu.className = 'wallet-menu';
+      positionWalletMenu();
+      providers.forEach((entry) => {
+        const item = document.createElement('button');
+        item.type = 'button';
+        item.className = 'wallet-menu-item wallet-pick';
+        if (entry.info?.icon) {
+          const icon = document.createElement('img');
+          icon.className = 'wallet-pick-icon';
+          icon.src = entry.info.icon;
+          icon.alt = '';
+          item.appendChild(icon);
+        }
+        const name = document.createElement('span');
+        name.textContent = entry.info?.name || 'Wallet';
+        item.appendChild(name);
+        item.addEventListener('click', () => connectWithMenuProvider(entry));
+        walletMenu.appendChild(item);
+      });
+      document.body.appendChild(walletMenu);
+      window.setTimeout(() => document.addEventListener('click', onWalletDocClick, true), 0);
+    }
+
+    els.search.addEventListener('input', renderManagers);
+    els.sort.addEventListener('change', renderManagers);
+    els.tiers.addEventListener('click', (event) => {
+      const detailButton = event.target.closest('button[data-tier-detail]');
+      if (detailButton) {
+        const tierId = detailButton.dataset.tierDetail;
+        if (state.expandedTiers.has(tierId)) state.expandedTiers.delete(tierId);
+        else state.expandedTiers.add(tierId);
+        renderTiers();
+        return;
+      }
+      const button = event.target.closest('button[data-cart-action]');
+      if (!button) return;
+      const tier = state.tiers.find((item) => item.id === button.dataset.tierId);
+      if (!tier) return;
+      const delta = button.dataset.cartAction === 'inc' ? 1 : -1;
+      setCartQty(tier, cartQty(tier) + delta);
+      renderTiers();
+      renderSummary();
+    });
+    els.rows.addEventListener('click', (event) => {
+      const row = event.target.closest('tr[data-entry-id]');
+      if (!row) return;
+      state.selectedManager = state.managers.find((item) => String(item.entryId) === row.dataset.entryId);
+      state.managerConfirmed = false;
+      renderManagers();
+      renderSummary();
+    });
+    els.rows.addEventListener('keydown', (event) => {
+      if (event.key !== 'Enter' && event.key !== ' ') return;
+      const row = event.target.closest('tr[data-entry-id]');
+      if (!row) return;
+      event.preventDefault();
+      row.click();
+    });
+    els.confirmEntry.addEventListener('change', () => {
+      state.managerConfirmed = els.confirmEntry.checked;
+      renderSummary();
+    });
+    els.connectWallet.addEventListener('click', () => {
+      if (!state.walletAccount) {
+        if (walletMenu) closeWalletMenu();
+        else openWalletPicker();
+        return;
+      }
+      if (walletMenu) closeWalletMenu();
+      else openConnectedWalletMenu();
+    });
+    els.buyNft.addEventListener('click', buyNft);
+    els.directoryFilter.addEventListener('input', filterLeagueDirectory);
+    els.copyDiscoveryPrompt.addEventListener('click', async (event) => {
+      event.preventDefault();
+      try {
+        await navigator.clipboard.writeText(DISCOVERY_AGENT_PROMPT);
+        els.copyDiscoveryPrompt.classList.add('copied');
+        els.copyDiscoveryPrompt.textContent = '[copied]';
+        window.setTimeout(() => {
+          els.copyDiscoveryPrompt.classList.remove('copied');
+          els.copyDiscoveryPrompt.textContent = '[prompt]';
+        }, 1400);
+      } catch (_) {
+        els.copyDiscoveryPrompt.textContent = '[unavailable]';
+        window.setTimeout(() => { els.copyDiscoveryPrompt.textContent = '[prompt]'; }, 1400);
+      }
+    });
+    els.copyDeployPrompt.addEventListener('click', async () => {
+      try {
+        await navigator.clipboard.writeText(DEPLOY_AGENT_PROMPT);
+        els.copyDeployPrompt.textContent = 'Instructions copied';
+        window.setTimeout(() => { els.copyDeployPrompt.textContent = 'Copy agent instructions'; }, 1800);
+      } catch (_) {
+        els.copyDeployPrompt.textContent = 'Copy unavailable';
+      }
+    });
+    window.addEventListener('hashchange', () => window.location.reload());
+
+    parseRoute();
+    if (state.isDiscovery) {
+      showDiscovery();
+      loadLeagueDirectory();
+    } else {
+      document.body.classList.remove('discovery-mode');
+      els.directoryLink.hidden = false;
+      renderTiers();
+      renderPaymentNotice();
+      eagerConnect().catch(() => {});
+      loadLeague()
+        .then(() => {
+          renderAll();
+          setStatus('League ready', `${state.managers.length} managers loaded.`);
+          if (state.projectId) {
+            loadProjectMetadata().catch(() => {
+              state.paymentNotice = '';
+              renderPaymentNotice();
+            });
+            setStatus('Loading NFT tiers', 'Reading the Juicebox 721 shop.');
+            return loadProjectTiers().catch((error) => {
+              renderAll();
+              setStatus('League ready', `${state.managers.length} managers loaded. Using fallback tiers because the shop read failed: ${error.message}`);
+            });
+          }
+        })
+        .catch((error) => {
+          renderHeader();
+          renderSummary();
+          setStatus('Could not load league', error.message, true);
+        });
+    }
+  </script>
+</body>
+</html>
