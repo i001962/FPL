@@ -3,8 +3,8 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Deploy FPL League Shop</title>
-  <meta name="description" content="Configure a project-specific FPL league NFT shop draft.">
+  <title>FPL League Checkout</title>
+  <meta name="description" content="Pay the FPL league checkout with USDC on Base Sepolia.">
   <link rel="icon" href="data:,">
   <style>
     :root {
@@ -12,11 +12,9 @@
       --ink: #14213d;
       --muted: #5f6876;
       --line: #d9dee8;
-      --panel: #ffffff;
       --bg: #f6f7f9;
       --accent: #08a88a;
       --accent-dark: #067761;
-      --warn: #b45309;
       --error: #b42318;
       --shadow: 0 18px 45px rgba(20, 33, 61, 0.12);
     }
@@ -38,13 +36,12 @@
     }
 
     button,
-    input,
-    textarea {
+    input {
       font: inherit;
     }
 
     .shell {
-      width: min(1120px, calc(100% - 32px));
+      width: min(1040px, calc(100% - 32px));
       margin: 0 auto;
       padding: 28px 0 36px;
     }
@@ -67,21 +64,14 @@
 
     .subtitle {
       margin: 14px 0 0;
-      max-width: 680px;
+      max-width: 650px;
       color: var(--muted);
       font-size: 1rem;
       line-height: 1.55;
     }
 
-    .header-side {
-      display: grid;
-      justify-items: end;
-      gap: 12px;
-      flex: 0 0 min(100%, 360px);
-    }
-
     .status {
-      width: 100%;
+      flex: 0 0 min(100%, 360px);
       padding: 14px 16px;
       border: 1px solid var(--line);
       border-radius: 8px;
@@ -104,7 +94,7 @@
 
     .layout {
       display: grid;
-      grid-template-columns: minmax(0, 1fr) 420px;
+      grid-template-columns: minmax(0, 1fr) 380px;
       gap: 18px;
       align-items: start;
     }
@@ -117,14 +107,14 @@
       box-shadow: var(--shadow);
     }
 
-    section {
+    section,
+    aside {
       padding: 22px;
     }
 
     aside {
       position: sticky;
       top: 18px;
-      padding: 18px;
     }
 
     h2 {
@@ -149,9 +139,10 @@
       text-transform: uppercase;
     }
 
-    .field input,
-    .field textarea {
+    .field input {
       width: 100%;
+      min-height: 44px;
+      padding: 0 12px;
       border: 1px solid var(--line);
       border-radius: 7px;
       background: #fff;
@@ -159,28 +150,9 @@
       outline: none;
     }
 
-    .field input {
-      min-height: 44px;
-      padding: 0 12px;
-    }
-
-    .field textarea {
-      min-height: 94px;
-      padding: 12px;
-      resize: vertical;
-      line-height: 1.45;
-    }
-
-    .field input:focus,
-    .field textarea:focus {
+    .field input:focus {
       border-color: var(--accent);
       box-shadow: 0 0 0 3px rgba(8, 168, 138, 0.16);
-    }
-
-    .row {
-      display: grid;
-      grid-template-columns: minmax(0, 1fr) minmax(160px, 0.36fr);
-      gap: 12px;
     }
 
     .actions {
@@ -218,9 +190,64 @@
       color: var(--ink);
     }
 
+    .button.full {
+      width: 100%;
+    }
+
     .button:disabled {
       cursor: not-allowed;
       opacity: 0.52;
+    }
+
+    .checkout-image {
+      display: block;
+      width: 100%;
+      max-width: 560px;
+      margin: 22px auto 0;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      object-fit: cover;
+    }
+
+    .summary {
+      display: grid;
+      gap: 10px;
+      margin: 0 0 16px;
+    }
+
+    .summary-row {
+      display: flex;
+      justify-content: space-between;
+      gap: 14px;
+      padding-bottom: 10px;
+      border-bottom: 1px solid var(--line);
+      color: var(--muted);
+      font-size: 0.88rem;
+    }
+
+    .summary-row strong {
+      max-width: 58%;
+      color: var(--ink);
+      text-align: right;
+      overflow-wrap: anywhere;
+    }
+
+    .muted,
+    .tx-status {
+      margin: 0;
+      color: var(--muted);
+      font-size: 0.86rem;
+      line-height: 1.45;
+      overflow-wrap: anywhere;
+    }
+
+    .tx-status {
+      min-height: 20px;
+      margin-top: 12px;
+    }
+
+    .tx-status.error {
+      color: var(--error);
     }
 
     .wallet-menu {
@@ -260,7 +287,8 @@
       background: rgba(8, 168, 138, 0.08);
     }
 
-    .wallet-menu-danger {
+    .wallet-menu-danger,
+    .wallet-menu-error {
       color: var(--error);
     }
 
@@ -269,114 +297,17 @@
       cursor: default;
     }
 
-    .wallet-menu-error {
-      color: var(--error);
-    }
-
     .wallet-pick-icon {
       width: 18px;
       height: 18px;
       border-radius: 4px;
     }
 
-    .wallet-card,
-    .preview-card {
-      display: grid;
-      gap: 12px;
-      margin-bottom: 14px;
-      padding: 14px;
-      border: 1px solid var(--line);
-      border-radius: 8px;
-      background: rgba(255, 255, 255, 0.72);
-    }
-
-    .wallet-card strong,
-    .preview-card strong {
-      display: block;
-      font-size: 0.92rem;
-    }
-
-    .muted {
-      margin: 0;
-      color: var(--muted);
-      font-size: 0.86rem;
-      line-height: 1.45;
-    }
-
-    .summary {
-      display: grid;
-      gap: 10px;
-      margin-top: 4px;
-    }
-
-    .summary-row {
-      display: flex;
-      justify-content: space-between;
-      gap: 14px;
-      padding-bottom: 10px;
-      border-bottom: 1px solid var(--line);
-      color: var(--muted);
-      font-size: 0.88rem;
-    }
-
-    .summary-row strong {
-      max-width: 58%;
-      color: var(--ink);
-      text-align: right;
-      overflow-wrap: anywhere;
-    }
-
-    .draft-preview {
-      width: 100%;
-      min-height: 320px;
-      margin-top: 14px;
-      padding: 12px;
-      border: 1px solid var(--line);
-      border-radius: 7px;
-      background: #101827;
-      color: #e5edf8;
-      font: 0.78rem/1.45 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-      resize: vertical;
-    }
-
-    .image-preview {
-      width: 100%;
-      aspect-ratio: 1;
-      border: 1px solid var(--line);
-      border-radius: 8px;
-      object-fit: cover;
-      background: rgba(8, 168, 138, 0.08);
-    }
-
-    .upload-box {
-      display: grid;
-      gap: 8px;
-      min-height: 96px;
-      align-content: center;
-      padding: 18px;
-      border: 1px dashed rgba(8, 168, 138, 0.52);
-      border-radius: 8px;
-      background: rgba(8, 168, 138, 0.06);
-    }
-
-    .upload-box input {
-      padding: 10px;
-      background: #fff;
-    }
-
     @media (max-width: 900px) {
       header,
-      .layout,
-      .row {
-        grid-template-columns: 1fr;
-      }
-
-      header {
+      .layout {
         display: grid;
-      }
-
-      .header-side {
-        justify-items: stretch;
+        grid-template-columns: 1fr;
       }
 
       aside {
@@ -389,19 +320,17 @@
   <main class="shell">
     <header>
       <div>
-        <h1>Deploy FPL League Shop</h1>
-        <p class="subtitle">Prepare a league-specific Juicebox draft from the default FPL shop template. Only the league, owner, project copy, image, and membership price are edited here.</p>
+        <h1>FPL League Checkout</h1>
+        <p class="subtitle">Pay $2.00 USDC to the FPL shop project on Base Sepolia. The payment memo is the loaded classic league ID.</p>
       </div>
-      <div class="header-side">
-        <div class="status" id="status">
-          <strong>Load a league</strong>
-          Enter a classic league ID or standings URL.
-        </div>
+      <div class="status" id="status">
+        <strong>Load a league</strong>
+        Enter a classic league ID or standings URL.
       </div>
     </header>
 
     <div class="layout">
-      <section aria-label="Deploy configuration">
+      <section aria-label="League checkout">
         <h2>League</h2>
         <div class="grid">
           <div class="field">
@@ -410,82 +339,91 @@
           </div>
           <div class="actions">
             <button class="button primary" id="loadLeague" type="button">Load league</button>
-            <button class="button" id="resetDraft" type="button">Reset draft</button>
           </div>
+          <p class="muted">The checkout sends $2.00 USDC to Juicebox project basesep:12. The memo is exactly the loaded league ID.</p>
         </div>
-
-        <h2 style="margin-top: 26px;">Project Fields</h2>
-        <div class="grid">
-          <div class="field">
-            <label for="projectName">Project name</label>
-            <input id="projectName" type="text" autocomplete="off">
-          </div>
-          <div class="field">
-            <label for="projectDescription">Project description</label>
-            <textarea id="projectDescription"></textarea>
-          </div>
-          <div class="row">
-            <div class="field upload-box">
-              <label for="projectImageUpload">Project image upload</label>
-              <input id="projectImageUpload" type="file" accept="image/*">
-              <p class="muted" id="imageLabel">Using the template image until one is uploaded.</p>
-            </div>
-            <div class="field">
-              <label for="membershipPrice">Membership price in USD</label>
-              <input id="membershipPrice" type="number" min="0" step="0.01" placeholder="5.00" autocomplete="off">
-            </div>
-          </div>
-          <p class="muted">The uploaded project image also becomes the first NFT membership image. This page embeds the upload in the preview draft so an agent can pin it before deploy. Other NFT tiers, categories, payment settings, token settings, and split defaults stay unchanged from the `.jb` template.</p>
-        </div>
+        <img class="checkout-image" src="assets/slopsshop.png" alt="FPL Shop">
       </section>
 
-      <aside aria-label="Draft summary">
-        <div class="wallet-card">
-          <strong>Owner wallet</strong>
-          <p class="muted" id="walletLabel">Not connected</p>
-          <button class="button primary" id="connectWallet" type="button">Connect wallet</button>
+      <aside aria-label="Payment summary">
+        <h2>Checkout</h2>
+        <div class="summary">
+          <div class="summary-row"><span>League</span><strong id="leagueLabel">Not loaded</strong></div>
+          <div class="summary-row"><span>Project</span><strong>basesep:12</strong></div>
+          <div class="summary-row"><span>Amount</span><strong>$2.00 USDC</strong></div>
+          <div class="summary-row"><span>Memo</span><strong id="memoLabel">Load league</strong></div>
+          <div class="summary-row"><span>Wallet</span><strong id="walletLabel">Not connected</strong></div>
         </div>
-        <div class="preview-card">
-          <strong>Template summary</strong>
-          <div class="summary">
-            <div class="summary-row"><span>League</span><strong id="leagueLabel">Not loaded</strong></div>
-            <div class="summary-row"><span>Owner/operator</span><strong id="ownerLabel">Not set</strong></div>
-            <div class="summary-row"><span>First NFT</span><strong id="nftLabel">Full Season</strong></div>
-            <div class="summary-row"><span>Price</span><strong id="priceLabel">$5.00</strong></div>
-            <div class="summary-row"><span>Splits</span><strong id="splitsLabel">None</strong></div>
-          </div>
-        </div>
-        <img class="image-preview" id="imagePreview" alt="Project image preview">
         <div class="actions">
-          <button class="button primary" id="copyDraft" type="button">Copy draft JSON</button>
-          <button class="button" id="downloadDraft" type="button">Download .jb</button>
+          <button class="button full" id="connectWallet" type="button">Connect wallet</button>
+          <button class="button primary full" id="payButton" type="button" disabled>Pay $2.00 USDC</button>
         </div>
-        <textarea class="draft-preview" id="draftPreview" readonly aria-readonly="true"></textarea>
+        <div class="tx-status" id="txStatus" aria-live="polite"></div>
       </aside>
     </div>
   </main>
 
-  <script>
-    const DRAFT_PATHS = [
-      'assets/fpl-insert-league-name-shop.jb',
-      '../assets/fpl-insert-league-name-shop.jb'
-    ];
+  <script type="module">
+    import { encodeFunctionData, parseUnits } from 'https://esm.sh/viem@2.21.55';
+
     const DEFAULT_API_BASE = 'https://fc-footy.vercel.app/api/fpl-league?leagueId=';
-    const TEMPLATE_IMAGE_URI = 'ipfs://bafkreib3a2bk2ufpr2dwolmwzxb7zkgvgcry65qmyicvqmnnbvtwhifjri';
-    const DEFAULT_IMAGE_PATH = 'assets/slopsshop.png';
-    const WALLET_FLAG = 'fpl-shop-deploy-wallet-connected';
-    const WALLET_RDNS = 'fpl-shop-deploy-wallet-rdns';
+    const PROJECT = {
+      chainSlug: 'basesep',
+      projectId: 12n,
+      amountUsd: '2.00',
+      chain: {
+        chainId: 84532,
+        chainHex: '0x14a34',
+        name: 'Base Sepolia',
+        rpcUrls: ['https://sepolia.base.org'],
+        blockExplorerUrls: ['https://sepolia.basescan.org'],
+        terminal: '0x130f5dd2bd8805443cf41755253d778a75a67f53',
+        approvalGasLimit: 100000n,
+        payGasLimit: 1000000n,
+        token: { symbol: 'USDC', address: '0x036CbD53842c5426634e7929541eC2318f3dCF7e', decimals: 6 }
+      }
+    };
+    const WALLET_FLAG = 'fpl-shop-checkout-wallet-connected';
+    const WALLET_RDNS = 'fpl-shop-checkout-wallet-rdns';
     const WALLET_PROVIDER_FALLBACK = { info: { uuid: 'injected-0', name: 'Browser wallet', rdns: 'injected', icon: '' }, provider: window.ethereum };
     const discoveredProviders = [];
 
+    const PAY_ABI = [{
+      type: 'function',
+      name: 'pay',
+      stateMutability: 'payable',
+      inputs: [
+        { name: 'projectId', type: 'uint256' },
+        { name: 'token', type: 'address' },
+        { name: 'amount', type: 'uint256' },
+        { name: 'beneficiary', type: 'address' },
+        { name: 'minReturnedTokens', type: 'uint256' },
+        { name: 'memo', type: 'string' },
+        { name: 'metadata', type: 'bytes' }
+      ],
+      outputs: [{ name: 'beneficiaryTokenCount', type: 'uint256' }]
+    }];
+
+    const ERC20_ABI = [
+      {
+        type: 'function',
+        name: 'allowance',
+        stateMutability: 'view',
+        inputs: [{ name: 'owner', type: 'address' }, { name: 'spender', type: 'address' }],
+        outputs: [{ name: '', type: 'uint256' }]
+      },
+      {
+        type: 'function',
+        name: 'approve',
+        stateMutability: 'nonpayable',
+        inputs: [{ name: 'spender', type: 'address' }, { name: 'amount', type: 'uint256' }],
+        outputs: [{ name: '', type: 'bool' }]
+      }
+    ];
+
     const state = {
-      template: null,
-      draft: null,
       leagueId: '',
       leagueName: '',
-      imageDataUrl: '',
-      imageName: 'slopsshop.png',
-      useDefaultImage: true,
       walletAccount: '',
       walletChainId: '',
       activeProvider: window.ethereum || null,
@@ -506,29 +444,13 @@
       status: document.querySelector('#status'),
       leagueInput: document.querySelector('#leagueInput'),
       loadLeague: document.querySelector('#loadLeague'),
-      resetDraft: document.querySelector('#resetDraft'),
-      projectName: document.querySelector('#projectName'),
-      projectDescription: document.querySelector('#projectDescription'),
-      projectImageUpload: document.querySelector('#projectImageUpload'),
-      imageLabel: document.querySelector('#imageLabel'),
-      membershipPrice: document.querySelector('#membershipPrice'),
-      connectWallet: document.querySelector('#connectWallet'),
-      walletLabel: document.querySelector('#walletLabel'),
       leagueLabel: document.querySelector('#leagueLabel'),
-      ownerLabel: document.querySelector('#ownerLabel'),
-      nftLabel: document.querySelector('#nftLabel'),
-      priceLabel: document.querySelector('#priceLabel'),
-      splitsLabel: document.querySelector('#splitsLabel'),
-      imagePreview: document.querySelector('#imagePreview'),
-      copyDraft: document.querySelector('#copyDraft'),
-      downloadDraft: document.querySelector('#downloadDraft'),
-      draftPreview: document.querySelector('#draftPreview')
+      memoLabel: document.querySelector('#memoLabel'),
+      walletLabel: document.querySelector('#walletLabel'),
+      connectWallet: document.querySelector('#connectWallet'),
+      payButton: document.querySelector('#payButton'),
+      txStatus: document.querySelector('#txStatus')
     };
-
-    function setStatus(title, text, isError = false) {
-      els.status.classList.toggle('error', isError);
-      els.status.innerHTML = `<strong>${escapeHtml(title)}</strong>${escapeHtml(text)}`;
-    }
 
     function escapeHtml(value) {
       return String(value || '').replace(/[&<>"']/g, (char) => ({
@@ -540,26 +462,14 @@
       }[char]));
     }
 
-    function clone(value) {
-      return JSON.parse(JSON.stringify(value));
+    function setStatus(title, text, isError = false) {
+      els.status.classList.toggle('error', isError);
+      els.status.innerHTML = `<strong>${escapeHtml(title)}</strong>${escapeHtml(text)}`;
     }
 
-    function parseLeagueId(value) {
-      const text = String(value || '').trim();
-      if (/^\d{3,9}$/.test(text)) return text;
-      return text.match(/(?:leagues\/)?(\d{3,9})(?:\/standings|\/|$)/i)?.[1] || '';
-    }
-
-    function shopNameForLeague(name) {
-      const trimmed = String(name || '').trim();
-      const withoutShop = trimmed.replace(/\s+shop$/i, '').trim();
-      return /^fpl\b/i.test(withoutShop) ? `${withoutShop} Shop` : `FPL ${withoutShop} Shop`;
-    }
-
-    function ipfsToGateway(uri) {
-      const text = String(uri || '').trim();
-      if (!text.startsWith('ipfs://')) return text;
-      return `https://ipfs.io/ipfs/${text.slice('ipfs://'.length)}`;
+    function setTxStatus(text, isError = false) {
+      els.txStatus.textContent = text || '';
+      els.txStatus.classList.toggle('error', isError);
     }
 
     function shortAddress(address) {
@@ -567,54 +477,14 @@
       return text ? `${text.slice(0, 6)}...${text.slice(-4)}` : '';
     }
 
-    function formatUsd(value) {
-      const amount = Number(value || 0);
-      if (!Number.isFinite(amount)) return '$0.00';
-      return new Intl.NumberFormat('en-US', {
-        style: 'currency',
-        currency: 'USD',
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2
-      }).format(amount);
+    function toHexQuantity(value) {
+      return `0x${BigInt(value).toString(16)}`;
     }
 
-    async function loadTemplate() {
-      let lastError = null;
-      for (const path of DRAFT_PATHS) {
-        try {
-          const response = await fetch(path, { cache: 'no-store' });
-          if (!response.ok) throw new Error(`${path}: ${response.status}`);
-          state.template = await response.json();
-          break;
-        } catch (error) {
-          lastError = error;
-        }
-      }
-      if (!state.template) throw new Error(`Could not load the .jb template. ${lastError?.message || ''}`.trim());
-      resetDraft();
-      setStatus('Template ready', 'Enter a league ID to create a configured draft.');
-    }
-
-    function resetDraft() {
-      if (!state.template) return;
-      state.draft = clone(state.template);
-      state.leagueId = '';
-      state.leagueName = '';
-      state.imageDataUrl = '';
-      state.imageName = 'slopsshop.png';
-      state.useDefaultImage = true;
-      if (state.walletAccount) applyWallet();
-      hydrateFields();
-      render();
-    }
-
-    function hydrateFields() {
-      const draft = state.draft;
-      els.projectName.value = draft?.details?.name || '';
-      els.projectDescription.value = draft?.details?.description || '';
-      els.projectImageUpload.value = '';
-      els.imageLabel.textContent = 'Using slopsshop.png as the default image. It must be pinned before deploy.';
-      els.membershipPrice.value = draft?.nfts?.[0]?.price || '';
+    function parseLeagueId(value) {
+      const text = String(value || '').trim();
+      if (/^\d{3,9}$/.test(text)) return text;
+      return text.match(/(?:leagues\/)?(\d{3,9})(?:\/standings|\/|$)/i)?.[1] || '';
     }
 
     async function fetchLeague(leagueId) {
@@ -634,56 +504,22 @@
         setStatus('League ID needed', 'Paste a classic league ID or standings URL.', true);
         return;
       }
-      if (!state.draft) {
-        setStatus('Template not ready', 'The .jb template has not loaded yet.', true);
-        return;
-      }
       setStatus('Loading league', `Reading league ${leagueId}.`);
+      setTxStatus('');
       try {
         const league = await fetchLeague(leagueId);
-        const leagueName = league?.league?.name || `League ${leagueId}`;
-        const name = shopNameForLeague(leagueName);
-        const description = `This shop is a companion to Fantasy Premier League team #${leagueId} - ${leagueName}.`;
         state.leagueId = String(leagueId);
-        state.leagueName = leagueName;
-        els.projectName.value = name;
-        els.projectDescription.value = description;
-        applyForm();
-        setStatus('League loaded', `${leagueName} is ready to configure.`);
+        state.leagueName = league?.league?.name || `League ${leagueId}`;
+        setStatus('League loaded', `${state.leagueName} is ready for checkout.`);
+        render();
       } catch (error) {
-        setStatus('Could not load league', error.message, true);
+        setStatus('Could not load league', error.message || String(error), true);
       }
-    }
-
-    function applyWallet() {
-      if (!state.draft) return;
-      state.draft.details.owner = state.walletAccount || state.template?.details?.owner || '';
-      state.draft.revOperator = state.walletAccount || state.template?.revOperator || '';
-    }
-
-    function applyForm() {
-      if (!state.draft) return;
-      const draft = state.draft;
-      const imageUri = state.imageDataUrl || (state.useDefaultImage ? DEFAULT_IMAGE_PATH : draft.details.logoUri || TEMPLATE_IMAGE_URI);
-      draft.details.name = els.projectName.value.trim();
-      draft.details.description = els.projectDescription.value.trim();
-      draft.details.logoUri = imageUri;
-      draft.details.tags = state.leagueId ? ['fpl', `fpl-league:${state.leagueId}`] : draft.details.tags;
-      draft.details.fpl = state.leagueId ? { leagueId: state.leagueId } : draft.details.fpl;
-      if (draft.nfts?.[0]) {
-        draft.nfts[0].imageUri = imageUri;
-        draft.nfts[0].price = String(els.membershipPrice.value || '0');
-      }
-      applyWallet();
-      render();
     }
 
     function render() {
-      const draft = state.draft;
-      const nft = draft?.nfts?.[0] || {};
-      const imageUri = draft?.details?.logoUri || DEFAULT_IMAGE_PATH;
       els.leagueLabel.textContent = state.leagueName ? `${state.leagueName} #${state.leagueId}` : 'Not loaded';
-      els.ownerLabel.textContent = state.walletAccount || 'Not set';
+      els.memoLabel.textContent = state.leagueId || 'Load league';
       els.walletLabel.textContent = state.walletAccount
         ? `${state.activeProviderInfo?.name || 'Wallet'} ${shortAddress(state.walletAccount)}`
         : 'Not connected';
@@ -693,11 +529,7 @@
       els.connectWallet.classList.toggle('connected', !!state.walletAccount);
       els.connectWallet.title = state.walletAccount || 'Connect a wallet';
       els.connectWallet.disabled = state.walletConnecting;
-      els.nftLabel.textContent = nft.name || 'Full Season';
-      els.priceLabel.textContent = formatUsd(nft.price);
-      els.splitsLabel.textContent = nft.splitOn || nft.splitRecipients?.length ? 'Custom' : 'None';
-      els.imagePreview.src = ipfsToGateway(imageUri);
-      els.draftPreview.value = draft ? JSON.stringify(draft, null, 2) : '';
+      els.payButton.disabled = !state.leagueId || !state.walletAccount || state.walletConnecting;
     }
 
     function walletNameForProvider(provider) {
@@ -781,7 +613,7 @@
             localStorage.removeItem(WALLET_FLAG);
             localStorage.removeItem(WALLET_RDNS);
           }
-          applyForm();
+          render();
         });
         provider.on('chainChanged', (chainId) => {
           state.walletChainId = chainId;
@@ -802,7 +634,7 @@
       state.walletAccount = accounts?.[0] || '';
       state.walletChainId = await state.activeProvider.request({ method: 'eth_chainId' }).catch(() => '');
       localStorage.setItem(WALLET_FLAG, '1');
-      applyForm();
+      render();
       return state.walletAccount;
     }
 
@@ -814,7 +646,7 @@
       state.walletChainId = '';
       localStorage.removeItem(WALLET_FLAG);
       localStorage.removeItem(WALLET_RDNS);
-      applyForm();
+      render();
     }
 
     async function eagerConnect() {
@@ -829,7 +661,7 @@
       const accounts = await state.activeProvider.request({ method: 'eth_accounts' }).catch(() => []);
       state.walletAccount = accounts?.[0] || '';
       state.walletChainId = state.walletAccount ? await state.activeProvider.request({ method: 'eth_chainId' }).catch(() => '') : '';
-      applyForm();
+      render();
     }
 
     let walletMenu = null;
@@ -908,7 +740,7 @@
       disconnect.addEventListener('click', async () => {
         closeWalletMenu();
         await disconnectWallet();
-        setStatus('Wallet disconnected', 'Connect a wallet to set owner/operator again.');
+        setTxStatus('Wallet disconnected.');
       });
       walletMenu.appendChild(provider);
       walletMenu.appendChild(copy);
@@ -923,7 +755,7 @@
       render();
       try {
         await connectToProvider(entry);
-        setStatus('Wallet connected', state.walletAccount);
+        setTxStatus('Wallet connected.');
       } catch (error) {
         openWalletNotice(error?.message || 'Could not connect wallet.', true);
       } finally {
@@ -971,53 +803,123 @@
       window.setTimeout(() => document.addEventListener('click', onWalletDocClick, true), 0);
     }
 
-    function handleImageUpload() {
-      const file = els.projectImageUpload.files?.[0];
-      if (!file) {
-        state.imageDataUrl = '';
-        state.imageName = 'slopsshop.png';
-        state.useDefaultImage = true;
-        els.imageLabel.textContent = 'Using slopsshop.png as the default image. It must be pinned before deploy.';
-        applyForm();
+    async function ensureWalletChain() {
+      if (!state.walletAccount) await connectToProvider();
+      const chain = PROJECT.chain;
+      const current = await state.activeProvider.request({ method: 'eth_chainId' });
+      if (current?.toLowerCase() === chain.chainHex.toLowerCase()) {
+        state.walletChainId = current;
         return;
       }
-      if (!file.type.startsWith('image/')) {
-        setStatus('Image unavailable', 'Choose an image file.', true);
-        return;
+      try {
+        await state.activeProvider.request({ method: 'wallet_switchEthereumChain', params: [{ chainId: chain.chainHex }] });
+      } catch (error) {
+        if (error?.code !== 4902) throw error;
+        await state.activeProvider.request({
+          method: 'wallet_addEthereumChain',
+          params: [{
+            chainId: chain.chainHex,
+            chainName: chain.name,
+            nativeCurrency: { name: 'Ether', symbol: 'ETH', decimals: 18 },
+            rpcUrls: chain.rpcUrls,
+            blockExplorerUrls: chain.blockExplorerUrls
+          }]
+        });
       }
-      const reader = new FileReader();
-      reader.addEventListener('load', () => {
-        state.imageDataUrl = String(reader.result || '');
-        state.imageName = file.name;
-        state.useDefaultImage = false;
-        els.imageLabel.textContent = `${file.name} selected. The deploy flow should pin it before transaction generation.`;
-        applyForm();
-      });
-      reader.addEventListener('error', () => {
-        setStatus('Image unavailable', 'Could not read that image file.', true);
-      });
-      reader.readAsDataURL(file);
+      state.walletChainId = chain.chainHex;
     }
 
-    async function copyDraft() {
-      if (!state.draft) return;
-      await navigator.clipboard.writeText(JSON.stringify(state.draft, null, 2));
-      setStatus('Draft copied', 'The configured .jb JSON is on the clipboard.');
+    async function readAllowance(owner, spender) {
+      const data = encodeFunctionData({
+        abi: ERC20_ABI,
+        functionName: 'allowance',
+        args: [owner, spender]
+      });
+      const result = await state.activeProvider.request({
+        method: 'eth_call',
+        params: [{ to: PROJECT.chain.token.address, data }, 'latest']
+      });
+      return BigInt(result || '0x0');
     }
 
-    function downloadDraft() {
-      if (!state.draft) return;
-      const namePart = state.leagueId || 'league';
-      const blob = new Blob([JSON.stringify(state.draft, null, 2)], { type: 'application/json' });
-      const link = document.createElement('a');
-      link.href = URL.createObjectURL(blob);
-      link.download = `fpl-${namePart}-shop.jb`;
-      link.click();
-      URL.revokeObjectURL(link.href);
+    async function approveToken(spender, amount) {
+      const data = encodeFunctionData({
+        abi: ERC20_ABI,
+        functionName: 'approve',
+        args: [spender, amount]
+      });
+      return state.activeProvider.request({
+        method: 'eth_sendTransaction',
+        params: [{
+          from: state.walletAccount,
+          to: PROJECT.chain.token.address,
+          data,
+          value: '0x0',
+          gas: toHexQuantity(PROJECT.chain.approvalGasLimit)
+        }]
+      });
+    }
+
+    async function waitForReceipt(txHash) {
+      for (let i = 0; i < 60; i += 1) {
+        const receipt = await state.activeProvider.request({
+          method: 'eth_getTransactionReceipt',
+          params: [txHash]
+        });
+        if (receipt) {
+          if (receipt.status && receipt.status !== '0x1') throw new Error(`Transaction failed: ${txHash}`);
+          return receipt;
+        }
+        await new Promise((resolve) => window.setTimeout(resolve, 2000));
+      }
+      throw new Error(`Timed out waiting for transaction: ${txHash}`);
+    }
+
+    async function payCheckout() {
+      try {
+        if (!state.leagueId) throw new Error('Load a league first.');
+        setTxStatus('Connecting wallet...');
+        await ensureWalletChain();
+        const amount = parseUnits(PROJECT.amountUsd, PROJECT.chain.token.decimals);
+        const allowance = await readAllowance(state.walletAccount, PROJECT.chain.terminal);
+        if (allowance < amount) {
+          setTxStatus(`Approve ${PROJECT.amountUsd} USDC for Juicebox...`);
+          const approveHash = await approveToken(PROJECT.chain.terminal, amount);
+          setTxStatus(`Waiting for approval: ${approveHash}`);
+          await waitForReceipt(approveHash);
+        }
+
+        setTxStatus('Confirm payment...');
+        const data = encodeFunctionData({
+          abi: PAY_ABI,
+          functionName: 'pay',
+          args: [
+            PROJECT.projectId,
+            PROJECT.chain.token.address,
+            amount,
+            state.walletAccount,
+            0n,
+            state.leagueId,
+            '0x'
+          ]
+        });
+        const txHash = await state.activeProvider.request({
+          method: 'eth_sendTransaction',
+          params: [{
+            from: state.walletAccount,
+            to: PROJECT.chain.terminal,
+            data,
+            value: '0x0',
+            gas: toHexQuantity(PROJECT.chain.payGasLimit)
+          }]
+        });
+        setTxStatus(`Payment sent: ${txHash}`);
+      } catch (error) {
+        setTxStatus(error?.message || String(error), true);
+      }
     }
 
     els.loadLeague.addEventListener('click', loadLeague);
-    els.resetDraft.addEventListener('click', resetDraft);
     els.connectWallet.addEventListener('click', () => {
       if (!state.walletAccount) {
         if (walletMenu) closeWalletMenu();
@@ -1027,16 +929,9 @@
       if (walletMenu) closeWalletMenu();
       else openConnectedWalletMenu();
     });
-    els.copyDraft.addEventListener('click', copyDraft);
-    els.downloadDraft.addEventListener('click', downloadDraft);
-    els.projectImageUpload.addEventListener('change', handleImageUpload);
-    [els.projectName, els.projectDescription, els.membershipPrice].forEach((input) => {
-      input.addEventListener('input', applyForm);
-    });
+    els.payButton.addEventListener('click', payCheckout);
 
-    loadTemplate().catch((error) => {
-      setStatus('Template unavailable', error.message, true);
-    });
+    render();
     eagerConnect().catch(() => {});
   </script>
 </body>
