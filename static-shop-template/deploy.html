@@ -693,6 +693,12 @@
       els.txStatus.classList.toggle('error', isError);
     }
 
+    function setProjectSuccessStatus(label, route) {
+      const href = `index.html${route}`;
+      els.txStatus.classList.remove('error');
+      els.txStatus.innerHTML = `${escapeHtml(label)} <a href="${escapeHtml(href)}">Go to project</a> <span>${escapeHtml(route)}</span>`;
+    }
+
     function shortAddress(address) {
       const text = String(address || '');
       return text ? `${text.slice(0, 6)}...${text.slice(-4)}` : '';
@@ -1822,7 +1828,8 @@
         setTxStatus(`Atomic batch submitted: ${batchId}`);
         const receipts = await waitForBatchReceipts(batchId);
         const route = receipts.map(deployedProjectRoute).find(Boolean);
-        setTxStatus(route ? `Project deployed and project 12 paid: ${route}` : `Batch confirmed: ${batchId}`);
+        if (route) setProjectSuccessStatus('Project deployed and project 12 paid.', route);
+        else setTxStatus(`Batch confirmed: ${batchId}`);
       } catch (error) {
         setTxStatus(error?.message || String(error), true);
       }
@@ -1849,7 +1856,8 @@
         setTxStatus(`Deploy sent: ${txHash}`);
         const receipt = await waitForReceipt(txHash);
         const route = deployedProjectRoute(receipt);
-        setTxStatus(route ? `Project deployed: ${route}` : `Deploy confirmed: ${txHash}`);
+        if (route) setProjectSuccessStatus('Project deployed.', route);
+        else setTxStatus(`Deploy confirmed: ${txHash}`);
       } catch (error) {
         setTxStatus(error?.message || String(error), true);
       }
