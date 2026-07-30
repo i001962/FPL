@@ -431,8 +431,8 @@
               <p class="muted" id="imageLabel">Using the template image until one is uploaded.</p>
             </div>
             <div class="field">
-              <label for="membershipPrice">Membership price</label>
-              <input id="membershipPrice" type="number" min="0" step="0.01" autocomplete="off">
+              <label for="membershipPrice">Membership price in USD</label>
+              <input id="membershipPrice" type="number" min="0" step="0.01" placeholder="5.00" autocomplete="off">
             </div>
           </div>
           <p class="muted">The uploaded project image also becomes the first NFT membership image. This page embeds the upload in the preview draft so an agent can pin it before deploy. Other NFT tiers, categories, payment settings, token settings, and split defaults stay unchanged from the `.jb` template.</p>
@@ -451,7 +451,7 @@
             <div class="summary-row"><span>League</span><strong id="leagueLabel">Not loaded</strong></div>
             <div class="summary-row"><span>Owner/operator</span><strong id="ownerLabel">Not set</strong></div>
             <div class="summary-row"><span>First NFT</span><strong id="nftLabel">Full Season</strong></div>
-            <div class="summary-row"><span>Price</span><strong id="priceLabel">5</strong></div>
+            <div class="summary-row"><span>Price</span><strong id="priceLabel">$5.00</strong></div>
             <div class="summary-row"><span>Splits</span><strong id="splitsLabel">None</strong></div>
           </div>
         </div>
@@ -565,6 +565,17 @@
     function shortAddress(address) {
       const text = String(address || '');
       return text ? `${text.slice(0, 6)}...${text.slice(-4)}` : '';
+    }
+
+    function formatUsd(value) {
+      const amount = Number(value || 0);
+      if (!Number.isFinite(amount)) return '$0.00';
+      return new Intl.NumberFormat('en-US', {
+        style: 'currency',
+        currency: 'USD',
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2
+      }).format(amount);
     }
 
     async function loadTemplate() {
@@ -683,7 +694,7 @@
       els.connectWallet.title = state.walletAccount || 'Connect a wallet';
       els.connectWallet.disabled = state.walletConnecting;
       els.nftLabel.textContent = nft.name || 'Full Season';
-      els.priceLabel.textContent = nft.price || '0';
+      els.priceLabel.textContent = formatUsd(nft.price);
       els.splitsLabel.textContent = nft.splitOn || nft.splitRecipients?.length ? 'Custom' : 'None';
       els.imagePreview.src = ipfsToGateway(imageUri);
       els.draftPreview.value = draft ? JSON.stringify(draft, null, 2) : '';
