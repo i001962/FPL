@@ -1319,11 +1319,37 @@
       if (match) state.leagueId = match[1];
     }
 
+    function firstMetadataText(...values) {
+      return values.find((value) => typeof value === 'string' && value.trim())?.trim() || '';
+    }
+
+    function projectTitleFromMetadata() {
+      const metadata = state.projectMetadata;
+      if (!metadata || typeof metadata !== 'object') return '';
+      return firstMetadataText(metadata.name, metadata.details?.name);
+    }
+
+    function projectSubtitleFromMetadata() {
+      const metadata = state.projectMetadata;
+      if (!metadata || typeof metadata !== 'object') return '';
+      return firstMetadataText(
+        metadata.projectTagline,
+        metadata.tagline,
+        metadata.description,
+        metadata.details?.tagline,
+        metadata.details?.description
+      );
+    }
+
     function renderHeader() {
       const chainLabel = CHAIN_LABELS[state.chainSlug] || state.chainSlug;
       const providerName = state.activeProviderInfo?.name || 'Wallet';
-      els.title.textContent = `FPL ${state.leagueName} Shop`;
-      els.subtitle.textContent = `${chainLabel} project ${state.projectId || 'not set'} · FPL league ${state.leagueId}`;
+      const title = projectTitleFromMetadata() || (state.leagueName ? `FPL ${state.leagueName} Shop` : 'FPL League NFT Shop');
+      const projectContext = `${chainLabel} project ${state.projectId || 'not set'} · FPL league ${state.leagueId || 'not set'}`;
+      const subtitle = projectSubtitleFromMetadata();
+      els.title.textContent = title;
+      els.subtitle.textContent = subtitle ? `${subtitle} · ${projectContext}` : projectContext;
+      document.title = title;
       els.projectLabel.textContent = state.projectId ? `${chainLabel}:${state.projectId}` : 'Project not set';
       els.walletLabel.textContent = state.walletAccount ? `${providerName} ${shortAddress(state.walletAccount)}` : 'Not connected';
     }
