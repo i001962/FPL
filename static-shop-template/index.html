@@ -1944,7 +1944,9 @@
       return metadata.dataHook;
     }
 
-    async function loadProjectTiers() {
+    async function loadProjectTiers(options = {}) {
+      const resetCart = options.resetCart !== false;
+      const updateStatus = options.updateStatus !== false;
       const chain = chainConfig();
       if (!chain || !state.projectId) return;
       const hook = await resolveShopHook(chain);
@@ -1995,14 +1997,14 @@
       state.tiers = tiers;
       state.shopHook = hook;
       const firstAvailable = tiers.find((tier) => tier.remaining !== 0) || tiers[0];
-      state.cart = firstAvailable ? { [firstAvailable.id]: 1 } : {};
+      if (resetCart) state.cart = firstAvailable ? { [firstAvailable.id]: 1 } : {};
       chain.tierMetadataTarget = idTarget || chain.tierMetadataTarget;
       renderAll();
       refreshSalesStats().catch(() => {
         state.salesStats = { loading: false, scanned: false, customers: 0, itemsSold: tiers.reduce((sum, tier) => sum + tierSoldCount(tier), 0), owned: [], scanLimitHit: false };
         renderOwnershipSummary();
       });
-      setStatus('League ready', `${state.managers.length} managers loaded. ${tiers.length} NFT tiers found.`);
+      if (updateStatus) setStatus('League ready', `${state.managers.length} managers loaded. ${tiers.length} NFT tiers found.`);
     }
 
     async function ensureWalletChain() {
@@ -2078,6 +2080,24 @@
       throw new Error(`Timed out waiting for transaction: ${txHash}`);
     }
 
+    function ownedItemCount() {
+      return (state.salesStats?.owned || []).reduce((sum, entry) => sum + Number(entry.qty || 0), 0);
+    }
+
+    async function refreshOwnershipAfterPurchase() {
+      for (let attempt = 1; attempt <= 5; attempt += 1) {
+        setTxStatus(`Refreshing owned items (${attempt}/5)...`);
+        await loadProjectTiers({ resetCart: false, updateStatus: false });
+        await refreshSalesStats();
+        if (ownedItemCount() > 0) {
+          setTxStatus('Purchase confirmed. Owned items updated.');
+          return;
+        }
+        if (attempt < 5) await new Promise((resolve) => window.setTimeout(resolve, 10000));
+      }
+      setTxStatus('Purchase confirmed. Ownership may take another moment to appear.');
+    }
+
     async function buyNft() {
       try {
         const chain = chainConfig();
@@ -2137,11 +2157,12 @@
             gas: toHexQuantity(chain.payGasLimit || 1500000n)
           }]
         });
+        setTxStatus(`Purchase sent: ${txHash}`);
+        await waitForReceipt(txHash);
         state.cart = {};
         renderTiers();
         renderSummary();
-        refreshSalesStats().catch(() => {});
-        setTxStatus(`Purchase sent: ${txHash}`);
+        await refreshOwnershipAfterPurchase();
       } catch (error) {
         setTxStatus(error?.message || String(error), true);
       }
