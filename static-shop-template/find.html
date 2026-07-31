@@ -1950,6 +1950,17 @@ Direct Juicebox routes use: 1=eth, 11155111=sep, 42161=arb, 421614=arbsep, 8453=
       return String(value || '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
     }
 
+    function shopFrontendRoute(shop) {
+      const firstDeployment = Array.isArray(shop.deployments) ? shop.deployments.find(Boolean) : null;
+      const route = String(shop.route || firstDeployment?.route || '').replace(/^#/, '').trim();
+      if (route) return `./#${route}`;
+      if (firstDeployment?.chainSlug && firstDeployment?.projectId) {
+        return `./#${firstDeployment.chainSlug}:${firstDeployment.projectId}`;
+      }
+      if (shop.chainSlug && shop.projectId) return `./#${shop.chainSlug}:${shop.projectId}`;
+      return './';
+    }
+
     function renderLeagueDirectory(shops) {
       if (!shops.length) {
         els.leagueDirectory.innerHTML = '<p class="league-directory-message">No indexed FPL shops are available yet.</p>';
@@ -1963,7 +1974,8 @@ Direct Juicebox routes use: 1=eth, 11155111=sep, 42161=arb, 421614=arbsep, 8453=
           ? `<a class="league-directory-link" href="${escapeHtml(leagueStandingsUrl(leagueId))}" target="_blank" rel="noopener">FPL league ${escapeHtml(leagueId)}</a>`
           : 'League not specified';
         const deployments = projectDeployments(shop);
-        return `<tr><td>${leagueLink}</td><td><span class="league-directory-name">${escapeHtml(title)}</span></td><td><span class="league-directory-description">${escapeHtml(description)}</span></td><td><span class="project-deployments">${deployments}</span></td><td><a class="button primary" href="${escapeHtml(shop.route)}">See items</a></td></tr>`;
+        const frontendRoute = shopFrontendRoute(shop);
+        return `<tr><td>${leagueLink}</td><td><span class="league-directory-name">${escapeHtml(title)}</span></td><td><span class="league-directory-description">${escapeHtml(description)}</span></td><td><span class="project-deployments">${deployments}</span></td><td><a class="button primary" href="${escapeHtml(frontendRoute)}">See items</a></td></tr>`;
       }).join('');
       els.leagueDirectory.innerHTML = `<div class="league-directory-table-wrap"><table class="league-directory-table"><thead><tr><th>League</th><th>Shop</th><th>Description</th><th>Project</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>`;
     }
