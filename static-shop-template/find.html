@@ -870,6 +870,14 @@
       min-height: 44px;
     }
 
+    .agent-choice {
+      margin: 4px 0 0;
+      color: var(--muted);
+      font-size: 0.82rem;
+      font-weight: 700;
+      text-align: center;
+    }
+
     .agent-copy {
       grid-column: auto;
       color: var(--accent-dark);
@@ -1259,21 +1267,23 @@
       <div class="discovery-grid">
         <article class="discovery-panel create-panel">
           <div>
-            <p class="discovery-kicker">Create with an agent</p>
-            <h2>Set up a league shop with an agent</h2>
-            <p>Tell the agent about the league. It can configure the shop and give everyone one place to use.</p>
+            <p class="discovery-kicker">Create a league shop</p>
+            <h2>Launch a shop for your FPL league</h2>
+            <p>Start with your league ID, choose the shop name, buy-in, description, and image, then deploy the Juicebox project from your wallet.</p>
             <ul class="create-benefits">
               <li>Buy-ins</li>
               <li>Prizes</li>
               <li>Items</li>
               <li>Public rules</li>
             </ul>
-            <p class="create-note">The FPL deploy skill sets the required project metadata, NFT rules, and shop route.</p>
+            <p class="create-note">The deploy page uses the same FPL template defaults and keeps the project route ready to share after deployment.</p>
           </div>
           <div class="discovery-footnote">
-            <div class="agent-actions" aria-label="Create a shop with an AI agent">
-              <a class="button primary" id="openClaude" href="https://claude.ai/new" target="_blank" rel="noopener">Open in Claude</a>
-              <a class="button primary" id="openChatgpt" href="https://chatgpt.com/" target="_blank" rel="noopener">Open in ChatGPT</a>
+            <div class="agent-actions" aria-label="Create a league shop">
+              <a class="button primary" href="./deploy.html">Deploy a shop</a>
+              <p class="agent-choice">Want an agent to prepare it with you?</p>
+              <a class="button" id="openClaude" href="https://claude.ai/new" target="_blank" rel="noopener">Open in Claude</a>
+              <a class="button" id="openChatgpt" href="https://chatgpt.com/" target="_blank" rel="noopener">Open in ChatGPT</a>
               <button class="button agent-copy" id="copyDeployPrompt" type="button">Copy agent instructions</button>
             </div>
             <a class="agent-repository" href="https://github.com/i001962/FPL/" target="_blank" rel="noopener">View the FPL deploy skill</a>
