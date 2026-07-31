@@ -1184,6 +1184,13 @@
       }
     }
 
+    function redirectBareRootToDirectory() {
+      if (window.location.hash || window.location.search || DEFAULT_PROJECT_ROUTE) return false;
+      if (!/^\/(?:index\.html)?$/i.test(window.location.pathname)) return false;
+      window.location.replace('./find.html');
+      return true;
+    }
+
     function setStatus(title, body, isError = false) {
       els.status.innerHTML = `<strong>${escapeHtml(title)}</strong><span class="${isError ? 'error' : ''}">${escapeHtml(body)}</span>`;
     }
@@ -2395,37 +2402,42 @@
     els.buyNft.addEventListener('click', buyNft);
     window.addEventListener('hashchange', () => window.location.reload());
 
-    parseRoute();
-    if (!state.projectId) {
-      els.shopView.hidden = true;
-      els.ownershipSummary.hidden = true;
-      els.title.textContent = 'FPL League NFT Shop';
-      els.subtitle.textContent = 'This project-specific template needs a Juicebox project route before it can load.';
-      setStatus('Project not configured', 'Set DEFAULT_PROJECT_ROUTE or open with #<chainSlug>:<projectId>.', true);
-    } else {
-      renderTiers();
-      renderPaymentNotice();
-      eagerConnect().catch(() => {});
-      loadLeague()
-        .then(() => {
-          renderAll();
-          setStatus('League ready', `${state.managers.length} managers loaded.`);
-          loadProjectMetadata().catch(() => {
-            state.paymentNotice = '';
-            renderPaymentNotice();
-          });
-          setStatus('Loading NFT tiers', 'Reading the Juicebox 721 shop.');
-          return loadProjectTiers().catch((error) => {
+    function start() {
+      if (redirectBareRootToDirectory()) return;
+      parseRoute();
+      if (!state.projectId) {
+        els.shopView.hidden = true;
+        els.ownershipSummary.hidden = true;
+        els.title.textContent = 'FPL League NFT Shop';
+        els.subtitle.textContent = 'This project-specific template needs a Juicebox project route before it can load.';
+        setStatus('Project not configured', 'Set DEFAULT_PROJECT_ROUTE or open with #<chainSlug>:<projectId>.', true);
+      } else {
+        renderTiers();
+        renderPaymentNotice();
+        eagerConnect().catch(() => {});
+        loadLeague()
+          .then(() => {
             renderAll();
-            setStatus('League ready', `${state.managers.length} managers loaded. Using fallback tiers because the shop read failed: ${error.message}`);
+            setStatus('League ready', `${state.managers.length} managers loaded.`);
+            loadProjectMetadata().catch(() => {
+              state.paymentNotice = '';
+              renderPaymentNotice();
+            });
+            setStatus('Loading NFT tiers', 'Reading the Juicebox 721 shop.');
+            return loadProjectTiers().catch((error) => {
+              renderAll();
+              setStatus('League ready', `${state.managers.length} managers loaded. Using fallback tiers because the shop read failed: ${error.message}`);
+            });
+          })
+          .catch((error) => {
+            renderHeader();
+            renderSummary();
+            setStatus('Could not load league', error.message, true);
           });
-        })
-        .catch((error) => {
-          renderHeader();
-          renderSummary();
-          setStatus('Could not load league', error.message, true);
-        });
+      }
     }
+
+    start();
   </script>
 </body>
 </html>
