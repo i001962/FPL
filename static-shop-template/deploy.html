@@ -735,10 +735,14 @@
       }).format(amount);
     }
 
-    function applyConfig() {
+    function syncDeployConfigFromForm() {
       state.projectName = els.projectName.value.trim();
       state.projectDescription = els.projectDescription.value.trim();
       state.membershipPrice = els.membershipPrice.value || '0';
+    }
+
+    function applyConfig() {
+      syncDeployConfigFromForm();
       render();
     }
 
@@ -1394,6 +1398,7 @@
     }
 
     function mutateDraft(template, imageUri) {
+      syncDeployConfigFromForm();
       const draft = cloneJson(template);
       draft.details = draft.details || {};
       draft.details.name = state.projectName;
@@ -1440,6 +1445,15 @@
         afterDeployDraft: draft,
         transactionInputs: {
           projectUri,
+          name: draft.details?.name || '',
+          description: draft.details?.description || '',
+          imageUri: draft.details?.logoUri || '',
+          collectionName: draft.collection?.name || '',
+          collectionSymbol: draft.collection?.symbol || '',
+          firstNftName: draft.nfts?.[0]?.name || '',
+          firstNftDescription: draft.nfts?.[0]?.description || '',
+          firstNftPriceUsd: draft.nfts?.[0]?.price || '',
+          nftImageUris: (draft.nfts || []).map((nft) => nft.imageUri || ''),
           owner: addrOrZero(draft.details?.owner) !== ZERO_ADDRESS ? draft.details.owner : state.walletAccount,
           operator: operatorAddressForDraft(draft),
           chainId: PROJECT.chain.chainId,
@@ -1456,6 +1470,7 @@
     }
 
     async function prepareDeployDraft() {
+      syncDeployConfigFromForm();
       const template = await loadJbTemplate();
       let imageUri = template?.details?.logoUri || '';
       if (state.imageFile) {
@@ -1789,6 +1804,7 @@
 
     async function deployAndPayProject12() {
       try {
+        syncDeployConfigFromForm();
         if (!state.leagueId) throw new Error('Load a league first.');
         if (!state.projectName || !state.projectDescription) throw new Error('Project name and description are required.');
         setTxStatus('Preparing atomic deploy + project 12 payment...');
@@ -1837,6 +1853,7 @@
 
     async function payCheckout() {
       try {
+        syncDeployConfigFromForm();
         if (!state.leagueId) throw new Error('Load a league first.');
         if (!state.projectName || !state.projectDescription) throw new Error('Project name and description are required.');
         setTxStatus('Preparing deploy...');
