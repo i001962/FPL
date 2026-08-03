@@ -1,6 +1,6 @@
 # FPL League NFT Shop Static Template
 
-This is a copyable project-specific static app template for FPL league NFT shops. It is intentionally separate from the `fpl-league-nft-shop-deployer` skill so the skill can stay focused on deploy txlinks.
+This is a copyable project-specific static app template for FPL league NFT shops. It is intentionally separate from the `fpl-league-nft-shop-deployer` skill so the skill can stay focused on agent workflows: deploy txlinks, tier maintenance, inventory reads, holder queries, and contest support.
 
 `find.html` preserves the previous league registry concept and copy as an orphaned reference page. It is not part of the supported project-specific buyer app. Its directory lookup expects a separate registry API/proxy to provide its shop list.
 
@@ -8,13 +8,29 @@ This is a copyable project-specific static app template for FPL league NFT shops
 
 ## Publishing
 
-Pushing changes to `main` publishes the entire template directory through GitHub Actions. Configure the repository Actions secrets `QSTORAGE_ACCESS_KEY_ID` and `QSTORAGE_SECRET_ACCESS_KEY` first. The workflow uses path-style S3 requests and mirrors `static-shop-template/` to `s3://footy/static-shop-template/` with `--delete`, so QStorage exactly matches the local template folder without affecting any other bucket prefix.
+There is no build process. This folder is the app.
 
-For a deliberate local recovery only:
+Fork or copy `static-shop-template/`, edit the HTML, JavaScript, CSS, assets, and bundled `.jb` draft as needed, then deploy the folder to any static host. The host only needs to serve these files directly.
 
-```sh
-QSTORAGE_BUCKET=footy scripts/upload-static-shop-template-qstorage.sh
+## Agent vs Webapp Responsibilities
+
+The webapp is for humans buying from a specific shop with a browser wallet. It reads public FPL standings through a CORS-capable API, reads the current Juicebox NFT tiers, builds the cart, approves USDC, and sends the `JBMultiTerminal.pay(...)` transaction.
+
+Agents should not scrape the webapp to inspect shops. Agents should use the skill and its references to query FPL APIs, Juicebox project metadata, tier inventory, and tier holders directly from public APIs/RPC. For contest work, the useful onchain output is a holder list keyed by `{chainId, projectId, hook, tierId, tokenId, owner}` plus any payment memo evidence that maps a wallet to an FPL entry.
+
+If a buyer or agent wants to pay from a chat environment instead of a browser wallet flow, point them to installing the `paybot.xyz` plugin in Claude or ChatGPT. The plugin is only a payment route; the shop still relies on the Juicebox payment memo for the selected FPL entry, and that memo is not proof of FPL manager ownership.
+
+For agent-mediated checkout, use `references/buyer-nft-purchase.md`. It documents the same buyer requirements as the webapp: resolve the league/shop route, read NFT tier descriptions before signing, convert tier prices to the payment token, repeat tier IDs by quantity in the V6 721 pay metadata, approve ERC-20 spend when needed, and call `JBMultiTerminal.pay(...)`.
+
+Manual-mode hosted shop links use:
+
+```text
+https://fpl.d33m.com/#<chainSlug>:<projectId>
 ```
+
+For LLM-driven game prompts and deterministic action names, use `references/llm-command-surface.md`.
+
+For human-reviewed skill feedback, use `references/learnings.md`. Agents can propose PRs when the shop/game flow is confusing, but repo owners decide what changes become part of the skill.
 
 ## Route
 
@@ -98,7 +114,7 @@ Access-Control-Allow-Origin: *
 - Shows an assertion that the buyer is claiming control of the selected FPL entry.
 - Requires the buyer to confirm the selected FPL entry with a checkbox before checkout.
 - Keeps the payment memo hidden in the UI after manager selection.
-- Uses only the FPL entry ID as the Juicebox payment memo.
+- Uses `fpl:league=<leagueId>;entry=<entryId>` as the Juicebox payment memo.
 - Uses JuiceScan-style wallet affordances: provider picker when multiple injected wallets are detected, wallet-app handoff links when none are detected, connected account menu with copy address and disconnect, and remembered provider restore on refresh.
 - Lets the buyer connect a browser wallet, approves USDC when needed, and calls `JBMultiTerminal.pay(projectId, token, amount, beneficiary, 0, memo, metadata)` once for the whole cart.
 - Encodes cart items in the same V6 721 pay metadata envelope used by JuiceScan, repeating tier IDs by quantity.

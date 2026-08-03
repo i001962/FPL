@@ -1184,13 +1184,6 @@
       }
     }
 
-    function redirectBareRootToDirectory() {
-      if (window.location.hash || window.location.search || DEFAULT_PROJECT_ROUTE) return false;
-      if (!/^\/(?:index\.html)?$/i.test(window.location.pathname)) return false;
-      window.location.replace('./find.html');
-      return true;
-    }
-
     function setStatus(title, body, isError = false) {
       els.status.innerHTML = `<strong>${escapeHtml(title)}</strong><span class="${isError ? 'error' : ''}">${escapeHtml(body)}</span>`;
     }
@@ -1468,7 +1461,7 @@
 
     function buildMemo() {
       if (!state.selectedManager) return '';
-      return String(state.selectedManager.entryId);
+      return `fpl:league=${state.leagueId};entry=${state.selectedManager.entryId}`;
     }
 
     function cartQty(tier) {
@@ -2403,7 +2396,6 @@
     window.addEventListener('hashchange', () => window.location.reload());
 
     function start() {
-      if (redirectBareRootToDirectory()) return;
       parseRoute();
       if (!state.projectId) {
         els.shopView.hidden = true;

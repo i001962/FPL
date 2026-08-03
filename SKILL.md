@@ -5,9 +5,22 @@ description: Deploy, inspect, or maintain a Fantasy Premier League league NFT sh
 
 # FPL League NFT Shop Deployer
 
-Use this skill to inspect live FPL shop inventory and to prepare reviewable `txlink.stupidtech.net` URLs for FPL league NFT shop deploys and existing-shop NFT tier maintenance. The shop itself is a static site; this skill does not create a backend and does not generate or design a frontend during deploy work.
+Use this skill to inspect live FPL shop inventory, query NFT tier holders for contest workflows, and prepare reviewable `txlink.stupidtech.net` URLs for FPL league NFT shop deploys and existing-shop NFT tier maintenance. The shop itself is a static site; this skill does not create a backend and does not generate or design a frontend during deploy work.
 
 The deliverable is either a completed wallet transaction sent by the acting agent from an authorized wallet, or a txlink URL the deployer/operator can open with their own wallet. The `.jb` draft is only an internal source of deploy settings and an optional review artifact; do not stop by handing the user a `.jb` file when an exact txlink can be built.
+
+## Actor Routing
+
+Read [references/actor-workflows.md](references/actor-workflows.md) when the request depends on the role being served: deployer/shop owner/operator, FPL manager, contest participant/buyer, or contest runner/settler agent.
+
+Use the actor inventory to keep these identities separate:
+
+- A deployer is normally also the Juicebox shop owner/operator.
+- An FPL manager is identified by an FPL entry ID from the league APIs.
+- A contest participant is identified by a wallet and may or may not manage the selected FPL entry.
+- A contest runner needs both onchain holder records and FPL scoring data.
+
+Do not describe a wallet-to-FPL-entry relation as verified unless a separate verification mechanism is added. The current shop links them only through payment memo evidence.
 
 ## Signing And Handoff
 
@@ -26,13 +39,7 @@ Do not create frontend code as part of this skill's txlink workflow. A copyable 
 static-shop-template/index.html
 ```
 
-The template is intended to be uploaded once to QStorage and reused by league deployers who want a starter buyer page. After the template is uploaded, record the public app URL here:
-
-```text
-https://qstorage.quilibrium.com/footy/static-shop-template/index.html
-```
-
-Until the QStorage URL is filled in, reference the local `static-shop-template/index.html` artifact as the source to upload or copy. The deploy skill should still return the post-deploy route pattern:
+The template is a forkable, customizable static folder. There is no build process and no required hosting provider. Copy or fork `static-shop-template/`, edit the static files directly, and deploy the folder anywhere that can serve HTML, JavaScript, and assets. The deploy skill should still return the post-deploy route pattern:
 
 ```text
 #<chainSlug>:<projectId>
@@ -41,31 +48,25 @@ Until the QStorage URL is filled in, reference the local `static-shop-template/i
 Example copied onto the pinned template:
 
 ```text
-https://qstorage.quilibrium.com/footy/static-shop-template/index.html#basesep:19
+https://example.com/index.html#basesep:19
 ```
 
-The template is a starter UI only. It resolves known test project IDs locally, loads the FPL leaderboard in the browser through a CORS-capable endpoint such as FC-Footy, requires a manager and tier selection, uses only the selected FPL entry ID as the payment memo, and points the buyer to the Juicebox project page. It does not replace the signer-reviewed deploy txlink, and it does not make the FPL manager-to-wallet link strong.
+The template is a starter UI only. It resolves known test project IDs locally, loads the FPL leaderboard in the browser through a CORS-capable endpoint such as FC-Footy, requires a manager and tier selection, uses `fpl:league=<leagueId>;entry=<entryId>` as the payment memo, and points the buyer to the Juicebox project page. It does not replace the signer-reviewed deploy txlink, and it does not make the FPL manager-to-wallet link strong.
 
 For a project-specific hosted copy, set `DEFAULT_PROJECT_ROUTE` in the copied template to the deployed `chainSlug:projectId` before publishing. The page must then load that project with no URL fragment, while an explicit `#<chainSlug>:<projectId>` fragment continues to override the default for testing. If no route is configured, the template shows a configuration error; it must not depend on a global shop index.
 
-The league data endpoint used by the browser template must allow reads from the QStorage origin. If FC-Footy is used, `GET /api/fpl-league` must send `Access-Control-Allow-Origin: *`. The template also accepts an `apiBase` query parameter for another CORS-capable endpoint. This browser constraint does not apply to the skill workflow; agents should call Fantasy Premier League APIs directly when possible.
+The league data endpoint used by the browser template must allow reads from the host where the static folder is deployed. If FC-Footy is used, `GET /api/fpl-league` must send `Access-Control-Allow-Origin: *`. The template also accepts an `apiBase` query parameter for another CORS-capable endpoint. This browser constraint does not apply to the skill workflow; agents should call Fantasy Premier League APIs directly when possible.
 
 ## Static Template Release
 
-When changing the reusable static buyer app or its QStorage upload script, release it in this order:
+When changing the reusable static buyer app:
 
 1. Validate the changed static HTML/JavaScript.
-2. Commit only the intended template, script, skill, workflow, and documentation changes, then push `main` to GitHub.
-3. Let `.github/workflows/deploy-static-shop-template.yml` publish the template. Configure these repository Actions secrets before the first release:
-   - `QSTORAGE_ACCESS_KEY_ID`
-   - `QSTORAGE_SECRET_ACCESS_KEY`
-   The workflow uses path-style S3 requests, QStorage's documented `q-world-1` signing region, and runs `aws s3 sync --delete` from `static-shop-template/` to `s3://footy/static-shop-template/`. It uploads the full folder tree and deletes only stale files inside that prefix. Never sync to `s3://footy/`, which could delete unrelated bucket contents.
-4. Confirm the GitHub Actions run succeeds and the public app URL returns HTTP 200:
-   ```text
-   https://qstorage.quilibrium.com/footy/static-shop-template/index.html
-   ```
+2. Commit only the intended template, skill, and documentation changes.
+3. Publish the `static-shop-template/` folder with the hosting provider or file server chosen by the deployer.
+4. Confirm the public app URL returns HTTP 200 and that the configured route loads the intended project.
 
-Do not use a local QStorage credential as the normal release path. Do not claim the static template release is complete until the GitHub push, Actions run, and QStorage verification all succeed. Keep the repository skill and the installed Codex skill copy in sync whenever this workflow changes.
+Keep the repository skill and the installed Codex skill copy in sync whenever this workflow changes.
 
 ## Builder Source
 
@@ -253,6 +254,67 @@ Use this read-only path when the user asks which NFTs a league shop sells, its l
 Read [references/inspect-existing-shop.md](references/inspect-existing-shop.md) before inspecting a project. It contains the required completion criteria, the active-hook resolution sequence, RPC fallbacks, metadata resolution, and the known Base Sepolia project/league examples.
 
 Do not ask the user to copy item cards from a frontend. Query the chain directly; use a public Juicebox page or explorer only as a read-only fallback when the runtime cannot reach all listed RPC endpoints.
+
+## Inspect NFT Tier Holders
+
+Use this read-only path when an agent needs to run or settle contests, find who bought a tier, count holders, check whether a wallet holds a tier, or build an exocortex/store view of league participants.
+
+Read [references/inspect-tier-holders.md](references/inspect-tier-holders.md) before querying holders. The required result is a structured holder list, not a screenshot or aggregate count. Return at least:
+
+- `chainId`, `chainSlug`, `projectId`, and resolved 721 `hook`
+- `tierId`, tier name when known, NFT `tokenId`, serial number, and current `owner`
+- per-tier holder counts and per-owner quantities
+- payment memo evidence when available, especially `fpl:league=<leagueId>;entry=<entryId>`
+
+The current static webapp scans holders only to show aggregate customer counts and the connected wallet's owned quantities. Agents must query the chain directly and return the full holder data needed for contest logic.
+
+## Buyer NFT Purchase
+
+Use this path when an account wants to buy into a league shop, inspect what an NFT tier entitles them to, or have a payment-capable agent prepare a shop payment.
+
+Read [references/buyer-nft-purchase.md](references/buyer-nft-purchase.md) before constructing checkout calldata. It contains the required project/league discovery reads, tier inventory and metadata reads, price conversion rules, quantity handling, Juicebox V6 721 pay metadata envelope, ERC-20 approval handling, and `JBMultiTerminal.pay(...)` transaction structure.
+
+The buyer workflow must let the account:
+
+- find the target league and shop route without confusing FPL league IDs with Juicebox project IDs
+- read each NFT tier's metadata description before signing, because that text explains the entitlement
+- buy any quantity up to remaining supply by repeating the tier ID once per NFT in the 721 pay metadata
+
+For chat-native buyers, call out `paybot.xyz` in Claude or ChatGPT as an optional payment route. It does not replace wallet review/approval, and it does not verify control of an FPL manager entry.
+
+When a buyer wants manual mode, provide the browser shop URL:
+
+```text
+https://fpl.d33m.com/#<chainSlug>:<projectId>
+```
+
+Use `fpl.d33m.com` as a manual UI only. Agents should still use direct FPL API and chain/RPC reads for inventory, holder, memo, and settlement work.
+
+## LLM Command Surface
+
+Read [references/llm-command-surface.md](references/llm-command-surface.md) when the user asks how to start, says `help`, asks what actions are available, or wants the shop/game experience to feel deterministic inside an LLM thread.
+
+Support these action names consistently:
+
+- `find_shop`
+- `list_tiers`
+- `buy`
+- `owned`
+- `eligible`
+- `standings`
+- `score`
+- `settle`
+- `operator`
+- `manual`
+- `feedback`
+
+For action-style requests, start with `Action: <name>`, list `Need:` for missing inputs, state `Using:` for resolved IDs/routes, show `Result:` or `Review:`, then end with `Next:` follow-up actions.
+
+## Learning Feedback Loop
+
+Read [references/learnings.md](references/learnings.md) when a user or agent reports that something was hard to understand, hard to operate, missing from the command surface, or under-specified in the shop/contest workflow.
+
+Agents may propose improvements by opening a pull request against `https://github.com/i001962/FPL` that appends a dated entry to `references/learnings.md` and, when appropriate, edits the relevant skill reference. This is intentionally human-reviewed: do not merge, self-approve, or silently change skill behavior without repo-owner review.
 
 ## Source Draft
 
@@ -477,7 +539,9 @@ Buyer flow:
 4. Derive the payment amount from the selected NFT tier price.
 5. Do not allow a freeform memo or freeform amount in v1.
 6. Let the buyer approve USDC when needed, then buy the NFT.
-7. Mark NFT ownership by matching onchain payment/NFT data to memo entry IDs.
+7. Keep the NFT holder relation separate from the FPL manager claim: ERC-721 ownership identifies the current wallet holder; Juicebox payment memos can provide weak evidence of the FPL entry selected at purchase time.
+
+Payment-capable agents or chat-native buyers can install the `paybot.xyz` plugin in Claude or ChatGPT as a way to make shop payments from a wallet-aware chat surface. Treat this as an optional payment route, not a verification mechanism: the payment still needs wallet review/approval, and the selected FPL entry must still be carried in the Juicebox memo.
 
 ## Output Format
 

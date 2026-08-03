@@ -13,6 +13,8 @@ Project discovery is not the result. For every matching project, return its acti
 
 Do not ask the user to transcribe frontend item cards. If reads fail, try every listed fallback and report the exact failed endpoint/call only after returning all data that did resolve.
 
+If the user asks who owns NFTs, who bought into a contest tier, whether a wallet can participate, or asks for holder counts beyond sold/remaining supply, continue with [inspect-tier-holders.md](inspect-tier-holders.md). Inventory alone is not enough for contest settlement.
+
 ## Known Base Sepolia Examples
 
 These are examples, not a registry. Verify their live metadata and tiers before using them:
@@ -89,5 +91,5 @@ If a direct RPC read fails:
 
 1. Retry the same idempotent read against the next endpoint above.
 2. Check the direct project page at `https://juicebox.money/v6/basesep:<projectId>` or the Base Sepolia explorer as a read-only verification fallback.
-3. Do not use `fpl.d33m.com` as a data dependency; it is an optional rendering of these reads.
+3. Do not use `fpl.d33m.com` as a data dependency; it is manual mode for humans. When a route is known, you may provide `https://fpl.d33m.com/#<chainSlug>:<projectId>` so the user can operate the shop UI themselves.
 4. Do not respond with only project identity while omitting tier inventory. If every fallback fails, list the endpoint and contract method that failed, then return every other verified field.
