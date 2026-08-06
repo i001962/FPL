@@ -6,6 +6,18 @@
   <title>FPL League NFT Shop</title>
   <meta name="description" content="A static FPL league NFT shop template for Juicebox projects.">
   <link rel="icon" href="data:,">
+  <script>
+    window.FPL_DEFAULT_PROJECT_ROUTE = '';
+    (() => {
+      const route = window.location.hash.replace(/^#/, '');
+      const params = new URLSearchParams(window.location.search);
+      const hasRoute = /^([a-z0-9-]+):(\d+)(?:\/fpl\/(\d+))?/i.test(route);
+      const hasDefaultRoute = /^([a-z0-9-]+):(\d+)(?:\/fpl\/(\d+))?$/i.test(window.FPL_DEFAULT_PROJECT_ROUTE);
+      if (!hasRoute && !params.get('projectId') && !hasDefaultRoute) {
+        window.location.replace(new URL('find.html', window.location.href).href);
+      }
+    })();
+  </script>
   <style>
     :root {
       color-scheme: light;
@@ -139,7 +151,8 @@
       background: rgba(255, 255, 255, 0.82);
     }
 
-    .ownership-item img {
+    .ownership-item img,
+    .ownership-item video {
       display: block;
       width: 100%;
       height: 100%;
@@ -337,7 +350,8 @@
       overflow: hidden;
     }
 
-    .tier-thumb img {
+    .tier-thumb img,
+    .tier-thumb video {
       display: block;
       width: 100%;
       height: 100%;
@@ -1091,8 +1105,8 @@
     const WALLET_RDNS = 'fpl-shop-wallet-rdns';
     const WALLET_PROVIDER_FALLBACK = { info: { uuid: 'injected-0', name: 'Browser wallet', rdns: 'injected', icon: '' }, provider: window.ethereum };
     const discoveredProviders = [];
-    // Set this when publishing a project-specific copy. A hash route still overrides it.
-    const DEFAULT_PROJECT_ROUTE = '';
+    // Set window.FPL_DEFAULT_PROJECT_ROUTE above when publishing a project-specific copy. A hash route still overrides it.
+    const DEFAULT_PROJECT_ROUTE = window.FPL_DEFAULT_PROJECT_ROUTE || '';
 
     const state = {
       chainSlug: 'base',
@@ -1186,6 +1200,11 @@
 
     function setStatus(title, body, isError = false) {
       els.status.innerHTML = `<strong>${escapeHtml(title)}</strong><span class="${isError ? 'error' : ''}">${escapeHtml(body)}</span>`;
+    }
+
+    function openFinderFallback() {
+      const target = new URL('find.html', window.location.href);
+      window.location.replace(target.href);
     }
 
     function setTxStatus(message, isError = false) {
@@ -1359,6 +1378,23 @@
       els.paymentNotice.innerHTML = `<strong>Payment notice</strong><span>${escapeHtml(notice)}</span>`;
     }
 
+    function isVideoMedia(tier) {
+      const mediaType = String(tier.mediaType || '').toLowerCase();
+      const media = String(tier.media || '');
+      return mediaType.startsWith('video/') || mediaType === 'video' || /\.(mp4|webm|ogg)(?:[?#].*)?$/i.test(media);
+    }
+
+    function renderTierMedia(tier) {
+      const src = tier.media || tier.image || '';
+      if (!src) return '';
+      const safeSrc = escapeHtml(src);
+      const safeAlt = escapeHtml(tier.name || 'NFT tier');
+      if (isVideoMedia(tier)) {
+        return `<video src="${safeSrc}" aria-label="${safeAlt}" autoplay muted loop playsinline preload="metadata" onerror="tryNextMediaGateway(this)"></video>`;
+      }
+      return `<img src="${safeSrc}" alt="${safeAlt}" loading="lazy" onerror="tryNextMediaGateway(this)">`;
+    }
+
     function tierSoldCount(tier) {
       const initial = Number(tier.initialSupply || 0);
       const remaining = Number(tier.remaining || 0);
@@ -1392,7 +1428,7 @@
       const emptyWalletText = state.walletAccount && !ownedCount ? '<span>No NFTs owned by this wallet.</span>' : '';
       const thumbnails = displayEntries.map(({ tier, qty }) => `
         <span class="ownership-item" title="${escapeHtml(tier.name)} x${escapeHtml(qty)}">
-          ${tier.image ? `<img src="${escapeHtml(tier.image)}" alt="">` : ''}
+          ${renderTierMedia(tier)}
           <span class="ownership-count">x${escapeHtml(qty)}</span>
         </span>
       `).join('');
@@ -1411,7 +1447,7 @@
     function renderTiers() {
       els.tiers.innerHTML = state.tiers.map((tier) => `
         <div class="tier ${cartQty(tier) > 0 ? 'selected' : ''}">
-          <span class="tier-thumb">${tier.image ? `<img src="${escapeHtml(tier.image)}" alt="">` : ''}</span>
+          <span class="tier-thumb">${renderTierMedia(tier)}</span>
           <span class="tier-main">
             <strong>${escapeHtml(tier.name)}</strong>
             <span class="tier-meta">
@@ -1797,6 +1833,59 @@
       return uri;
     }
 
+    function ipfsPathFromUrl(uri) {
+      const value = String(uri || '');
+      if (value.startsWith('ipfs://')) return value.replace('ipfs://', '');
+      const match = value.match(/^https?:\/\/[^/]+\/ipfs\/([^?#]+)/i);
+      return match ? decodeURIComponent(match[1]) : '';
+    }
+
+    function gatewayUrls(uri) {
+      const primary = gatewayUrl(uri);
+      const path = ipfsPathFromUrl(uri);
+      if (!path) return primary ? [primary] : [];
+      return [
+        `https://gateway.pinata.cloud/ipfs/${path}`,
+        `https://ipfs.io/ipfs/${path}`,
+        `https://cloudflare-ipfs.com/ipfs/${path}`,
+        `https://dweb.link/ipfs/${path}`
+      ].filter((value, index, values) => value && values.indexOf(value) === index);
+    }
+
+    function tryNextMediaGateway(el) {
+      const candidates = gatewayUrls(el.currentSrc || el.src);
+      const index = Number(el.dataset.gatewayIndex || 0) + 1;
+      if (index >= candidates.length) return;
+      el.dataset.gatewayIndex = String(index);
+      el.src = candidates[index];
+      if (typeof el.load === 'function') el.load();
+    }
+    window.tryNextMediaGateway = tryNextMediaGateway;
+
+    function mediaTypeFromUrl(uri) {
+      const value = String(uri || '').toLowerCase();
+      if (/\.gif(?:[?#].*)?$/.test(value) || value.startsWith('data:image/gif')) return 'image/gif';
+      if (/\.(png|apng|jpg|jpeg|webp|svg)(?:[?#].*)?$/.test(value) || value.startsWith('data:image/')) return 'image';
+      if (/\.(mp4|webm|ogg)(?:[?#].*)?$/.test(value) || value.startsWith('data:video/')) return 'video';
+      return '';
+    }
+
+    async function mediaTypeFromHeaders(uri) {
+      const url = gatewayUrl(uri);
+      if (!url || url.startsWith('data:')) return '';
+      const controller = new AbortController();
+      const timeout = window.setTimeout(() => controller.abort(), 3500);
+      try {
+        const response = await fetch(url, { method: 'HEAD', signal: controller.signal });
+        if (!response.ok) return '';
+        return response.headers.get('content-type')?.split(';')[0]?.trim().toLowerCase() || '';
+      } catch (_) {
+        return '';
+      } finally {
+        window.clearTimeout(timeout);
+      }
+    }
+
     function decodeDataJson(uri) {
       const match = String(uri || '').match(/^data:application\/json(?:;charset=[^;,]+)?(;base64)?,(.*)$/i);
       if (!match) return null;
@@ -1919,10 +2008,15 @@
       for (const uri of uris) {
         try {
           const metadata = await fetchMetadata(uri);
-          const image = metadata?.image || metadata?.image_url || metadata?.animation_url || '';
+          const image = metadata?.image || metadata?.image_url || '';
+          const animation = metadata?.animation_url || '';
+          const mediaSource = animation || image;
+          const mediaType = metadata?.mediaType || metadata?.media_type || metadata?.mimeType || metadata?.mime_type || mediaTypeFromUrl(mediaSource) || await mediaTypeFromHeaders(mediaSource);
           return {
             name: metadata?.name || tier.name,
             image: gatewayUrl(image),
+            media: gatewayUrl(mediaSource),
+            mediaType,
             description: metadata?.description || ''
           };
         } catch (_) {}
@@ -2017,7 +2111,7 @@
             remaining: Number(tier.remainingSupply ?? tier[2] ?? 0)
           };
           const media = await resolveTierMedia(chain, shop, baseTier);
-          return { ...baseTier, name: media.name || baseTier.name, image: media.image || '', description: media.description || '' };
+          return { ...baseTier, name: media.name || baseTier.name, image: media.image || '', media: media.media || media.image || '', mediaType: media.mediaType || '', description: media.description || '' };
       }));
       if (!tiers.length) throw new Error('No active NFT tiers found.');
       state.tiers = tiers;
@@ -2398,11 +2492,7 @@
     function start() {
       parseRoute();
       if (!state.projectId) {
-        els.shopView.hidden = true;
-        els.ownershipSummary.hidden = true;
-        els.title.textContent = 'FPL League NFT Shop';
-        els.subtitle.textContent = 'This project-specific template needs a Juicebox project route before it can load.';
-        setStatus('Project not configured', 'Set DEFAULT_PROJECT_ROUTE or open with #<chainSlug>:<projectId>.', true);
+        openFinderFallback();
       } else {
         renderTiers();
         renderPaymentNotice();

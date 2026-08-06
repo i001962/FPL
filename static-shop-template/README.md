@@ -34,9 +34,9 @@ For human-reviewed skill feedback, use `references/learnings.md`. Agents can pro
 
 ## Route
 
-Set `DEFAULT_PROJECT_ROUTE` near the top of `index.html` to the deployed project route before publishing a project-specific copy. This makes the bare app URL open its shop without a fragment while preserving the reusable hash-route behavior.
+Set `window.FPL_DEFAULT_PROJECT_ROUTE` near the top of `index.html` to the deployed project route before publishing a project-specific copy. This makes the bare app URL open its shop without a fragment while preserving the reusable hash-route behavior.
 
-If `DEFAULT_PROJECT_ROUTE` is blank and no hash or query route is supplied, the app shows a configuration error. It does not include a global FPL shop directory or proxy.
+If `window.FPL_DEFAULT_PROJECT_ROUTE` is blank and no hash or query route is supplied, `index.html` redirects to `find.html` so the bare app URL opens the finder page instead of the buyer checkout. The finder page can still be opened directly as `find.html`.
 
 Open the app with this hash route to select or override a project:
 
@@ -50,7 +50,7 @@ Example:
 #basesep:19
 ```
 
-For example, after setting `DEFAULT_PROJECT_ROUTE = 'basesep:19'`, both of these load project 19:
+For example, after setting `window.FPL_DEFAULT_PROJECT_ROUTE = 'basesep:19'`, both of these load project 19:
 
 ```text
 https://example.com/index.html
