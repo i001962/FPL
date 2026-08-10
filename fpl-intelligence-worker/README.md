@@ -2,7 +2,7 @@
 
 An independently deployable Cloudflare Worker that exposes public Fantasy Premier League analysis through MCP Streamable HTTP at `/mcp`.
 
-It ports the useful FPL-facing surface of [`dohyung1/x402-fpl-api`](https://github.com/dohyung1/x402-fpl-api) to TypeScript/Workers. Access is gated by verified ownership of a Base ERC-721 collection, with a $0.01 USDC, one-hour payment fallback. The Worker never signs or submits wallet transactions.
+It ports the useful FPL-facing surface of [`dohyung1/x402-fpl-api`](https://github.com/dohyung1/x402-fpl-api) to TypeScript/Workers. Access is gated by verified ownership of a Base ERC-721 collection, with a $0.05 USDC, 15-minute payment fallback. The Worker never signs or submits wallet transactions.
 
 ## Included tools
 
@@ -37,7 +37,7 @@ This is a collection-level gate: the verified signer must have `balanceOf(wallet
 3. Call `fpl_verify_access` with the challenge and signature.
 4. Set `Authorization: Bearer <accessToken>` (or `X-FPL-Access-Token`) on subsequent MCP HTTP requests.
 
-The Worker verifies ownership again on each protected call. Tokens expire after one hour. Configure the signing key before deploying:
+The Worker verifies NFT ownership again on each protected call. NFT-derived tokens expire after five minutes; payment-derived tokens expire after 15 minutes. Configure the signing key before deploying:
 
 ```bash
 npx wrangler secret put ACCESS_TOKEN_SECRET
@@ -49,9 +49,9 @@ For a non-holder, `fpl_purchase_instructions` returns the exact Base ERC-20 appr
 
 ## Paid fallback (x402-style)
 
-When no valid access token is supplied, protected tools return HTTP `402` with a Base payment quote. A non-holder can pay at least **$0.01 USDC** through `JBRouterTerminalRegistry.pay(...)` to Juicebox project `base:3`, with beneficiary `0xDf087B724174A3E4eD2338C0798193932E851F1b`.
+When no valid access token is supplied, protected tools return HTTP `402` with a Base payment quote. A non-holder can pay at least **$0.05 USDC** through `JBRouterTerminalRegistry.pay(...)` to Juicebox project `base:3`, with beneficiary `0xDf087B724174A3E4eD2338C0798193932E851F1b`.
 
-After the payment is mined, the payer signs a fresh `fpl_access_challenge` and calls `fpl_verify_payment` with the signature and transaction hash. The Worker verifies the Base receipt and decoded router `pay()` fields, consumes that hash once using a Durable Object, and returns a one-hour access token. It never signs, simulates, or broadcasts a payment transaction.
+After the payment is mined, the payer signs a fresh `fpl_access_challenge` and calls `fpl_verify_payment` with the signature and transaction hash. The Worker verifies the Base receipt and decoded router `pay()` fields, consumes that hash once using a Durable Object, and returns a 15-minute access token. It never signs, simulates, or broadcasts a payment transaction.
 
 For example, a stateless caller uses the returned token on a protected call like:
 

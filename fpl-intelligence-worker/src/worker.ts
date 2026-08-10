@@ -26,19 +26,20 @@ const USER_AGENT = "Mozilla/5.0 (compatible; FPL-Intelligence-MCP/0.1; +https://
 const TEAM_ID = z.coerce.number().int().positive();
 const LEAGUE_ID = z.coerce.number().int().positive();
 const PLAYER_ID = z.coerce.number().int().positive();
-const ACCESS_TOKEN_ARGUMENT = z.string().trim().min(1).optional().describe("One-hour access token returned by fpl_verify_access or fpl_verify_payment. Stateless clients may send it here instead of an Authorization header.");
+const ACCESS_TOKEN_ARGUMENT = z.string().trim().min(1).optional().describe("Short-lived access token returned by fpl_verify_access or fpl_verify_payment. Stateless clients may send it here instead of an Authorization header.");
 function protectedToolInput<T extends z.ZodRawShape>(shape: T) { return { ...shape, accessToken: ACCESS_TOKEN_ARGUMENT }; }
 const POSITION = ["GKP", "DEF", "MID", "FWD"] as const;
 const BASE_CHAIN_ID = 8453;
 const ELIGIBILITY_ASSET_TYPE = "eip155:8453/erc721:0x4669162aa53b9052f73f1ca12e43f4be57cf40bf";
 const ELIGIBILITY_CONTRACT = "0x4669162aa53b9052f73f1ca12e43f4be57cf40bf" as Address;
 const CHALLENGE_TTL_SECONDS = 5 * 60;
-const ACCESS_TTL_SECONDS = 60 * 60;
+const NFT_ACCESS_TTL_SECONDS = 5 * 60;
+const PAYMENT_ACCESS_TTL_SECONDS = 15 * 60;
 const FREE_ACCESS_TOOLS = new Set(["fpl_access_challenge", "fpl_verify_access", "fpl_verify_payment", "fpl_purchase_instructions"]);
 const X402_ROUTER = "0xe0427f250fdb0379c8e98e884ee4570521208cbc" as Address;
 const X402_PROJECT_ID = 3n;
 const X402_USDC = "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913" as Address;
-const X402_MIN_AMOUNT = 10_000n;
+const X402_MIN_AMOUNT = 50_000n;
 const X402_BENEFICIARY = "0xDf087B724174A3E4eD2338C0798193932E851F1b" as Address;
 const JUICEBOX_TERMINAL = "0x130f5dd2bd8805443cf41755253d778a75a67f53" as Address;
 const JUICEBOX_PROJECT_ID = 10n;
@@ -137,12 +138,12 @@ async function verifyChallengeAndIssueAccess(env: Env, walletInput: string, chal
   const wallet = await verifyWalletChallenge(env, walletInput, challenge, signature);
   const balance = await collectionBalance(env, wallet);
   if (balance < 1n) return { eligible: false as const, wallet, balance: balance.toString(), assetType: ELIGIBILITY_ASSET_TYPE };
-  const expiresAt = Math.floor(Date.now() / 1000) + ACCESS_TTL_SECONDS;
+  const expiresAt = Math.floor(Date.now() / 1000) + NFT_ACCESS_TTL_SECONDS;
   const accessToken = await signPayload<AccessPayload>(env, { wallet, expiresAt, assetType: ELIGIBILITY_ASSET_TYPE, source: "nft" });
   return { eligible: true as const, wallet, balance: balance.toString(), assetType: ELIGIBILITY_ASSET_TYPE, accessToken, expiresAt: new Date(expiresAt * 1000).toISOString() };
 }
 function paymentQuote() {
-  return { x402: true, network: "base", chainId: BASE_CHAIN_ID, router: X402_ROUTER, function: "pay", projectId: X402_PROJECT_ID.toString(), token: X402_USDC, amount: X402_MIN_AMOUNT.toString(), amountDisplay: "$0.01 USDC", beneficiary: X402_BENEFICIARY, accessDurationSeconds: ACCESS_TTL_SECONDS, instructions: "Pay at least 0.01 Base USDC through JBRouterTerminalRegistry.pay for project 3, then prove control of the transaction sender with fpl_access_challenge and call fpl_verify_payment with the mined transaction hash." };
+  return { x402: true, network: "base", chainId: BASE_CHAIN_ID, router: X402_ROUTER, function: "pay", projectId: X402_PROJECT_ID.toString(), token: X402_USDC, amount: X402_MIN_AMOUNT.toString(), amountDisplay: "$0.05 USDC", beneficiary: X402_BENEFICIARY, accessDurationSeconds: PAYMENT_ACCESS_TTL_SECONDS, instructions: "Pay at least 0.05 Base USDC through JBRouterTerminalRegistry.pay for project 3, then prove control of the transaction sender with fpl_access_challenge and call fpl_verify_payment with the mined transaction hash." };
 }
 async function baseRpc<T>(env: Env, method: string, params: unknown[]): Promise<T> {
   let lastError: unknown;
@@ -181,7 +182,7 @@ async function verifyPaymentAndIssueAccess(env: Env, walletInput: string, challe
   await verifyJuiceboxPayment(env, txHash, wallet);
   const receipt = env.PAYMENT_RECEIPTS.getByName(txHash.toLowerCase());
   if (!await receipt.consume(txHash)) throw new Error("This payment transaction has already been used for access.");
-  const expiresAt = Math.floor(Date.now() / 1000) + ACCESS_TTL_SECONDS;
+  const expiresAt = Math.floor(Date.now() / 1000) + PAYMENT_ACCESS_TTL_SECONDS;
   const accessToken = await signPayload<AccessPayload>(env, { wallet, expiresAt, assetType: ELIGIBILITY_ASSET_TYPE, source: "payment" });
   return { eligible: false, paid: true, wallet, paymentTxHash: txHash, accessToken, expiresAt: new Date(expiresAt * 1000).toISOString(), quote: paymentQuote() };
 }
@@ -290,17 +291,17 @@ function createServer(env: Env): McpServer {
       return { content: [{ type: "text", text: "Sign this exact message with the specified wallet, then call fpl_verify_access with the returned challenge and signature. Do not sign a transaction." }], structuredContent: challenge };
     } catch (error) { return errorResult(error); }
   });
-  server.tool("fpl_verify_access", "Verify a signed wallet challenge and require the signer to hold at least one NFT from the required Base ERC-721 collection. Returns a one-hour HTTP access token only for eligible holders.", { walletAddress: z.string().trim(), challenge: z.string().trim().min(20), signature: z.string().trim().regex(/^0x[0-9a-fA-F]{130}$/, "Provide a 65-byte EVM signature.") }, async ({ walletAddress, challenge, signature }) => {
+  server.tool("fpl_verify_access", "Verify a signed wallet challenge and require the signer to hold at least one NFT from the required Base ERC-721 collection. Returns a five-minute access token only for eligible holders; ownership is also rechecked on every protected call.", { walletAddress: z.string().trim(), challenge: z.string().trim().min(20), signature: z.string().trim().regex(/^0x[0-9a-fA-F]{130}$/, "Provide a 65-byte EVM signature.") }, async ({ walletAddress, challenge, signature }) => {
     try {
       const result = await verifyChallengeAndIssueAccess(env, walletAddress, challenge, signature as Hex);
-      if (!result.eligible) return { content: [{ type: "text", text: "This wallet does not hold the required NFT. Pay $0.01 USDC through the Base Juicebox route in the included quote, then call fpl_verify_payment with this same signed challenge and the mined transaction hash." }], structuredContent: { ...result, paymentQuote: paymentQuote() } };
-      return { content: [{ type: "text", text: "Ownership verified. Include `Authorization: Bearer <accessToken>` on subsequent MCP HTTP requests. The token expires in one hour and access is rechecked against the collection on every protected tool call." }], structuredContent: result };
+      if (!result.eligible) return { content: [{ type: "text", text: "This wallet does not hold the required NFT. Pay $0.05 USDC through the Base Juicebox route in the included quote, then call fpl_verify_payment with this same signed challenge and the mined transaction hash." }], structuredContent: { ...result, paymentQuote: paymentQuote() } };
+      return { content: [{ type: "text", text: "Ownership verified. Include the accessToken in protected tool arguments or use `Authorization: Bearer <accessToken>`. The token expires in five minutes and ownership is rechecked against the collection on every protected tool call." }], structuredContent: result };
     } catch (error) { return errorResult(error); }
   });
-  server.tool("fpl_verify_payment", "Verify one Base Juicebox RouterTerminalRegistry USDC pay transaction as a one-hour x402-style fallback when the verified wallet does not hold the access NFT. The transaction hash can be used only once.", { walletAddress: z.string().trim(), challenge: z.string().trim().min(20), signature: z.string().trim().regex(/^0x[0-9a-fA-F]{130}$/, "Provide a 65-byte EVM signature."), paymentTxHash: z.string().trim().regex(/^0x[0-9a-fA-F]{64}$/, "Provide a Base transaction hash.") }, async ({ walletAddress, challenge, signature, paymentTxHash }) => {
+  server.tool("fpl_verify_payment", "Verify one Base Juicebox RouterTerminalRegistry USDC pay transaction as a 15-minute x402-style fallback when the verified wallet does not hold the access NFT. The transaction hash can be used only once.", { walletAddress: z.string().trim(), challenge: z.string().trim().min(20), signature: z.string().trim().regex(/^0x[0-9a-fA-F]{130}$/, "Provide a 65-byte EVM signature."), paymentTxHash: z.string().trim().regex(/^0x[0-9a-fA-F]{64}$/, "Provide a Base transaction hash.") }, async ({ walletAddress, challenge, signature, paymentTxHash }) => {
     try {
       const result = await verifyPaymentAndIssueAccess(env, walletAddress, challenge, signature as Hex, paymentTxHash);
-      return { content: [{ type: "text", text: "Payment verified. Include `Authorization: Bearer <accessToken>` on subsequent MCP HTTP requests; the paid pass expires in one hour." }], structuredContent: result };
+      return { content: [{ type: "text", text: "Payment verified. Include the accessToken in protected tool arguments or use `Authorization: Bearer <accessToken>`; the paid pass expires in 15 minutes." }], structuredContent: result };
     } catch (error) { return errorResult(error); }
   });
   server.tool("fpl_purchase_instructions", "Show the exact Base Juicebox ERC-20 approval and pay transaction calldata required to mint the access NFT to the buyer address. This tool never signs, submits, or simulates a transaction.", { buyerAddress: z.string().trim() }, async ({ buyerAddress }) => {
@@ -309,7 +310,7 @@ function createServer(env: Env): McpServer {
       return { content: [{ type: "text", text: "This is the exact transaction that will be sent to your wallet. Review it before signing. It spends 1000 SLOPSHOP, first approves JBMultiTerminal, and mints the NFT to the supplied buyer address as beneficiary." }], structuredContent: { requiredAssetType: ELIGIBILITY_ASSET_TYPE, purchase: plan, instructions: ["Review the ERC-20 approval for 1000 SLOPSHOP to JBMultiTerminal.", "Review the Base JBMultiTerminal.pay transaction. Its beneficiary is your buyer wallet address.", "Submit the approval only if your current allowance is insufficient, wait for confirmation, then submit pay.", "After the NFT arrives, request a fresh fpl_access_challenge and verify ownership."] } };
     } catch (error) { return errorResult(error); }
   });
-  server.tool("captain_pick", "Rank the best FPL captain picks using form, underlying attacking output, penalties, availability, and fixture difficulty. Stateless clients can provide the one-hour accessToken returned by fpl_verify_payment directly in this tool's arguments.", protectedToolInput({ gameweek: z.coerce.number().int().min(1).max(38).optional() }), async ({ gameweek }) => {
+  server.tool("captain_pick", "Rank the best FPL captain picks using form, underlying attacking output, penalties, availability, and fixture difficulty. Stateless clients can provide the short-lived accessToken returned by fpl_verify_payment directly in this tool's arguments.", protectedToolInput({ gameweek: z.coerce.number().int().min(1).max(38).optional() }), async ({ gameweek }) => {
     try { const app = await core(env); const gw = gameweek ?? app.next; const picks = captainPicks(app.bootstrap, app.fixtures, gw); return { content: [{ type: "text", text: `Top captain picks for GW${gw}: ${picks.map((pick) => pick.name).join(", ")}.` }], structuredContent: { gameweek: gw, picks } }; } catch (error) { return errorResult(error); }
   });
   server.tool("player_comparison", "Compare two to four FPL players across price, form, points, expected output, ownership, availability, and next five fixtures.", protectedToolInput({ playerIds: z.array(PLAYER_ID).min(2).max(4), gameweek: z.coerce.number().int().min(1).max(38).optional() }), async ({ playerIds, gameweek }) => {
