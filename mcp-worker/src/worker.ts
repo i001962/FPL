@@ -404,7 +404,7 @@ function createServer(env: Env): McpServer {
       structuredContent: { ...standings, ...project },
     };
   });
-  server.tool("fpl_prepare_buy", "Prepare a manager-specific FPL purchase. Returns live tier choices and the fields required for a PayBox-ready transaction plan; it never signs or sends a transaction.", {
+  server.tool("fpl_prepare_buy", "Prepare a manager-specific FPL purchase. Returns live tier choices and the fields required for a wallet-ready transaction plan; it never signs or sends a transaction.", {
     projectRoute: projectRouteSchema.optional(), entryId: z.coerce.number().int().positive(),
   }, async ({ projectRoute, entryId }) => {
     const project = await projectContext(env, projectRoute);
@@ -415,7 +415,7 @@ function createServer(env: Env): McpServer {
     const warning = "The memo is evidence of the selected FPL entry, not proof that the buyer wallet controls that manager.";
     const shop = await shopContext(project.projectRoute);
     return {
-      content: [{ type: "text", text: `Prepared ${memo}. Select one or more live tier IDs, get the PayBox wallet address, then call fpl_create_purchase_transaction. PayBox must review and submit the returned transaction plan.` }],
+      content: [{ type: "text", text: `Prepared ${memo}. Select one or more live tier IDs, get the connected wallet address, then call fpl_create_purchase_transaction. A wallet-capable connector must review and submit the returned transaction plan.` }],
       structuredContent: {
         ...project, entryId, entryName: manager.entryName, playerName: manager.playerName, memo, warning,
         payment: { chainId: CHAINS[shop.chain].chainId, asset: "USDC", token: shop.token },
@@ -424,11 +424,11 @@ function createServer(env: Env): McpServer {
       },
     };
   });
-  server.tool("fpl_create_purchase_transaction", "Build a simulated, unsigned Base purchase plan for a PayBox-connected wallet. The host agent must ask for approval and use PayBox to submit it.", {
+  server.tool("fpl_create_purchase_transaction", "Build a simulated, unsigned Base purchase plan for a connected wallet. The host agent must ask for approval and use any wallet-capable connector to submit it.", {
     projectRoute: projectRouteSchema.optional(),
     entryId: z.coerce.number().int().positive(),
     tierIds: z.array(z.coerce.number().int().min(1).max(65535)).min(1).max(20),
-    buyerAddress: z.string().trim().regex(/^0x[a-fA-F0-9]{40}$/, "Provide the PayBox wallet address."),
+    buyerAddress: z.string().trim().regex(/^0x[a-fA-F0-9]{40}$/, "Provide the connected wallet address."),
   }, async ({ projectRoute, entryId, tierIds, buyerAddress }) => {
     const project = await projectContext(env, projectRoute);
     const standings = await loadStandings(env, project.leagueId, MAX_STANDINGS);
@@ -460,15 +460,15 @@ function createServer(env: Env): McpServer {
     transactions.push({ chainId: CHAINS[shop.chain].chainId, to: terminal, data, value: "0x0" as Hex, purpose: "Buy selected FPL NFT tiers", simulation: paySimulation });
     return {
       content: [{ type: "text", text: approvalRequired
-        ? "Prepared a PayBox approval and pay sequence. Submit and confirm the USDC approval first, then call this tool again to simulate and submit the pay transaction."
-        : "Prepared a simulated unsigned pay transaction for PayBox. Ask the user to review the USDC amount, selected FPL entry, and memo before submitting." }],
+        ? "Prepared an approval and pay sequence. Submit and confirm the USDC approval first, then call this tool again to simulate and submit the pay transaction."
+        : "Prepared a simulated unsigned pay transaction. Ask the user to review the USDC amount, selected FPL entry, and memo before submitting." }],
       structuredContent: {
         ...project, entryId, entryName: manager.entryName, playerName: manager.playerName, buyerAddress, memo,
         amountRaw: amount.toString(), amountUsdc: Number(amount) / 1_000_000, tierIds,
         transactions, submitRawTransactions: transactions.map(({ chainId, to, data, value }) => ({ chainId, to, data, value })),
         approvalRequired,
-        nextStep: approvalRequired ? "Submit and confirm the approval transaction, then call fpl_create_purchase_transaction again before submitting pay." : "Submit the simulated pay transaction through PayBox after user approval.",
-        warning: "This plan is unsigned. PayBox is the wallet signer, and the memo is only a weak claim linking that wallet payment to the selected FPL entry.",
+        nextStep: approvalRequired ? "Submit and confirm the approval transaction, then call fpl_create_purchase_transaction again before submitting pay." : "Submit the simulated pay transaction through the connected wallet after user approval.",
+        warning: "This plan is unsigned. The connected wallet is the signer, and the memo is only a weak claim linking that wallet payment to the selected FPL entry.",
       },
     };
   });

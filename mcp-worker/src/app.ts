@@ -90,7 +90,7 @@ async function preparePurchase(manager: Manager) {
     purchaseEl.hidden = false;
     const availableTiers = (plan.tiers || []).map((tier) => `#${tier.tierId} ($${tier.amountUsdc.toFixed(2)} USDC)`).join(", ");
     purchaseDetailEl.textContent = availableTiers
-      ? `Live tiers: ${availableTiers}. Ask the PayBox-connected agent to call fpl_create_purchase_transaction with the selected tier IDs and its wallet address.`
+      ? `Live tiers: ${availableTiers}. Ask the wallet-connected agent to call fpl_create_purchase_transaction with the selected tier IDs and its wallet address.`
       : "No purchasable live NFT tiers are available for this project.";
     showStatus(plan.warning);
   } catch (error) {
