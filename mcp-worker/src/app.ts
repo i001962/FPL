@@ -65,11 +65,11 @@ async function loadStandings() {
   reloadButton.disabled = true;
   showStatus("Resolving project metadata and loading standings...");
   try {
-    const result = await app.callServerTool({ name: "fpl_standings", arguments: { projectRoute, limit: 100 } });
+    const result = await app.callServerTool({ name: "fpl_standings", arguments: { projectRoute, limit: 500 } });
     const data = result.structuredContent as Standings | undefined;
     if (!data?.projectRoute) throw new Error("The server returned no project context.");
     renderStandings(data);
-    showStatus(data.managers.length ? (data.hasMore ? "Showing the first 100 managers." : "Standings are current.") : "No published manager standings are available for this league yet.");
+    showStatus(data.managers.length ? (data.hasMore ? "Showing the first 500 managers." : "Standings are current.") : "No published manager standings are available for this league yet.");
   } catch (error) {
     showStatus(error instanceof Error ? error.message : "Could not resolve the project.", true);
   } finally {
@@ -107,7 +107,7 @@ app.ontoolresult = (result) => {
   if (data?.projectRoute) {
     const standings = data as Standings;
     renderStandings(standings);
-    showStatus(standings.managers.length ? (standings.hasMore ? "Showing the first 100 managers." : "Standings are current.") : "No published manager standings are available for this league yet.");
+    showStatus(standings.managers.length ? (standings.hasMore ? "Showing the first 500 managers." : "Standings are current.") : "No published manager standings are available for this league yet.");
   }
 };
 reloadButton.addEventListener("click", loadStandings);

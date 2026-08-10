@@ -11,7 +11,7 @@ interface Env {
 }
 
 const RESOURCE_URI = "ui://fpl-league-shop/standings.html";
-const MAX_STANDINGS = 250;
+const MAX_STANDINGS = 500;
 const PROJECT_ROUTE = /^(base|basesep):[1-9]\d*$/;
 const projectRouteSchema = z.string().trim().regex(PROJECT_ROUTE, "Use a Juicebox route such as base:9 or basesep:19.");
 
@@ -411,14 +411,14 @@ function createServer(env: Env): McpServer {
       };
     }
     const project = await projectContext(env, projectRoute);
-    const standings = await loadStandings(env, project.leagueId, 100);
+    const standings = await loadStandings(env, project.leagueId, MAX_STANDINGS);
     return {
       content: [{ type: "text", text: `${project.projectRoute} resolved FPL league ${project.leagueId} from ${project.source}; ${standings.managers.length} manager rows loaded.` }],
       structuredContent: { ...standings, ...project },
     };
   });
   server.tool("fpl_standings", "Resolve a Juicebox project route to its FPL league and return public manager standings.", {
-    projectRoute: projectRouteSchema.optional(), limit: z.coerce.number().int().min(1).max(MAX_STANDINGS).default(100),
+    projectRoute: projectRouteSchema.optional(), limit: z.coerce.number().int().min(1).max(MAX_STANDINGS).default(MAX_STANDINGS),
   }, async ({ projectRoute, limit }) => {
     const project = await projectContext(env, projectRoute);
     const standings = await loadStandings(env, project.leagueId, limit);
