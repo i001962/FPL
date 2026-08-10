@@ -4,6 +4,7 @@
   "main": "src/worker.ts",
   "compatibility_date": "2026-08-10",
   "compatibility_flags": ["nodejs_compat"],
+  "routes": [{ "pattern": "fpl-shop.d33m.com", "custom_domain": true }],
   "assets": {
     "directory": "./dist",
     "binding": "ASSETS",
