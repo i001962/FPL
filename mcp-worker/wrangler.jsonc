@@ -10,7 +10,6 @@
     "run_worker_first": ["/mcp", "/health"]
   },
   "vars": {
-    "FPL_API_BASE": "https://fantasy.premierleague.com/api",
-    "FPL_SHOP_URL": "https://fpl.d33m.com/"
+    "FPL_API_BASE": "https://fantasy.premierleague.com/api"
   }
 }

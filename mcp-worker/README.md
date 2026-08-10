@@ -4,9 +4,10 @@ Cloudflare Worker MCP server and MCP App for the first FPL shop workflow:
 
 - `fpl_shop`: opens an interactive manager standings table in an MCP Apps-capable host.
 - `fpl_standings`: resolves a Juicebox project route such as `base:9`, then returns its public FPL classic-league standings.
-- `fpl_prepare_buy`: validates a selected manager, builds `fpl:league=<leagueId>;entry=<entryId>`, and creates a manual Juicebox shop handoff.
+- `fpl_prepare_buy`: validates a selected manager, builds `fpl:league=<leagueId>;entry=<entryId>`, and returns its live purchasable tier options.
+- `fpl_create_purchase_transaction`: creates a simulated, unsigned USDC approval/pay plan for a PayBox-connected wallet.
 
-The server is intentionally non-custodial. It never signs, simulates, or submits a payment, and the payment memo is not proof that a wallet controls an FPL entry.
+The server is intentionally non-custodial. It never signs or submits a payment. It simulates the unsigned transaction plan from the PayBox wallet address, and the payment memo is not proof that a wallet controls an FPL entry.
 
 ## Configure
 
@@ -16,7 +17,17 @@ Optionally set a default Juicebox project route:
 npx wrangler secret put FPL_DEFAULT_PROJECT_ROUTE
 ```
 
-`FPL_DEFAULT_PROJECT_ROUTE` must look like `base:123` or `basesep:19`. The Worker reads the project's Juicebox metadata to resolve `fpl.leagueId`, with the project token URI as a fallback. `FPL_SHOP_URL` defaults to `https://fpl.d33m.com/` and can be changed in `wrangler.jsonc` for a project-specific static shop.
+`FPL_DEFAULT_PROJECT_ROUTE` must look like `base:123` or `basesep:19`. The Worker reads the project's Juicebox metadata to resolve `fpl.leagueId`, with the project token URI as a fallback.
+
+## PayBox Checkout
+
+The host agent must keep wallet actions explicit:
+
+1. Call `fpl_prepare_buy` to validate the FPL manager and read the live tier IDs.
+2. Get the connected PayBox wallet address and call `fpl_create_purchase_transaction` with that address and selected tier IDs.
+3. Show the returned USDC approval (when needed) and `JBMultiTerminal.pay(...)` transactions for review, then have PayBox submit them.
+
+The Worker cannot call PayBox directly because both are peer MCP servers. It returns wallet-agnostic raw transaction objects for the host agent to pass to PayBox.
 
 ## Develop and deploy
 

@@ -11,7 +11,7 @@ type Standings = {
   managers: Manager[];
   hasMore: boolean;
 };
-type PurchasePlan = { entryId: number; entryName: string; memo: string; checkoutUrl: string; warning: string };
+type PurchasePlan = { entryId: number; entryName: string; memo: string; warning: string; tiers?: { tierId: number; amountUsdc: number; remainingSupply: number }[] };
 type AppLaunch = { inputRequired?: boolean; projectRoute?: string };
 
 const app = new App({ name: "FPL League Shop", version: "0.2.0" });
@@ -24,7 +24,7 @@ const reloadButton = document.querySelector<HTMLButtonElement>("#reload")!;
 const purchaseEl = document.querySelector<HTMLElement>("#purchase")!;
 const selectedManagerEl = document.querySelector<HTMLElement>("#selected-manager")!;
 const memoEl = document.querySelector<HTMLElement>("#memo")!;
-const checkoutEl = document.querySelector<HTMLAnchorElement>("#checkout")!;
+const purchaseDetailEl = document.querySelector<HTMLElement>("#purchase-detail")!;
 let currentStandings: Standings | null = null;
 
 function inputProjectRoute(): string | null {
@@ -88,7 +88,10 @@ async function preparePurchase(manager: Manager) {
     selectedManagerEl.textContent = `${plan.entryName} (entry ${plan.entryId})`;
     memoEl.textContent = plan.memo;
     purchaseEl.hidden = false;
-    checkoutEl.href = plan.checkoutUrl;
+    const availableTiers = (plan.tiers || []).map((tier) => `#${tier.tierId} ($${tier.amountUsdc.toFixed(2)} USDC)`).join(", ");
+    purchaseDetailEl.textContent = availableTiers
+      ? `Live tiers: ${availableTiers}. Ask the PayBox-connected agent to call fpl_create_purchase_transaction with the selected tier IDs and its wallet address.`
+      : "No purchasable live NFT tiers are available for this project.";
     showStatus(plan.warning);
   } catch (error) {
     showStatus(error instanceof Error ? error.message : "Could not prepare the purchase.", true);
