@@ -12,7 +12,7 @@ The frontend template is intentionally separate from the skill:
 The skill and the buyer app have different FPL data requirements:
 
 - Agents using the skill should read Fantasy Premier League data directly from FPL APIs when possible.
-- The browser app uses a CORS-capable league endpoint, defaulting to `https://fc-footy.vercel.app/api/fpl-league`.
+- The browser app uses the paginated CORS-capable league endpoint at `https://fpl-league-shop-mcp.i001962.workers.dev/api/fpl-league` by default.
 
 ## Actor Coverage
 
@@ -47,4 +47,4 @@ To publish a project-specific shop, copy the folder to your static host and set 
 #<chainSlug>:<projectId>
 ```
 
-The FC-Footy league API, or any replacement `apiBase`, must allow browser reads from the host where the static folder is deployed. Add `Access-Control-Allow-Origin: *` to `GET /api/fpl-league` responses when needed.
+The default FPL Worker endpoint, or any replacement `apiBase`, must allow browser reads from the host where the static folder is deployed and support `page_standings` and `page_new_entries`. Add `Access-Control-Allow-Origin: *` to `GET /api/fpl-league` responses when needed.

@@ -367,6 +367,29 @@ async function loadStandings(env: Env, leagueId: number, limit: number) {
   };
 }
 
+function pageParameter(url: URL, name: string): number {
+  const value = url.searchParams.get(name) || "1";
+  if (!/^\d+$/.test(value) || Number(value) < 1 || Number(value) > 1_000) {
+    throw new Error(`${name} must be a positive page number.`);
+  }
+  return Number(value);
+}
+
+async function fplLeagueProxy(request: Request, env: Env): Promise<Response> {
+  const requestUrl = new URL(request.url);
+  const leagueId = requestUrl.searchParams.get("leagueId") || "";
+  if (!/^\d{3,9}$/.test(leagueId)) return withCors(Response.json({ error: "Provide a valid FPL leagueId." }, { status: 400 }));
+  try {
+    const fplUrl = new URL(`${fplBase(env)}/leagues-classic/${leagueId}/standings/`);
+    fplUrl.searchParams.set("page_standings", String(pageParameter(requestUrl, "page_standings")));
+    fplUrl.searchParams.set("page_new_entries", String(pageParameter(requestUrl, "page_new_entries")));
+    const response = Response.json(await fetchJson(fplUrl.toString()), { headers: { "Cache-Control": "public, max-age=60" } });
+    return withCors(response);
+  } catch (error) {
+    return withCors(Response.json({ error: error instanceof Error ? error.message : "Could not load FPL standings." }, { status: 502 }));
+  }
+}
+
 async function appHtml(env: Env): Promise<string> {
   const response = await env.ASSETS.fetch("https://assets.invalid/mcp-app.html");
   if (!response.ok) throw new Error("MCP app asset is unavailable. Run npm run build before deploying.");
@@ -482,6 +505,11 @@ export default {
   async fetch(request: Request, env: Env, _ctx: ExecutionContext): Promise<Response> {
     const url = new URL(request.url);
     if (url.pathname === "/health") return Response.json({ ok: true, service: "fpl-league-shop-mcp" });
+    if (url.pathname === "/api/fpl-league") {
+      if (request.method === "OPTIONS") return new Response(null, { headers: corsHeaders() });
+      if (request.method !== "GET") return withCors(Response.json({ error: "Method not allowed." }, { status: 405 }));
+      return fplLeagueProxy(request, env);
+    }
     if (url.pathname !== "/mcp") return env.ASSETS.fetch(request);
     if (request.method === "OPTIONS") return new Response(null, { headers: corsHeaders() });
     const transport = new WebStandardStreamableHTTPServerTransport({ sessionIdGenerator: undefined, enableJsonResponse: true });
@@ -494,7 +522,7 @@ export default {
 function corsHeaders(): Headers {
   return new Headers({
     "Access-Control-Allow-Origin": "*",
-    "Access-Control-Allow-Methods": "POST, OPTIONS",
+    "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
     "Access-Control-Allow-Headers": "Content-Type, Mcp-Session-Id, MCP-Protocol-Version",
   });
 }

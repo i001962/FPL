@@ -1126,7 +1126,7 @@
       activeProvider: window.ethereum || null,
       activeProviderInfo: window.ethereum ? WALLET_PROVIDER_FALLBACK.info : null,
       walletConnecting: false,
-      apiBase: 'https://fc-footy.vercel.app/api/fpl-league?leagueId=',
+      apiBase: 'https://fpl-league-shop-mcp.i001962.workers.dev/api/fpl-league?leagueId=',
       projectLeagueMap: {
         'basesep:19': '143466'
       }
@@ -1268,13 +1268,14 @@
       return managers;
     }
 
-    function leagueApiUrl() {
+    function leagueApiUrl(standingsPage, newEntriesPage) {
       let url = state.apiBase.includes('{leagueId}')
         ? state.apiBase.replaceAll('{leagueId}', encodeURIComponent(state.leagueId))
         : `${state.apiBase}${encodeURIComponent(state.leagueId)}`;
       if (!/[?&]includeManagersInfo(?:=|&|$)/.test(url)) {
         url += `${url.includes('?') ? '&' : '?'}includeManagersInfo=1`;
       }
+      url += `&page_standings=${encodeURIComponent(standingsPage)}&page_new_entries=${encodeURIComponent(newEntriesPage)}`;
       return url;
     }
 
@@ -1289,11 +1290,23 @@
       if (!state.leagueId) {
         throw new Error('Could not resolve FPL league for this project. Add leagueId to the route or project metadata.');
       }
-      const response = await fetch(leagueApiUrl());
-      if (!response.ok) throw new Error(`League fetch failed: ${response.status}`);
-      const data = await response.json();
-      state.leagueName = data?.league?.name || `League ${state.leagueId}`;
-      state.managers = normalizeManagers(data);
+      const managers = new Map();
+      let standingsPage = 1;
+      let newEntriesPage = 1;
+      let standingsHasNext = true;
+      let newEntriesHasNext = true;
+      while (standingsHasNext || newEntriesHasNext) {
+        const response = await fetch(leagueApiUrl(standingsPage, newEntriesPage));
+        if (!response.ok) throw new Error(`League fetch failed: ${response.status}`);
+        const data = await response.json();
+        state.leagueName = data?.league?.name || `League ${state.leagueId}`;
+        normalizeManagers(data).forEach((manager) => managers.set(String(manager.entryId), manager));
+        standingsHasNext = data?.standings?.has_next === true;
+        newEntriesHasNext = data?.new_entries?.has_next === true;
+        if (standingsHasNext) standingsPage += 1;
+        if (newEntriesHasNext) newEntriesPage += 1;
+      }
+      state.managers = [...managers.values()];
       if (!state.managers.length) throw new Error('No managers found for this league.');
     }
 

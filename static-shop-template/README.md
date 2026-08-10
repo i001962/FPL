@@ -101,8 +101,8 @@ Access-Control-Allow-Origin: *
 ## Behavior
 
 - Resolves known test project IDs locally. The bundled test mapping is `basesep:19 -> 143466`.
-- Loads the FPL league leaderboard in the browser from `https://fc-footy.vercel.app/api/fpl-league` by default, or from the `apiBase` query parameter. The request includes `includeManagersInfo=1`.
-- Renders each manager's compact club badge from the FC-Footy response's `club_badge_src`. The static app never calls the FPL entry endpoint directly.
+- Loads and merges every FPL standings and new-entry page from `https://fpl-league-shop-mcp.i001962.workers.dev/api/fpl-league` by default, or from the `apiBase` query parameter.
+- Renders each manager's compact club badge when the configured FPL proxy provides `club_badge_src`. The static app never calls the FPL entry endpoint directly.
 - Reads the active Juicebox V6 721 shop from `JBDirectory -> controllerOf -> currentRulesetOf -> dataHook`, then loads all tiers with `tiersOf(...)`.
 - Resolves tier thumbnails from the hook's `tokenUriResolverOf(...)`, `resolvedUri`, or encoded IPFS metadata.
 - Reads project metadata from `JBDirectory.controllerOf(projectId) -> uriOf(projectId)`, falling back to `JBDirectory.PROJECTS().tokenURI(projectId)`, and shows its payment notice.
