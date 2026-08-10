@@ -2,7 +2,7 @@
 
 An independently deployable Cloudflare Worker that exposes public Fantasy Premier League analysis through MCP Streamable HTTP at `/mcp`.
 
-It ports the useful FPL-facing surface of [`dohyung1/x402-fpl-api`](https://github.com/dohyung1/x402-fpl-api) to TypeScript/Workers. It deliberately has no x402 or payment verification. Access is gated by verified ownership of a Base ERC-721 collection, and a non-holder can inspect—but never have the Worker sign or submit—a Juicebox purchase plan.
+It ports the useful FPL-facing surface of [`dohyung1/x402-fpl-api`](https://github.com/dohyung1/x402-fpl-api) to TypeScript/Workers. Access is gated by verified ownership of a Base ERC-721 collection, with a $0.01 USDC, one-hour payment fallback. The Worker never signs or submits wallet transactions.
 
 ## Included tools
 
@@ -51,6 +51,14 @@ When no valid access token is supplied, protected tools return HTTP `402` with a
 
 After the payment is mined, the payer signs a fresh `fpl_access_challenge` and calls `fpl_verify_payment` with the signature and transaction hash. The Worker verifies the Base receipt and decoded router `pay()` fields, consumes that hash once using a Durable Object, and returns a one-hour access token. It never signs, simulates, or broadcasts a payment transaction.
 
+Payment verification needs an authenticated, archive-capable Base RPC endpoint. Store the full provider URL as a Worker secret (do not commit it):
+
+```bash
+npx wrangler secret put BASE_RPC_URL
+```
+
+Without it, public RPC fallbacks may reject historical receipt lookups after a transaction is mined.
+
 ## Browser clients and CORS
 
 Remote MCP clients normally do not send an `Origin` header. If a browser-hosted MCP client does, configure an allow-list before deploying:
@@ -69,4 +77,4 @@ Wallet signatures prove wallet control; the collection read proves current entit
 - FPL API data is cached at the edge for 120 seconds by default. Set `FPL_CACHE_TTL_SECONDS` in `wrangler.jsonc` (0–900) to adjust it.
 - `live_points` uses a 30-second cache.
 - FPL may block requests from certain networks. The Worker sends a browser-like `User-Agent`; test `/health` and a tool call after deployment.
-- `/health` confirms the service state and that payments/eligibility are intentionally disabled.
+- `/health` confirms the service state and whether an authenticated Base RPC URL is configured.

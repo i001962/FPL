@@ -11,6 +11,8 @@ export interface Env {
   ALLOWED_ORIGINS?: string;
   /** Wrangler secret. Used to sign short-lived wallet challenges and access tokens. */
   ACCESS_TOKEN_SECRET?: string;
+  /** Wrangler secret. Authenticated, archive-capable Base JSON-RPC endpoint for payment receipt checks. */
+  BASE_RPC_URL?: string;
   PAYMENT_RECEIPTS: DurableObjectNamespace<PaymentReceipt>;
 }
 
@@ -28,7 +30,7 @@ const POSITION = ["GKP", "DEF", "MID", "FWD"] as const;
 const BASE_CHAIN_ID = 8453;
 const ELIGIBILITY_ASSET_TYPE = "eip155:8453/erc721:0x4669162aa53b9052f73f1ca12e43f4be57cf40bf";
 const ELIGIBILITY_CONTRACT = "0x4669162aa53b9052f73f1ca12e43f4be57cf40bf" as Address;
-const BASE_RPC_URLS = ["https://mainnet.base.org", "https://base-rpc.publicnode.com"];
+const BASE_RPC_FALLBACK_URLS = ["https://mainnet.base.org", "https://base-rpc.publicnode.com"];
 const CHALLENGE_TTL_SECONDS = 5 * 60;
 const ACCESS_TTL_SECONDS = 60 * 60;
 const FREE_ACCESS_TOOLS = new Set(["fpl_access_challenge", "fpl_verify_access", "fpl_verify_payment", "fpl_purchase_instructions"]);
@@ -96,10 +98,14 @@ async function verifyPayload<T extends object>(env: Env, token: string): Promise
 function accessMessage(challenge: string, payload: ChallengePayload): string {
   return ["FPL Intelligence MCP access request", `Wallet: ${payload.wallet}`, `Chain: eip155:${BASE_CHAIN_ID}`, `Asset: ${payload.assetType}`, `Expires: ${new Date(payload.expiresAt * 1000).toISOString()}`, `Challenge: ${challenge}`].join("\n");
 }
-async function collectionBalance(wallet: Address): Promise<bigint> {
+function baseRpcUrls(env: Env): string[] {
+  const configured = env.BASE_RPC_URL?.trim();
+  return configured ? [configured, ...BASE_RPC_FALLBACK_URLS] : BASE_RPC_FALLBACK_URLS;
+}
+async function collectionBalance(env: Env, wallet: Address): Promise<bigint> {
   const calldata = `0x70a08231${wallet.slice(2).toLowerCase().padStart(64, "0")}` as Hex;
   let lastError: unknown;
-  for (const rpcUrl of BASE_RPC_URLS) {
+  for (const rpcUrl of baseRpcUrls(env)) {
     try {
       const response = await fetch(rpcUrl, { method: "POST", headers: { "content-type": "application/json" }, signal: AbortSignal.timeout(8_000), body: JSON.stringify({ jsonrpc: "2.0", id: crypto.randomUUID(), method: "eth_call", params: [{ to: ELIGIBILITY_CONTRACT, data: calldata }, "latest"] }) });
       const result = await response.json() as { result?: Hex; error?: { message?: string } };
@@ -127,7 +133,7 @@ async function verifyWalletChallenge(env: Env, walletInput: string, challenge: s
 }
 async function verifyChallengeAndIssueAccess(env: Env, walletInput: string, challenge: string, signature: Hex) {
   const wallet = await verifyWalletChallenge(env, walletInput, challenge, signature);
-  const balance = await collectionBalance(wallet);
+  const balance = await collectionBalance(env, wallet);
   if (balance < 1n) return { eligible: false as const, wallet, balance: balance.toString(), assetType: ELIGIBILITY_ASSET_TYPE };
   const expiresAt = Math.floor(Date.now() / 1000) + ACCESS_TTL_SECONDS;
   const accessToken = await signPayload<AccessPayload>(env, { wallet, expiresAt, assetType: ELIGIBILITY_ASSET_TYPE, source: "nft" });
@@ -136,9 +142,9 @@ async function verifyChallengeAndIssueAccess(env: Env, walletInput: string, chal
 function paymentQuote() {
   return { x402: true, network: "base", chainId: BASE_CHAIN_ID, router: X402_ROUTER, function: "pay", projectId: X402_PROJECT_ID.toString(), token: X402_USDC, amount: X402_MIN_AMOUNT.toString(), amountDisplay: "$0.01 USDC", beneficiary: X402_BENEFICIARY, accessDurationSeconds: ACCESS_TTL_SECONDS, instructions: "Pay at least 0.01 Base USDC through JBRouterTerminalRegistry.pay for project 3, then prove control of the transaction sender with fpl_access_challenge and call fpl_verify_payment with the mined transaction hash." };
 }
-async function baseRpc<T>(method: string, params: unknown[]): Promise<T> {
+async function baseRpc<T>(env: Env, method: string, params: unknown[]): Promise<T> {
   let lastError: unknown;
-  for (const rpcUrl of BASE_RPC_URLS) {
+  for (const rpcUrl of baseRpcUrls(env)) {
     try {
       const response = await fetch(rpcUrl, { method: "POST", headers: { "content-type": "application/json" }, signal: AbortSignal.timeout(8_000), body: JSON.stringify({ jsonrpc: "2.0", id: crypto.randomUUID(), method, params }) });
       const payload = await response.json() as { result?: T; error?: { message?: string } };
@@ -146,13 +152,13 @@ async function baseRpc<T>(method: string, params: unknown[]): Promise<T> {
       return payload.result;
     } catch (error) { lastError = error; }
   }
-  throw lastError instanceof Error ? lastError : new Error("Base payment verification failed.");
+  throw new Error(lastError instanceof Error ? `Base payment verification failed: ${lastError.message}` : "Base payment verification failed. Configure the BASE_RPC_URL secret with an authenticated, archive-capable Base RPC endpoint.");
 }
 type BaseTransaction = { from: Address; to: Address | null; input: Hex };
 type BaseReceipt = { status: Hex | null };
-async function verifyJuiceboxPayment(txHash: string, wallet: Address): Promise<void> {
+async function verifyJuiceboxPayment(env: Env, txHash: string, wallet: Address): Promise<void> {
   if (!/^0x[0-9a-fA-F]{64}$/.test(txHash)) throw new Error("Provide a valid Base transaction hash.");
-  const [transaction, receipt] = await Promise.all([baseRpc<BaseTransaction>("eth_getTransactionByHash", [txHash]), baseRpc<BaseReceipt>("eth_getTransactionReceipt", [txHash])]);
+  const [transaction, receipt] = await Promise.all([baseRpc<BaseTransaction>(env, "eth_getTransactionByHash", [txHash]), baseRpc<BaseReceipt>(env, "eth_getTransactionReceipt", [txHash])]);
   if (!transaction || !receipt || receipt.status !== "0x1") throw new Error("Payment transaction is missing or did not succeed.");
   if (transaction.from.toLowerCase() !== wallet.toLowerCase() || transaction.to?.toLowerCase() !== X402_ROUTER.toLowerCase()) throw new Error("Payment must be sent by the verified wallet to JBRouterTerminalRegistry.");
   const decoded = decodeFunctionData({ abi: JUICEBOX_PAY_ABI, data: transaction.input });
@@ -170,7 +176,7 @@ export class PaymentReceipt extends DurableObject<Env> {
 }
 async function verifyPaymentAndIssueAccess(env: Env, walletInput: string, challenge: string, signature: Hex, txHash: string) {
   const wallet = await verifyWalletChallenge(env, walletInput, challenge, signature);
-  await verifyJuiceboxPayment(txHash, wallet);
+  await verifyJuiceboxPayment(env, txHash, wallet);
   const receipt = env.PAYMENT_RECEIPTS.getByName(txHash.toLowerCase());
   if (!await receipt.consume(txHash)) throw new Error("This payment transaction has already been used for access.");
   const expiresAt = Math.floor(Date.now() / 1000) + ACCESS_TTL_SECONDS;
@@ -180,7 +186,7 @@ async function verifyPaymentAndIssueAccess(env: Env, walletInput: string, challe
 async function verifyAccessToken(env: Env, token: string): Promise<AccessPayload> {
   const payload = await verifyPayload<AccessPayload>(env, token);
   if (!isAddress(payload.wallet) || payload.assetType !== ELIGIBILITY_ASSET_TYPE || (payload.source !== "nft" && payload.source !== "payment") || payload.expiresAt <= Math.floor(Date.now() / 1000)) throw new Error("Access token is invalid or expired. Verify ownership or payment again.");
-  if (payload.source === "nft" && await collectionBalance(getAddress(payload.wallet)) < 1n) throw new Error("The required NFT is no longer held by this wallet.");
+  if (payload.source === "nft" && await collectionBalance(env, getAddress(payload.wallet)) < 1n) throw new Error("The required NFT is no longer held by this wallet.");
   return payload;
 }
 function purchasePlan(walletInput: string) {
@@ -377,7 +383,7 @@ export default {
     const url = new URL(request.url);
     const origin = allowedOrigin(request, env);
     if (request.headers.has("Origin") && !origin) return Response.json({ error: "Origin is not allowed." }, { status: 403 });
-    if (url.pathname === "/health") return withCors(Response.json({ ok: true, service: "fpl-intelligence-mcp", payment: "disabled", eligibility: "not_configured" }), request, env);
+    if (url.pathname === "/health") return withCors(Response.json({ ok: true, service: "fpl-intelligence-mcp", payment: "enabled", eligibility: "enabled", baseRpcConfigured: Boolean(env.BASE_RPC_URL) }), request, env);
     if (url.pathname !== "/mcp") return new Response("Not found", { status: 404 });
     if (request.method === "OPTIONS") return new Response(null, { headers: cors(request, env) });
     const denied = await accessGuard(request, env);
