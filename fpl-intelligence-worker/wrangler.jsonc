@@ -8,6 +8,12 @@
     "FPL_API_BASE": "https://fantasy.premierleague.com/api",
     "FPL_CACHE_TTL_SECONDS": "120"
   },
+  "durable_objects": {
+    "bindings": [{ "name": "PAYMENT_RECEIPTS", "class_name": "PaymentReceipt" }]
+  },
+  "exports": {
+    "PaymentReceipt": { "type": "durable-object", "storage": "sqlite" }
+  },
   "observability": {
     "enabled": true,
     "head_sampling_rate": 1

@@ -1,6 +1,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
-import { encodeFunctionData, getAddress, isAddress, verifyMessage, type Address, type Hex } from "viem";
+import { DurableObject } from "cloudflare:workers";
+import { decodeFunctionData, encodeFunctionData, getAddress, isAddress, verifyMessage, type Address, type Hex } from "viem";
 import { z } from "zod";
 
 export interface Env {
@@ -10,6 +11,7 @@ export interface Env {
   ALLOWED_ORIGINS?: string;
   /** Wrangler secret. Used to sign short-lived wallet challenges and access tokens. */
   ACCESS_TOKEN_SECRET?: string;
+  PAYMENT_RECEIPTS: DurableObjectNamespace<PaymentReceipt>;
 }
 
 type Json = Record<string, unknown>;
@@ -29,7 +31,12 @@ const ELIGIBILITY_CONTRACT = "0x4669162aa53b9052f73f1ca12e43f4be57cf40bf" as Add
 const BASE_RPC_URLS = ["https://mainnet.base.org", "https://base-rpc.publicnode.com"];
 const CHALLENGE_TTL_SECONDS = 5 * 60;
 const ACCESS_TTL_SECONDS = 60 * 60;
-const FREE_ACCESS_TOOLS = new Set(["fpl_access_challenge", "fpl_verify_access", "fpl_purchase_instructions"]);
+const FREE_ACCESS_TOOLS = new Set(["fpl_access_challenge", "fpl_verify_access", "fpl_verify_payment", "fpl_purchase_instructions"]);
+const X402_ROUTER = "0xe0427f250fdb0379c8e98e884ee4570521208cbc" as Address;
+const X402_PROJECT_ID = 3n;
+const X402_USDC = "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913" as Address;
+const X402_MIN_AMOUNT = 10_000n;
+const X402_BENEFICIARY = "0xDf087B724174A3E4eD2338C0798193932E851F1b" as Address;
 const JUICEBOX_TERMINAL = "0x130f5dd2bd8805443cf41755253d778a75a67f53" as Address;
 const JUICEBOX_PROJECT_ID = 10n;
 const PURCHASE_TOKEN = "0x253bA2F6570a90bC3c7C98e4F7f205B081EA9Ba3" as Address;
@@ -51,7 +58,7 @@ function fplBase(env: Env): string { return (env.FPL_API_BASE || "https://fantas
 function cacheTtl(env: Env): number { return Math.max(0, Math.min(900, number(env.FPL_CACHE_TTL_SECONDS) || 120)); }
 
 type ChallengePayload = { wallet: Address; expiresAt: number; nonce: string; assetType: typeof ELIGIBILITY_ASSET_TYPE };
-type AccessPayload = { wallet: Address; expiresAt: number; assetType: typeof ELIGIBILITY_ASSET_TYPE };
+type AccessPayload = { wallet: Address; expiresAt: number; assetType: typeof ELIGIBILITY_ASSET_TYPE; source: "nft" | "payment" };
 
 function requiredAccessSecret(env: Env): string {
   if (!env.ACCESS_TOKEN_SECRET || env.ACCESS_TOKEN_SECRET.length < 32) throw new Error("Eligibility is not configured. The Worker owner must set ACCESS_TOKEN_SECRET.");
@@ -109,23 +116,71 @@ async function issueChallenge(env: Env, walletInput: string) {
   const challenge = await signPayload(env, payload);
   return { challenge, message: accessMessage(challenge, payload), expiresAt: new Date(payload.expiresAt * 1000).toISOString(), wallet: payload.wallet, assetType: payload.assetType };
 }
-async function verifyChallengeAndIssueAccess(env: Env, walletInput: string, challenge: string, signature: Hex) {
+async function verifyWalletChallenge(env: Env, walletInput: string, challenge: string, signature: Hex): Promise<Address> {
   if (!isAddress(walletInput)) throw new Error("Provide a valid EVM wallet address.");
   const payload = await verifyPayload<ChallengePayload>(env, challenge);
   const wallet = getAddress(walletInput);
   if (payload.assetType !== ELIGIBILITY_ASSET_TYPE || payload.wallet.toLowerCase() !== wallet.toLowerCase() || payload.expiresAt <= Math.floor(Date.now() / 1000)) throw new Error("This wallet challenge is invalid or expired. Request a new challenge.");
   const validSignature = await verifyMessage({ address: wallet, message: accessMessage(challenge, payload), signature });
   if (!validSignature) throw new Error("Signature does not prove control of this wallet.");
+  return wallet;
+}
+async function verifyChallengeAndIssueAccess(env: Env, walletInput: string, challenge: string, signature: Hex) {
+  const wallet = await verifyWalletChallenge(env, walletInput, challenge, signature);
   const balance = await collectionBalance(wallet);
   if (balance < 1n) return { eligible: false as const, wallet, balance: balance.toString(), assetType: ELIGIBILITY_ASSET_TYPE };
   const expiresAt = Math.floor(Date.now() / 1000) + ACCESS_TTL_SECONDS;
-  const accessToken = await signPayload<AccessPayload>(env, { wallet, expiresAt, assetType: ELIGIBILITY_ASSET_TYPE });
+  const accessToken = await signPayload<AccessPayload>(env, { wallet, expiresAt, assetType: ELIGIBILITY_ASSET_TYPE, source: "nft" });
   return { eligible: true as const, wallet, balance: balance.toString(), assetType: ELIGIBILITY_ASSET_TYPE, accessToken, expiresAt: new Date(expiresAt * 1000).toISOString() };
+}
+function paymentQuote() {
+  return { x402: true, network: "base", chainId: BASE_CHAIN_ID, router: X402_ROUTER, function: "pay", projectId: X402_PROJECT_ID.toString(), token: X402_USDC, amount: X402_MIN_AMOUNT.toString(), amountDisplay: "$0.01 USDC", beneficiary: X402_BENEFICIARY, accessDurationSeconds: ACCESS_TTL_SECONDS, instructions: "Pay at least 0.01 Base USDC through JBRouterTerminalRegistry.pay for project 3, then prove control of the transaction sender with fpl_access_challenge and call fpl_verify_payment with the mined transaction hash." };
+}
+async function baseRpc<T>(method: string, params: unknown[]): Promise<T> {
+  let lastError: unknown;
+  for (const rpcUrl of BASE_RPC_URLS) {
+    try {
+      const response = await fetch(rpcUrl, { method: "POST", headers: { "content-type": "application/json" }, signal: AbortSignal.timeout(8_000), body: JSON.stringify({ jsonrpc: "2.0", id: crypto.randomUUID(), method, params }) });
+      const payload = await response.json() as { result?: T; error?: { message?: string } };
+      if (!response.ok || payload.error || payload.result === undefined) throw new Error(payload.error?.message || `Base RPC returned ${response.status}.`);
+      return payload.result;
+    } catch (error) { lastError = error; }
+  }
+  throw lastError instanceof Error ? lastError : new Error("Base payment verification failed.");
+}
+type BaseTransaction = { from: Address; to: Address | null; input: Hex };
+type BaseReceipt = { status: Hex | null };
+async function verifyJuiceboxPayment(txHash: string, wallet: Address): Promise<void> {
+  if (!/^0x[0-9a-fA-F]{64}$/.test(txHash)) throw new Error("Provide a valid Base transaction hash.");
+  const [transaction, receipt] = await Promise.all([baseRpc<BaseTransaction>("eth_getTransactionByHash", [txHash]), baseRpc<BaseReceipt>("eth_getTransactionReceipt", [txHash])]);
+  if (!transaction || !receipt || receipt.status !== "0x1") throw new Error("Payment transaction is missing or did not succeed.");
+  if (transaction.from.toLowerCase() !== wallet.toLowerCase() || transaction.to?.toLowerCase() !== X402_ROUTER.toLowerCase()) throw new Error("Payment must be sent by the verified wallet to JBRouterTerminalRegistry.");
+  const decoded = decodeFunctionData({ abi: JUICEBOX_PAY_ABI, data: transaction.input });
+  if (decoded.functionName !== "pay") throw new Error("Payment transaction is not a Juicebox pay call.");
+  const [projectId, token, amount, beneficiary] = decoded.args;
+  if (projectId !== X402_PROJECT_ID || token.toLowerCase() !== X402_USDC.toLowerCase() || amount < X402_MIN_AMOUNT || beneficiary.toLowerCase() !== X402_BENEFICIARY.toLowerCase()) throw new Error("Payment does not meet the required project, USDC amount, or beneficiary.");
+}
+export class PaymentReceipt extends DurableObject<Env> {
+  async consume(txHash: string): Promise<boolean> {
+    const key = `payment:${txHash.toLowerCase()}`;
+    if (await this.ctx.storage.get<boolean>(key)) return false;
+    await this.ctx.storage.put(key, true);
+    return true;
+  }
+}
+async function verifyPaymentAndIssueAccess(env: Env, walletInput: string, challenge: string, signature: Hex, txHash: string) {
+  const wallet = await verifyWalletChallenge(env, walletInput, challenge, signature);
+  await verifyJuiceboxPayment(txHash, wallet);
+  const receipt = env.PAYMENT_RECEIPTS.getByName(txHash.toLowerCase());
+  if (!await receipt.consume(txHash)) throw new Error("This payment transaction has already been used for access.");
+  const expiresAt = Math.floor(Date.now() / 1000) + ACCESS_TTL_SECONDS;
+  const accessToken = await signPayload<AccessPayload>(env, { wallet, expiresAt, assetType: ELIGIBILITY_ASSET_TYPE, source: "payment" });
+  return { eligible: false, paid: true, wallet, paymentTxHash: txHash, accessToken, expiresAt: new Date(expiresAt * 1000).toISOString(), quote: paymentQuote() };
 }
 async function verifyAccessToken(env: Env, token: string): Promise<AccessPayload> {
   const payload = await verifyPayload<AccessPayload>(env, token);
-  if (!isAddress(payload.wallet) || payload.assetType !== ELIGIBILITY_ASSET_TYPE || payload.expiresAt <= Math.floor(Date.now() / 1000)) throw new Error("Access token is invalid or expired. Verify ownership again.");
-  if (await collectionBalance(getAddress(payload.wallet)) < 1n) throw new Error("The required NFT is no longer held by this wallet.");
+  if (!isAddress(payload.wallet) || payload.assetType !== ELIGIBILITY_ASSET_TYPE || (payload.source !== "nft" && payload.source !== "payment") || payload.expiresAt <= Math.floor(Date.now() / 1000)) throw new Error("Access token is invalid or expired. Verify ownership or payment again.");
+  if (payload.source === "nft" && await collectionBalance(getAddress(payload.wallet)) < 1n) throw new Error("The required NFT is no longer held by this wallet.");
   return payload;
 }
 function purchasePlan(walletInput: string) {
@@ -230,8 +285,14 @@ function createServer(env: Env): McpServer {
   server.tool("fpl_verify_access", "Verify a signed wallet challenge and require the signer to hold at least one NFT from the required Base ERC-721 collection. Returns a one-hour HTTP access token only for eligible holders.", { walletAddress: z.string().trim(), challenge: z.string().trim().min(20), signature: z.string().trim().regex(/^0x[0-9a-fA-F]{130}$/, "Provide a 65-byte EVM signature.") }, async ({ walletAddress, challenge, signature }) => {
     try {
       const result = await verifyChallengeAndIssueAccess(env, walletAddress, challenge, signature as Hex);
-      if (!result.eligible) return { content: [{ type: "text", text: "This wallet does not hold the required NFT. Call fpl_purchase_instructions with the buyer wallet address to review the exact Juicebox approval and pay calldata before signing." }], structuredContent: result, isError: true };
+      if (!result.eligible) return { content: [{ type: "text", text: "This wallet does not hold the required NFT. Pay $0.01 USDC through the Base Juicebox route in the included quote, then call fpl_verify_payment with this same signed challenge and the mined transaction hash." }], structuredContent: { ...result, paymentQuote: paymentQuote() } };
       return { content: [{ type: "text", text: "Ownership verified. Include `Authorization: Bearer <accessToken>` on subsequent MCP HTTP requests. The token expires in one hour and access is rechecked against the collection on every protected tool call." }], structuredContent: result };
+    } catch (error) { return errorResult(error); }
+  });
+  server.tool("fpl_verify_payment", "Verify one Base Juicebox RouterTerminalRegistry USDC pay transaction as a one-hour x402-style fallback when the verified wallet does not hold the access NFT. The transaction hash can be used only once.", { walletAddress: z.string().trim(), challenge: z.string().trim().min(20), signature: z.string().trim().regex(/^0x[0-9a-fA-F]{130}$/, "Provide a 65-byte EVM signature."), paymentTxHash: z.string().trim().regex(/^0x[0-9a-fA-F]{64}$/, "Provide a Base transaction hash.") }, async ({ walletAddress, challenge, signature, paymentTxHash }) => {
+    try {
+      const result = await verifyPaymentAndIssueAccess(env, walletAddress, challenge, signature as Hex, paymentTxHash);
+      return { content: [{ type: "text", text: "Payment verified. Include `Authorization: Bearer <accessToken>` on subsequent MCP HTTP requests; the paid pass expires in one hour." }], structuredContent: result };
     } catch (error) { return errorResult(error); }
   });
   server.tool("fpl_purchase_instructions", "Show the exact Base Juicebox ERC-20 approval and pay transaction calldata required to mint the access NFT to the buyer address. This tool never signs, submits, or simulates a transaction.", { buyerAddress: z.string().trim() }, async ({ buyerAddress }) => {
@@ -307,7 +368,7 @@ async function accessGuard(request: Request, env: Env): Promise<Response | null>
   if (FREE_ACCESS_TOOLS.has(toolName)) return null;
   const authorization = request.headers.get("authorization") || request.headers.get("x-fpl-access-token") || "";
   const token = authorization.startsWith("Bearer ") ? authorization.slice("Bearer ".length).trim() : authorization.trim();
-  if (!token) return Response.json({ error: "NFT access required. Call fpl_access_challenge, sign the returned message, call fpl_verify_access, then send Authorization: Bearer <accessToken>." }, { status: 401 });
+  if (!token) return Response.json({ error: "NFT access required or payment needed.", payment: paymentQuote(), access: "Call fpl_access_challenge, sign the returned message, then use fpl_verify_access for NFT holders or fpl_verify_payment with a mined payment transaction hash." }, { status: 402 });
   try { await verifyAccessToken(env, token); return null; } catch (error) { return Response.json({ error: error instanceof Error ? error.message : "NFT access verification failed." }, { status: 403 }); }
 }
 

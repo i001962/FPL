@@ -45,6 +45,12 @@ npx wrangler secret put ACCESS_TOKEN_SECRET
 
 For a non-holder, `fpl_purchase_instructions` returns the exact Base ERC-20 approval and `JBMultiTerminal.pay(...)` calldata. It uses the supplied buyer address as the transaction beneficiary, so a successful mint can satisfy the gate. The Worker does not sign, simulate, or submit either transaction.
 
+## Paid fallback (x402-style)
+
+When no valid access token is supplied, protected tools return HTTP `402` with a Base payment quote. A non-holder can pay at least **$0.01 USDC** through `JBRouterTerminalRegistry.pay(...)` to Juicebox project `base:3`, with beneficiary `0xDf087B724174A3E4eD2338C0798193932E851F1b`.
+
+After the payment is mined, the payer signs a fresh `fpl_access_challenge` and calls `fpl_verify_payment` with the signature and transaction hash. The Worker verifies the Base receipt and decoded router `pay()` fields, consumes that hash once using a Durable Object, and returns a one-hour access token. It never signs, simulates, or broadcasts a payment transaction.
+
 ## Browser clients and CORS
 
 Remote MCP clients normally do not send an `Origin` header. If a browser-hosted MCP client does, configure an allow-list before deploying:
