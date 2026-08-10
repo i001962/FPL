@@ -1,16 +1,24 @@
 import { App } from "@modelcontextprotocol/ext-apps";
 import "./styles.css";
 
-type Manager = { rank: number; entry: number; entryName: string; playerName: string; total: number };
-type Standings = { leagueId: number; leagueName: string; managers: Manager[]; hasMore: boolean; projectRoute?: string | null };
-type PurchasePlan = { entryId: number; entryName: string; memo: string; checkoutUrl: string | null; warning: string };
+type Manager = { rank: number | null; entry: number; entryName: string; playerName: string; total: number };
+type Standings = {
+  projectRoute: string;
+  projectName: string;
+  leagueId: number;
+  leagueName: string;
+  source: string;
+  managers: Manager[];
+  hasMore: boolean;
+};
+type PurchasePlan = { entryId: number; entryName: string; memo: string; checkoutUrl: string; warning: string };
+type AppLaunch = { inputRequired?: boolean; projectRoute?: string };
 
-const app = new App({ name: "FPL League Shop", version: "0.1.0" });
+const app = new App({ name: "FPL League Shop", version: "0.2.0" });
 const standingsEl = document.querySelector<HTMLTableSectionElement>("#standings")!;
 const statusEl = document.querySelector<HTMLElement>("#status")!;
 const leagueNameEl = document.querySelector<HTMLElement>("#league-name")!;
 const leagueMetaEl = document.querySelector<HTMLElement>("#league-meta")!;
-const leagueIdInput = document.querySelector<HTMLInputElement>("#league-id")!;
 const projectRouteInput = document.querySelector<HTMLInputElement>("#project-route")!;
 const reloadButton = document.querySelector<HTMLButtonElement>("#reload")!;
 const purchaseEl = document.querySelector<HTMLElement>("#purchase")!;
@@ -19,9 +27,9 @@ const memoEl = document.querySelector<HTMLElement>("#memo")!;
 const checkoutEl = document.querySelector<HTMLAnchorElement>("#checkout")!;
 let currentStandings: Standings | null = null;
 
-function inputLeagueId(): number | null {
-  const value = Number(leagueIdInput.value);
-  return Number.isSafeInteger(value) && value > 0 ? value : null;
+function inputProjectRoute(): string | null {
+  const value = projectRouteInput.value.trim();
+  return /^(base|basesep):[1-9]\d*$/.test(value) ? value : null;
 }
 
 function showStatus(message: string, isError = false) {
@@ -31,14 +39,13 @@ function showStatus(message: string, isError = false) {
 
 function renderStandings(data: Standings) {
   currentStandings = data;
-  leagueIdInput.value = String(data.leagueId);
-  if (data.projectRoute) projectRouteInput.value = data.projectRoute;
+  projectRouteInput.value = data.projectRoute;
   leagueNameEl.textContent = data.leagueName;
-  leagueMetaEl.textContent = `League ${data.leagueId} · ${data.managers.length} managers${data.hasMore ? " shown" : ""}`;
+  leagueMetaEl.textContent = `${data.projectRoute} · FPL league ${data.leagueId} from ${data.source}`;
   standingsEl.replaceChildren();
   for (const manager of data.managers) {
     const row = document.createElement("tr");
-    row.innerHTML = `<td>${manager.rank}</td><td></td><td></td><td class="points">${manager.total}</td><td></td>`;
+    row.innerHTML = `<td>${manager.rank ?? "—"}</td><td></td><td></td><td class="points">${manager.total}</td><td></td>`;
     row.children[1].textContent = manager.playerName;
     row.children[2].textContent = manager.entryName;
     const action = document.createElement("button");
@@ -53,53 +60,53 @@ function renderStandings(data: Standings) {
 }
 
 async function loadStandings() {
-  const leagueId = inputLeagueId();
-  if (!leagueId) return showStatus("Enter a positive FPL league ID.", true);
+  const projectRoute = inputProjectRoute();
+  if (!projectRoute) return showStatus("Enter a Juicebox project route such as base:9.", true);
   reloadButton.disabled = true;
-  showStatus("Loading standings...");
+  showStatus("Resolving project metadata and loading standings...");
   try {
-    const result = await app.callServerTool({ name: "fpl_standings", arguments: { leagueId, limit: 100 } });
+    const result = await app.callServerTool({ name: "fpl_standings", arguments: { projectRoute, limit: 100 } });
     const data = result.structuredContent as Standings | undefined;
-    if (!data?.managers) throw new Error("The server returned no standings.");
+    if (!data?.projectRoute) throw new Error("The server returned no project context.");
     renderStandings(data);
-    showStatus(data.hasMore ? "Showing the first 100 managers." : "Standings are current.");
+    showStatus(data.managers.length ? (data.hasMore ? "Showing the first 100 managers." : "Standings are current.") : "No published manager standings are available for this league yet.");
   } catch (error) {
-    showStatus(error instanceof Error ? error.message : "Could not load standings.", true);
+    showStatus(error instanceof Error ? error.message : "Could not resolve the project.", true);
   } finally {
     reloadButton.disabled = false;
   }
 }
 
 async function preparePurchase(manager: Manager) {
-  const leagueId = currentStandings?.leagueId ?? inputLeagueId();
-  if (!leagueId) return;
+  const projectRoute = currentStandings?.projectRoute ?? inputProjectRoute();
+  if (!projectRoute) return;
   showStatus(`Preparing ${manager.entryName}...`);
   try {
-    const result = await app.callServerTool({
-      name: "fpl_prepare_buy",
-      arguments: { leagueId, entryId: manager.entry, projectRoute: projectRouteInput.value.trim() || undefined },
-    });
+    const result = await app.callServerTool({ name: "fpl_prepare_buy", arguments: { projectRoute, entryId: manager.entry } });
     const plan = result.structuredContent as PurchasePlan | undefined;
     if (!plan?.memo) throw new Error("The server returned no purchase plan.");
     selectedManagerEl.textContent = `${plan.entryName} (entry ${plan.entryId})`;
     memoEl.textContent = plan.memo;
     purchaseEl.hidden = false;
-    checkoutEl.href = plan.checkoutUrl ?? "#";
-    checkoutEl.classList.toggle("disabled", !plan.checkoutUrl);
-    checkoutEl.setAttribute("aria-disabled", String(!plan.checkoutUrl));
-    showStatus(plan.warning, !plan.checkoutUrl);
+    checkoutEl.href = plan.checkoutUrl;
+    showStatus(plan.warning);
   } catch (error) {
     showStatus(error instanceof Error ? error.message : "Could not prepare the purchase.", true);
   }
 }
 
 app.ontoolresult = (result) => {
-  const data = result.structuredContent as Standings | undefined;
-  if (data?.managers) {
-    renderStandings(data);
-    showStatus(data.hasMore ? "Showing the first 100 managers." : "Standings are current.");
+  const data = result.structuredContent as Standings | AppLaunch | undefined;
+  if (data && "inputRequired" in data && data.inputRequired) {
+    showStatus("Enter a Juicebox project route such as base:9.");
+    return;
+  }
+  if (data?.projectRoute) {
+    const standings = data as Standings;
+    renderStandings(standings);
+    showStatus(standings.managers.length ? (standings.hasMore ? "Showing the first 100 managers." : "Standings are current.") : "No published manager standings are available for this league yet.");
   }
 };
 reloadButton.addEventListener("click", loadStandings);
-leagueIdInput.addEventListener("change", loadStandings);
+projectRouteInput.addEventListener("change", loadStandings);
 app.connect();

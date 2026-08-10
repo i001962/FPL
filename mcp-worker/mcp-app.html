@@ -12,13 +12,12 @@
         <div>
           <p class="eyebrow">FPL LEAGUE SHOP</p>
           <h1 id="league-name">League standings</h1>
-          <p id="league-meta" class="muted">Load a league to choose a manager.</p>
+          <p id="league-meta" class="muted">Enter a Juicebox project to load its league.</p>
         </div>
         <button id="reload" class="icon-button" type="button" aria-label="Refresh standings" title="Refresh standings">↻</button>
       </header>
       <section class="controls" aria-label="Shop setup">
-        <label>League ID<input id="league-id" inputmode="numeric" pattern="[0-9]*" placeholder="143466" /></label>
-        <label>Juicebox route<input id="project-route" placeholder="base:123" /></label>
+        <label>Juicebox project route<input id="project-route" placeholder="base:9" /></label>
       </section>
       <p id="status" class="status" role="status">Waiting for a league.</p>
       <section class="table-wrap" aria-label="Manager standings">

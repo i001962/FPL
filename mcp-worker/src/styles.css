@@ -8,7 +8,7 @@ h1 { margin: 2px 0 4px; font-size: 24px; font-weight: 700; letter-spacing: 0; }
 .eyebrow { color: #087f5b; font-size: 12px; font-weight: 700; letter-spacing: 0; margin: 0; }
 .muted { color: #5f6d76; margin: 0; font-size: 14px; }
 .icon-button { border: 1px solid #bdc9ce; background: #fff; border-radius: 4px; width: 36px; height: 36px; font-size: 20px; cursor: pointer; }
-.controls { display: grid; grid-template-columns: minmax(150px, .6fr) minmax(200px, 1fr); gap: 12px; margin: 16px 0; }
+.controls { display: grid; grid-template-columns: minmax(220px, 1fr); gap: 12px; margin: 16px 0; }
 label { color: #42515c; display: grid; gap: 5px; font-size: 13px; font-weight: 600; }
 input { border: 1px solid #b9c5ca; border-radius: 4px; padding: 9px 10px; background: #fff; color: #1b2430; }
 .status { min-height: 20px; color: #42515c; font-size: 14px; margin: 12px 0; }
