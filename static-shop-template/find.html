@@ -1358,11 +1358,6 @@
   <script type="module">
     import { decodeFunctionResult, encodeAbiParameters, encodeFunctionData, formatUnits, keccak256, parseUnits } from 'https://esm.sh/viem@2.21.55';
 
-    const FALLBACK_TIERS = [
-      { id: 'full-season', tierId: 1, name: 'Full Season', price: '5', currency: 'USDC' },
-      { id: 'game-week-1', tierId: 2, name: 'Game Week 1', price: '1', currency: 'USDC' }
-    ];
-
     const CHAIN_LABELS = {
       base: 'Base',
       basesep: 'Base Sepolia'
@@ -1373,7 +1368,7 @@
         chainId: 8453,
         chainHex: '0x2105',
         name: 'Base',
-        rpcUrls: ['https://mainnet.base.org'],
+        rpcUrls: ['https://base-rpc.publicnode.com', 'https://mainnet.base.org'],
         blockExplorerUrls: ['https://basescan.org'],
         directory: '0x5aff29060e023e6fb87be5596652b33c65af535b',
         omnichainDeployer: '0xb853758a70a6b4216c09f1d071ea2344aba0a34f',
@@ -1390,7 +1385,7 @@
         chainId: 84532,
         chainHex: '0x14a34',
         name: 'Base Sepolia',
-        rpcUrls: ['https://sepolia.base.org'],
+        rpcUrls: ['https://sepolia.base.org', 'https://sepolia-preconf.base.org', 'https://base-sepolia-rpc.publicnode.com'],
         blockExplorerUrls: ['https://sepolia.basescan.org'],
         directory: '0x5aff29060e023e6fb87be5596652b33c65af535b',
         omnichainDeployer: '0xb853758a70a6b4216c09f1d071ea2344aba0a34f',
@@ -1665,9 +1660,10 @@ Direct Juicebox routes use: 1=eth, 11155111=sep, 42161=arb, 421614=arbsep, 8453=
       managers: [],
       badgeCache: loadBadgeCache(),
       selectedManager: null,
+      requestedEntryId: '',
       managerConfirmed: false,
-      tiers: FALLBACK_TIERS,
-      cart: { [FALLBACK_TIERS[0].id]: 1 },
+      tiers: [],
+      cart: {},
       expandedTiers: new Set(),
       walletAccount: '',
       walletChainId: '',
@@ -1730,6 +1726,7 @@ Direct Juicebox routes use: 1=eth, 11155111=sep, 42161=arb, 421614=arbsep, 8453=
       state.chainSlug = match?.[1] || params.get('chain') || defaultMatch?.[1] || 'base';
       state.projectId = match?.[2] || params.get('projectId') || defaultMatch?.[2] || '';
       state.leagueId = match?.[3] || params.get('leagueId') || defaultMatch?.[3] || '';
+      state.requestedEntryId = params.get('entryId') || '';
       state.apiBase = params.get('apiBase') || state.apiBase;
       state.isDiscovery = !state.projectId;
 
@@ -2098,6 +2095,17 @@ Direct Juicebox routes use: 1=eth, 11155111=sep, 42161=arb, 421614=arbsep, 8453=
     }
 
     function renderTiers() {
+      if (!state.tiers.length) {
+        els.tiers.innerHTML = `
+          <div class="tier">
+            <span class="tier-main">
+              <strong>No NFT items loaded</strong>
+              <span class="tier-meta">Purchases are disabled until this project's live Juicebox NFT tiers load.</span>
+            </span>
+          </div>
+        `;
+        return;
+      }
       els.tiers.innerHTML = state.tiers.map((tier) => `
         <div class="tier ${cartQty(tier) > 0 ? 'selected' : ''}">
           <span class="tier-thumb">${renderTierMedia(tier)}</span>
@@ -2151,6 +2159,12 @@ Direct Juicebox routes use: 1=eth, 11155111=sep, 42161=arb, 421614=arbsep, 8453=
     function buildMemo() {
       if (!state.selectedManager) return '';
       return `fpl:league=${state.leagueId};entry=${state.selectedManager.entryId}`;
+    }
+
+    function selectRequestedManager() {
+      if (!/^\d+$/.test(state.requestedEntryId)) return;
+      const manager = state.managers.find((item) => String(item.entryId) === state.requestedEntryId);
+      if (manager) state.selectedManager = manager;
     }
 
     function cartQty(tier) {
@@ -2420,14 +2434,23 @@ Direct Juicebox routes use: 1=eth, 11155111=sep, 42161=arb, 421614=arbsep, 8453=
     }
 
     async function rpcCall(chain, call) {
-      const response = await fetch(chain.rpcUrls[0], {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ jsonrpc: '2.0', id: Date.now(), method: 'eth_call', params: [call, 'latest'] })
-      });
-      const json = await response.json();
-      if (json.error) throw new Error(json.error.message || 'RPC call failed.');
-      return json.result;
+      let lastError = null;
+      for (const rpcUrl of chain.rpcUrls) {
+        try {
+          const response = await fetch(rpcUrl, {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ jsonrpc: '2.0', id: Date.now(), method: 'eth_call', params: [call, 'latest'] })
+          });
+          if (!response.ok) throw new Error(`RPC HTTP ${response.status}`);
+          const json = await response.json();
+          if (json.error) throw new Error(json.error.message || 'RPC call failed.');
+          return json.result;
+        } catch (error) {
+          lastError = error;
+        }
+      }
+      throw lastError || new Error('RPC call failed.');
     }
 
     async function readContract(chain, address, abi, functionName, args = []) {
@@ -2549,9 +2572,17 @@ Direct Juicebox routes use: 1=eth, 11155111=sep, 42161=arb, 421614=arbsep, 8453=
     async function fetchMetadata(uri) {
       if (!uri) return null;
       if (uri.startsWith('data:application/json')) return decodeDataJson(uri);
-      const response = await fetch(gatewayUrl(uri));
-      if (!response.ok) throw new Error(`Metadata fetch failed: ${response.status}`);
-      return response.json();
+      let lastError = null;
+      for (const url of gatewayUrls(uri)) {
+        try {
+          const response = await fetch(url);
+          if (!response.ok) throw new Error(`Metadata fetch failed: ${response.status}`);
+          return response.json();
+        } catch (error) {
+          lastError = error;
+        }
+      }
+      throw lastError || new Error('Metadata fetch failed.');
     }
 
     function paymentNoticeFromMetadata(metadata) {
@@ -2727,7 +2758,7 @@ Direct Juicebox routes use: 1=eth, 11155111=sep, 42161=arb, 421614=arbsep, 8453=
       const resolver = await readContract(chain, store, TIER721_STORE_ABI, 'tokenUriResolverOf', [hook]).catch(() => '');
       const rawTiers = await readContract(chain, store, TIER721_STORE_ABI, 'tiersOf', [hook, [], false, 0n, 200n]);
       const decimals = Number(pricing?.decimals ?? pricing?.[1] ?? 6);
-      const currency = String(state.tiers[0]?.currency || 'USDC').toUpperCase();
+      const currency = 'USDC';
       const token = chain.tokens[currency];
       if (!token) throw new Error(`${currency} is not configured for ${chain.name}.`);
       const pricingCurrency = Number(pricing?.currency ?? pricing?.[0] ?? 2);
@@ -3156,9 +3187,10 @@ Direct Juicebox routes use: 1=eth, 11155111=sep, 42161=arb, 421614=arbsep, 8453=
       renderTiers();
       renderPaymentNotice();
       eagerConnect().catch(() => {});
-      loadLeague()
-        .then(() => {
-          renderAll();
+        loadLeague()
+          .then(() => {
+            selectRequestedManager();
+            renderAll();
           setStatus('League ready', `${state.managers.length} managers loaded.`);
           if (state.projectId) {
             loadProjectMetadata().catch(() => {
@@ -3167,8 +3199,10 @@ Direct Juicebox routes use: 1=eth, 11155111=sep, 42161=arb, 421614=arbsep, 8453=
             });
             setStatus('Loading NFT tiers', 'Reading the Juicebox 721 shop.');
             return loadProjectTiers().catch((error) => {
+              state.tiers = [];
+              state.cart = {};
               renderAll();
-              setStatus('League ready', `${state.managers.length} managers loaded. Using fallback tiers because the shop read failed: ${error.message}`);
+              setStatus('NFT items unavailable', `Managers loaded, but this project's live NFT tiers could not be read: ${error.message}`, true);
             });
           }
         })
