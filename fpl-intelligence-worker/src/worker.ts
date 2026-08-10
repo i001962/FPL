@@ -30,7 +30,6 @@ const POSITION = ["GKP", "DEF", "MID", "FWD"] as const;
 const BASE_CHAIN_ID = 8453;
 const ELIGIBILITY_ASSET_TYPE = "eip155:8453/erc721:0x4669162aa53b9052f73f1ca12e43f4be57cf40bf";
 const ELIGIBILITY_CONTRACT = "0x4669162aa53b9052f73f1ca12e43f4be57cf40bf" as Address;
-const BASE_RPC_FALLBACK_URLS = ["https://mainnet.base.org", "https://base-rpc.publicnode.com"];
 const CHALLENGE_TTL_SECONDS = 5 * 60;
 const ACCESS_TTL_SECONDS = 60 * 60;
 const FREE_ACCESS_TOOLS = new Set(["fpl_access_challenge", "fpl_verify_access", "fpl_verify_payment", "fpl_purchase_instructions"]);
@@ -100,7 +99,8 @@ function accessMessage(challenge: string, payload: ChallengePayload): string {
 }
 function baseRpcUrls(env: Env): string[] {
   const configured = env.BASE_RPC_URL?.trim();
-  return configured ? [configured, ...BASE_RPC_FALLBACK_URLS] : BASE_RPC_FALLBACK_URLS;
+  if (!configured) throw new Error("Base RPC is not configured. Set the BASE_RPC_URL secret to the Dwellir Base Mainnet archive endpoint.");
+  return [configured];
 }
 async function collectionBalance(env: Env, wallet: Address): Promise<bigint> {
   const calldata = `0x70a08231${wallet.slice(2).toLowerCase().padStart(64, "0")}` as Hex;

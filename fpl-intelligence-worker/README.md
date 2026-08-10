@@ -51,13 +51,13 @@ When no valid access token is supplied, protected tools return HTTP `402` with a
 
 After the payment is mined, the payer signs a fresh `fpl_access_challenge` and calls `fpl_verify_payment` with the signature and transaction hash. The Worker verifies the Base receipt and decoded router `pay()` fields, consumes that hash once using a Durable Object, and returns a one-hour access token. It never signs, simulates, or broadcasts a payment transaction.
 
-Payment verification needs an authenticated, archive-capable Base RPC endpoint. Store the full provider URL as a Worker secret (do not commit it):
+Payment verification needs an authenticated, archive-capable Base RPC endpoint. Store the Dwellir Base Mainnet archive URL as a Worker secret (do not commit it):
 
 ```bash
 npx wrangler secret put BASE_RPC_URL
 ```
 
-Without it, public RPC fallbacks may reject historical receipt lookups after a transaction is mined.
+The Worker does not fall back to public RPC providers: archive receipt verification fails closed if this secret is unavailable.
 
 ## Browser clients and CORS
 

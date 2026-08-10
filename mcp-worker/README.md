@@ -19,6 +19,12 @@ npx wrangler secret put FPL_DEFAULT_PROJECT_ROUTE
 
 `FPL_DEFAULT_PROJECT_ROUTE` must look like `base:123` or `basesep:19`. The Worker reads the project's Juicebox metadata to resolve `fpl.leagueId`, with the project token URI as a fallback.
 
+The Worker reads Base and Base Sepolia contract state through Dwellir. Configure its API key as a Worker secret; do not put it in `wrangler.jsonc` or browser assets:
+
+```bash
+npx wrangler secret put DWELLIR_API_KEY
+```
+
 ## Wallet Checkout
 
 The host agent must keep wallet actions explicit:

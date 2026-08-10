@@ -8,6 +8,8 @@ interface Env {
   ASSETS: Fetcher;
   FPL_API_BASE?: string;
   FPL_DEFAULT_PROJECT_ROUTE?: string;
+  /** Wrangler secret shared by Dwellir Base Mainnet and Sepolia archive endpoint paths. */
+  DWELLIR_API_KEY?: string;
 }
 
 const RESOURCE_URI = "ui://fpl-league-shop/standings.html";
@@ -19,7 +21,6 @@ const CHAINS = {
   base: {
     chainId: 8453,
     directory: "0x5aff29060e023e6fb87be5596652b33c65af535b",
-    rpcUrls: ["https://base-rpc.publicnode.com", "https://mainnet.base.org"],
     terminal: "0x130f5dd2bd8805443cf41755253d778a75a67f53",
     prices: "0xad45e4627f068d1e6b21e5301870d807543a8401",
     token: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
@@ -27,7 +28,6 @@ const CHAINS = {
   basesep: {
     chainId: 84532,
     directory: "0x5aff29060e023e6fb87be5596652b33c65af535b",
-    rpcUrls: ["https://sepolia.base.org", "https://base-sepolia-rpc.publicnode.com"],
     terminal: "0x130f5dd2bd8805443cf41755253d778a75a67f53",
     prices: "0xad45e4627f068d1e6b21e5301870d807543a8401",
     token: "0x036CbD53842c5426634e7929541eC2318f3dCF7e",
@@ -136,6 +136,13 @@ function fplBase(env: Env): string {
   return (env.FPL_API_BASE || "https://fantasy.premierleague.com/api").replace(/\/$/, "");
 }
 
+function chainRpcUrls(env: Env, chain: ChainSlug): string[] {
+  const key = env.DWELLIR_API_KEY?.trim();
+  if (!key) throw new Error("Blockchain RPC is not configured. Set the DWELLIR_API_KEY Worker secret.");
+  const network = chain === "base" ? "mainnet" : "sepolia";
+  return [`https://api-base-${network}-archive.n.dwellir.com/${key}`];
+}
+
 function resolveProjectRoute(env: Env, projectRoute?: string): string {
   const route = projectRoute ?? env.FPL_DEFAULT_PROJECT_ROUTE;
   if (!route || !PROJECT_ROUTE.test(route)) {
@@ -183,9 +190,9 @@ async function fetchJson(url: string): Promise<unknown> {
   return response.json();
 }
 
-async function ethCall(chain: ChainSlug, address: string, data: Hex): Promise<Hex> {
+async function ethCall(env: Env, chain: ChainSlug, address: string, data: Hex): Promise<Hex> {
   let lastError: unknown;
-  for (const rpcUrl of CHAINS[chain].rpcUrls) {
+  for (const rpcUrl of chainRpcUrls(env, chain)) {
     try {
       const response = await fetch(rpcUrl, {
         method: "POST",
@@ -204,9 +211,9 @@ async function ethCall(chain: ChainSlug, address: string, data: Hex): Promise<He
   throw lastError instanceof Error ? lastError : new Error("Project metadata RPC read failed.");
 }
 
-async function rpcRequest<T>(chain: ChainSlug, method: string, params: unknown[]): Promise<T> {
+async function rpcRequest<T>(env: Env, chain: ChainSlug, method: string, params: unknown[]): Promise<T> {
   let lastError: unknown;
-  for (const rpcUrl of CHAINS[chain].rpcUrls) {
+  for (const rpcUrl of chainRpcUrls(env, chain)) {
     try {
       const response = await fetch(rpcUrl, {
         method: "POST",
@@ -257,32 +264,32 @@ function v6TierMetadata(idTarget: string, tierIds: number[]): Hex {
   return `0x${"00".repeat(32)}${metadataId}02${"00".repeat(27)}${tierData.slice(2)}` as Hex;
 }
 
-async function shopContext(projectRoute: string) {
+async function shopContext(env: Env, projectRoute: string) {
   const [chain, projectIdText] = projectRoute.split(":") as [ChainSlug, string];
   const projectId = BigInt(projectIdText);
   const chainConfig = CHAINS[chain];
   const controller = decodeFunctionResult({
     abi: CONTROLLER_OF_ABI, functionName: "controllerOf",
-    data: await ethCall(chain, chainConfig.directory, encodeFunctionData({ abi: CONTROLLER_OF_ABI, functionName: "controllerOf", args: [projectId] })),
+    data: await ethCall(env, chain, chainConfig.directory, encodeFunctionData({ abi: CONTROLLER_OF_ABI, functionName: "controllerOf", args: [projectId] })),
   });
   if (isZeroAddress(controller)) throw new Error(`No controller found for ${projectRoute}.`);
   const ruleset = decodeFunctionResult({
     abi: CURRENT_RULESET_ABI, functionName: "currentRulesetOf",
-    data: await ethCall(chain, controller, encodeFunctionData({ abi: CURRENT_RULESET_ABI, functionName: "currentRulesetOf", args: [projectId] })),
+    data: await ethCall(env, chain, controller, encodeFunctionData({ abi: CURRENT_RULESET_ABI, functionName: "currentRulesetOf", args: [projectId] })),
   });
   const metadata = ruleset[1];
   if (!metadata.useDataHookForPay || isZeroAddress(metadata.dataHook)) throw new Error("The project has no active Juicebox pay data hook.");
   const hook = metadata.dataHook;
-  const store = decodeFunctionResult({ abi: HOOK_STORE_ABI, functionName: "STORE", data: await ethCall(chain, hook, encodeFunctionData({ abi: HOOK_STORE_ABI, functionName: "STORE" })) });
-  const idTarget = decodeFunctionResult({ abi: HOOK_METADATA_ID_TARGET_ABI, functionName: "METADATA_ID_TARGET", data: await ethCall(chain, hook, encodeFunctionData({ abi: HOOK_METADATA_ID_TARGET_ABI, functionName: "METADATA_ID_TARGET" })) });
-  const pricing = decodeFunctionResult({ abi: PRICING_CONTEXT_ABI, functionName: "pricingContext", data: await ethCall(chain, hook, encodeFunctionData({ abi: PRICING_CONTEXT_ABI, functionName: "pricingContext" })) });
-  const rawTiers = decodeFunctionResult({ abi: TIER_STORE_ABI, functionName: "tiersOf", data: await ethCall(chain, store, encodeFunctionData({ abi: TIER_STORE_ABI, functionName: "tiersOf", args: [hook, [], false, 0n, 200n] })) });
+  const store = decodeFunctionResult({ abi: HOOK_STORE_ABI, functionName: "STORE", data: await ethCall(env, chain, hook, encodeFunctionData({ abi: HOOK_STORE_ABI, functionName: "STORE" })) });
+  const idTarget = decodeFunctionResult({ abi: HOOK_METADATA_ID_TARGET_ABI, functionName: "METADATA_ID_TARGET", data: await ethCall(env, chain, hook, encodeFunctionData({ abi: HOOK_METADATA_ID_TARGET_ABI, functionName: "METADATA_ID_TARGET" })) });
+  const pricing = decodeFunctionResult({ abi: PRICING_CONTEXT_ABI, functionName: "pricingContext", data: await ethCall(env, chain, hook, encodeFunctionData({ abi: PRICING_CONTEXT_ABI, functionName: "pricingContext" })) });
+  const rawTiers = decodeFunctionResult({ abi: TIER_STORE_ABI, functionName: "tiersOf", data: await ethCall(env, chain, store, encodeFunctionData({ abi: TIER_STORE_ABI, functionName: "tiersOf", args: [hook, [], false, 0n, 200n] })) });
   const pricingCurrency = pricing[0];
   const decimals = pricing[1];
   const paymentCurrency = tokenCurrency(chainConfig.token);
   const pricePerUnit = paymentCurrency === pricingCurrency
     ? 10n ** 6n
-    : decodeFunctionResult({ abi: PRICE_PER_UNIT_ABI, functionName: "pricePerUnitOf", data: await ethCall(chain, chainConfig.prices, encodeFunctionData({ abi: PRICE_PER_UNIT_ABI, functionName: "pricePerUnitOf", args: [projectId, paymentCurrency, pricingCurrency, 6n] })) });
+    : decodeFunctionResult({ abi: PRICE_PER_UNIT_ABI, functionName: "pricePerUnitOf", data: await ethCall(env, chain, chainConfig.prices, encodeFunctionData({ abi: PRICE_PER_UNIT_ABI, functionName: "pricePerUnitOf", args: [projectId, paymentCurrency, pricingCurrency, 6n] })) });
   const tiers: ShopTier[] = rawTiers
     .filter((tier) => tier.initialSupply > 0)
     .map((tier) => ({ tierId: Number(tier.id), price: rawPaymentAmount(tier.price, decimals, pricePerUnit), remainingSupply: Number(tier.remainingSupply), initialSupply: Number(tier.initialSupply) }));
@@ -296,25 +303,25 @@ async function projectContext(env: Env, requestedRoute?: string) {
   const controller = decodeFunctionResult({
     abi: CONTROLLER_OF_ABI,
     functionName: "controllerOf",
-    data: await ethCall(chain, CHAINS[chain].directory, encodeFunctionData({ abi: CONTROLLER_OF_ABI, functionName: "controllerOf", args: [projectId] })),
+    data: await ethCall(env, chain, CHAINS[chain].directory, encodeFunctionData({ abi: CONTROLLER_OF_ABI, functionName: "controllerOf", args: [projectId] })),
   });
   let metadataUri = controller && !/^0x0+$/i.test(controller)
     ? decodeFunctionResult({
       abi: URI_OF_ABI,
       functionName: "uriOf",
-      data: await ethCall(chain, controller, encodeFunctionData({ abi: URI_OF_ABI, functionName: "uriOf", args: [projectId] })),
+      data: await ethCall(env, chain, controller, encodeFunctionData({ abi: URI_OF_ABI, functionName: "uriOf", args: [projectId] })),
     })
     : "";
   if (!metadataUri) {
     const projects = decodeFunctionResult({
       abi: PROJECTS_OF_ABI,
       functionName: "PROJECTS",
-      data: await ethCall(chain, CHAINS[chain].directory, encodeFunctionData({ abi: PROJECTS_OF_ABI, functionName: "PROJECTS" })),
+      data: await ethCall(env, chain, CHAINS[chain].directory, encodeFunctionData({ abi: PROJECTS_OF_ABI, functionName: "PROJECTS" })),
     });
     metadataUri = decodeFunctionResult({
       abi: TOKEN_URI_ABI,
       functionName: "tokenURI",
-      data: await ethCall(chain, projects, encodeFunctionData({ abi: TOKEN_URI_ABI, functionName: "tokenURI", args: [projectId] })),
+      data: await ethCall(env, chain, projects, encodeFunctionData({ abi: TOKEN_URI_ABI, functionName: "tokenURI", args: [projectId] })),
     });
   }
   if (!metadataUri) throw new Error(`Project ${projectRoute} has no readable metadata URI.`);
@@ -446,7 +453,7 @@ function createServer(env: Env): McpServer {
     if (!manager) return { content: [{ type: "text", text: `FPL entry ${entryId} was not found in the first ${MAX_STANDINGS} standings for ${project.projectRoute}.` }], isError: true };
     const memo = `fpl:league=${project.leagueId};entry=${entryId}`;
     const warning = "The memo is evidence of the selected FPL entry, not proof that the buyer wallet controls that manager.";
-    const shop = await shopContext(project.projectRoute);
+    const shop = await shopContext(env, project.projectRoute);
     return {
       content: [{ type: "text", text: `Prepared ${memo}. Select one or more live tier IDs, get the connected wallet address, then call fpl_create_purchase_transaction. A wallet-capable connector must review and submit the returned transaction plan.` }],
       structuredContent: {
@@ -467,7 +474,7 @@ function createServer(env: Env): McpServer {
     const standings = await loadStandings(env, project.leagueId, MAX_STANDINGS);
     const manager = standings.managers.find((row) => row.entry === entryId);
     if (!manager) return { content: [{ type: "text", text: `FPL entry ${entryId} was not found in the first ${MAX_STANDINGS} standings for ${project.projectRoute}.` }], isError: true };
-    const shop = await shopContext(project.projectRoute);
+    const shop = await shopContext(env, project.projectRoute);
     const selected = tierIds.map((tierId) => {
       const tier = shop.tiers.find((candidate) => candidate.tierId === tierId);
       if (!tier) throw new Error(`Tier ${tierId} is not active for ${project.projectRoute}.`);
