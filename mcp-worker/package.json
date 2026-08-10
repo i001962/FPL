@@ -1,0 +1,24 @@
+{
+  "name": "fpl-league-shop-mcp",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "vite build",
+    "check": "tsc --noEmit",
+    "dev": "npm run build && wrangler dev",
+    "deploy": "npm run build && wrangler deploy"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/ext-apps": "^1.7.5",
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "zod": "^3.24.2"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^5.20260801.1",
+    "typescript": "^5.8.2",
+    "vite": "^6.2.2",
+    "vite-plugin-singlefile": "^2.1.0",
+    "wrangler": "^4.13.2"
+  }
+}

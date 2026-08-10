@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>FPL League Shop</title>
+    <script type="module" src="/src/app.ts"></script>
+  </head>
+  <body>
+    <main class="app-shell">
+      <header class="toolbar">
+        <div>
+          <p class="eyebrow">FPL LEAGUE SHOP</p>
+          <h1 id="league-name">League standings</h1>
+          <p id="league-meta" class="muted">Load a league to choose a manager.</p>
+        </div>
+        <button id="reload" class="icon-button" type="button" aria-label="Refresh standings" title="Refresh standings">↻</button>
+      </header>
+      <section class="controls" aria-label="Shop setup">
+        <label>League ID<input id="league-id" inputmode="numeric" pattern="[0-9]*" placeholder="143466" /></label>
+        <label>Juicebox route<input id="project-route" placeholder="base:123" /></label>
+      </section>
+      <p id="status" class="status" role="status">Waiting for a league.</p>
+      <section class="table-wrap" aria-label="Manager standings">
+        <table>
+          <thead><tr><th>Rank</th><th>Manager</th><th>Team</th><th class="points">Points</th><th aria-label="Checkout"></th></tr></thead>
+          <tbody id="standings"></tbody>
+        </table>
+      </section>
+      <section id="purchase" class="purchase" hidden>
+        <div>
+          <p class="eyebrow">PURCHASE PREPARED</p>
+          <p id="selected-manager"></p>
+          <code id="memo"></code>
+          <p class="muted">This memo records the selected entry as a weak claim. It does not verify wallet control of the FPL team.</p>
+        </div>
+        <a id="checkout" class="checkout" target="_blank" rel="noreferrer">Open shop</a>
+      </section>
+    </main>
+  </body>
+</html>

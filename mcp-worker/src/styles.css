@@ -1,0 +1,27 @@
+:root { color: #1b2430; background: #f5f7f8; font-family: Inter, ui-sans-serif, system-ui, sans-serif; }
+* { box-sizing: border-box; }
+body { margin: 0; }
+button, input { font: inherit; }
+.app-shell { max-width: 960px; margin: 0 auto; padding: 20px; }
+.toolbar { display: flex; justify-content: space-between; gap: 16px; align-items: start; border-bottom: 1px solid #d9e0e3; padding-bottom: 16px; }
+h1 { margin: 2px 0 4px; font-size: 24px; font-weight: 700; letter-spacing: 0; }
+.eyebrow { color: #087f5b; font-size: 12px; font-weight: 700; letter-spacing: 0; margin: 0; }
+.muted { color: #5f6d76; margin: 0; font-size: 14px; }
+.icon-button { border: 1px solid #bdc9ce; background: #fff; border-radius: 4px; width: 36px; height: 36px; font-size: 20px; cursor: pointer; }
+.controls { display: grid; grid-template-columns: minmax(150px, .6fr) minmax(200px, 1fr); gap: 12px; margin: 16px 0; }
+label { color: #42515c; display: grid; gap: 5px; font-size: 13px; font-weight: 600; }
+input { border: 1px solid #b9c5ca; border-radius: 4px; padding: 9px 10px; background: #fff; color: #1b2430; }
+.status { min-height: 20px; color: #42515c; font-size: 14px; margin: 12px 0; }
+.status.error { color: #b42318; }
+.table-wrap { overflow-x: auto; border: 1px solid #d9e0e3; background: #fff; }
+table { border-collapse: collapse; min-width: 620px; width: 100%; }
+th, td { border-bottom: 1px solid #e6ebed; padding: 11px 12px; text-align: left; font-size: 14px; }
+th { background: #eef3f4; color: #42515c; font-size: 12px; }
+tbody tr:last-child td { border-bottom: 0; }
+.points { text-align: right; font-variant-numeric: tabular-nums; }
+.select, .checkout { border: 1px solid #087f5b; border-radius: 4px; background: #087f5b; color: #fff; cursor: pointer; padding: 6px 10px; text-decoration: none; font-size: 13px; font-weight: 600; white-space: nowrap; }
+.purchase { display: flex; justify-content: space-between; gap: 16px; align-items: center; margin-top: 16px; padding: 14px; border: 1px solid #9fc8b8; background: #edf8f3; }
+.purchase p { margin: 4px 0; }
+code { display: inline-block; margin: 5px 0; padding: 4px 6px; background: #dbeee5; border-radius: 3px; color: #174a3b; font-size: 12px; }
+.disabled { pointer-events: none; opacity: .5; }
+@media (max-width: 620px) { .app-shell { padding: 14px; } .controls { grid-template-columns: 1fr; } .purchase { align-items: stretch; flex-direction: column; } .checkout { text-align: center; } }

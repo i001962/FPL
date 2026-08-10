@@ -2,6 +2,8 @@
 
 This repo contains a Codex skill for preparing signer-reviewable Juicebox deploy txlinks for FPL league NFT shops, plus a static buyer app that can be forked and customized for individual stores.
 
+`mcp-worker/` adds a Cloudflare Worker MCP server and MCP App for reading a classic-league manager table and preparing a selected manager's payment memo before handing the buyer to a configured Juicebox shop. See [mcp-worker/README.md](mcp-worker/README.md) for configuration and deployment.
+
 The frontend template is intentionally separate from the skill:
 
 - Skill workflow: generate and validate deploy state, metadata, calldata, simulation, txlinks, tier inventory, and holder queries for agent contest workflows.
