@@ -5,7 +5,7 @@ Cloudflare Worker MCP server and MCP App for the first FPL shop workflow:
 - `fpl_shop`: opens an interactive manager standings table in an MCP Apps-capable host.
 - `fpl_standings`: resolves a Juicebox project route such as `base:9`, then returns its public FPL classic-league standings.
 - `fpl_prepare_buy`: validates a selected manager, builds `fpl:league=<leagueId>;entry=<entryId>`, and returns its live purchasable tier options.
-- `fpl_create_purchase_transaction`: creates a simulated, unsigned USDC approval/pay plan for any connected wallet.
+- `fpl_create_purchase_transaction`: creates simulated, unsigned, signer-ready USDC approval/pay transactions for any connected wallet.
 
 The server is intentionally non-custodial. It never signs or submits a payment. It simulates the unsigned transaction plan from the PayBox wallet address, and the payment memo is not proof that a wallet controls an FPL entry.
 
@@ -28,6 +28,8 @@ The host agent must keep wallet actions explicit:
 3. Show the returned USDC approval (when needed) and `JBMultiTerminal.pay(...)` transactions for review, then have the user's wallet connector submit them.
 
 The Worker cannot call a peer wallet MCP server directly. It returns wallet-agnostic raw transaction objects for the host agent to pass to the user's selected wallet connector.
+
+Each sendable transaction includes the connected wallet's pending nonce, estimated gas, and current EIP-1559 fee caps. These fields are short-lived. When an approval is required, submit and confirm it first, then call the tool again to build a fresh pay transaction with the next nonce and current fees.
 
 ## Develop and deploy
 
