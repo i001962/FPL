@@ -2,7 +2,7 @@
 
 An independently deployable Cloudflare Worker that exposes public Fantasy Premier League analysis through MCP Streamable HTTP at `/mcp`.
 
-It ports the useful FPL-facing surface of [`dohyung1/x402-fpl-api`](https://github.com/dohyung1/x402-fpl-api) to TypeScript/Workers. It deliberately has no x402, Web3, payment verification, wallet handling, or NFT eligibility logic.
+It ports the useful FPL-facing surface of [`dohyung1/x402-fpl-api`](https://github.com/dohyung1/x402-fpl-api) to TypeScript/Workers. It deliberately has no x402 or payment verification. Access is gated by verified ownership of a Base ERC-721 collection, and a non-holder can inspect—but never have the Worker sign or submit—a Juicebox purchase plan.
 
 ## Included tools
 
@@ -22,7 +22,30 @@ npm run deploy
 
 Connect an MCP client to `https://<worker>.<account>.workers.dev/mcp` using Streamable HTTP.
 
-## Browser clients and authentication
+## NFT eligibility and authentication
+
+All FPL analysis tools require a current access token. The gated collection is the CAIP-19 asset type:
+
+```text
+eip155:8453/erc721:0x4669162aa53b9052f73f1ca12e43f4be57cf40bf
+```
+
+This is a collection-level gate: the verified signer must have `balanceOf(wallet) > 0`. CAIP-19 supports an asset type without a token ID; add a token ID only when the policy should permit a specific NFT rather than any NFT in the collection.
+
+1. Call `fpl_access_challenge` with the EVM wallet address.
+2. Sign the exact returned message with that wallet—this is a message signature, not a transaction.
+3. Call `fpl_verify_access` with the challenge and signature.
+4. Set `Authorization: Bearer <accessToken>` (or `X-FPL-Access-Token`) on subsequent MCP HTTP requests.
+
+The Worker verifies ownership again on each protected call. Tokens expire after one hour. Configure the signing key before deploying:
+
+```bash
+npx wrangler secret put ACCESS_TOKEN_SECRET
+```
+
+For a non-holder, `fpl_purchase_instructions` returns the exact Base ERC-20 approval and `JBMultiTerminal.pay(...)` calldata. It uses the supplied buyer address as the transaction beneficiary, so a successful mint can satisfy the gate. The Worker does not sign, simulate, or submit either transaction.
+
+## Browser clients and CORS
 
 Remote MCP clients normally do not send an `Origin` header. If a browser-hosted MCP client does, configure an allow-list before deploying:
 
@@ -33,7 +56,7 @@ npx wrangler secret put ALLOWED_ORIGINS
 
 Requests with an `Origin` are rejected unless it is in that comma-separated list. This satisfies the Streamable HTTP origin-validation requirement while keeping non-browser MCP clients working.
 
-This Worker intentionally has no authentication yet. Before exposing it to untrusted users, add OAuth or another authentication layer and rate limiting. The planned NFT eligibility gate belongs in an explicit tool/middleware layer; it should not be inferred from a wallet address or FPL team ID.
+Wallet signatures prove wallet control; the collection read proves current entitlement. Add rate limiting before broadly exposing the purchase or access endpoints.
 
 ## Operations
 
@@ -41,4 +64,3 @@ This Worker intentionally has no authentication yet. Before exposing it to untru
 - `live_points` uses a 30-second cache.
 - FPL may block requests from certain networks. The Worker sends a browser-like `User-Agent`; test `/health` and a tool call after deployment.
 - `/health` confirms the service state and that payments/eligibility are intentionally disabled.
-

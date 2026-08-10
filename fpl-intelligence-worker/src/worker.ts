@@ -1,5 +1,6 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
+import { encodeFunctionData, getAddress, isAddress, verifyMessage, type Address, type Hex } from "viem";
 import { z } from "zod";
 
 export interface Env {
@@ -7,6 +8,8 @@ export interface Env {
   FPL_CACHE_TTL_SECONDS?: string;
   /** Comma-separated browser origins allowed to call this remote MCP endpoint. */
   ALLOWED_ORIGINS?: string;
+  /** Wrangler secret. Used to sign short-lived wallet challenges and access tokens. */
+  ACCESS_TOKEN_SECRET?: string;
 }
 
 type Json = Record<string, unknown>;
@@ -20,6 +23,20 @@ const TEAM_ID = z.coerce.number().int().positive();
 const LEAGUE_ID = z.coerce.number().int().positive();
 const PLAYER_ID = z.coerce.number().int().positive();
 const POSITION = ["GKP", "DEF", "MID", "FWD"] as const;
+const BASE_CHAIN_ID = 8453;
+const ELIGIBILITY_ASSET_TYPE = "eip155:8453/erc721:0x4669162aa53b9052f73f1ca12e43f4be57cf40bf";
+const ELIGIBILITY_CONTRACT = "0x4669162aa53b9052f73f1ca12e43f4be57cf40bf" as Address;
+const BASE_RPC_URLS = ["https://mainnet.base.org", "https://base-rpc.publicnode.com"];
+const CHALLENGE_TTL_SECONDS = 5 * 60;
+const ACCESS_TTL_SECONDS = 60 * 60;
+const FREE_ACCESS_TOOLS = new Set(["fpl_access_challenge", "fpl_verify_access", "fpl_purchase_instructions"]);
+const JUICEBOX_TERMINAL = "0x130f5dd2bd8805443cf41755253d778a75a67f53" as Address;
+const JUICEBOX_PROJECT_ID = 10n;
+const PURCHASE_TOKEN = "0x253bA2F6570a90bC3c7C98e4F7f205B081EA9Ba3" as Address;
+const PURCHASE_AMOUNT = 1_000_000_000_000_000_000_000n;
+const PURCHASE_METADATA = "0x00000000000000000000000000000000000000000000000000000000000000005962def1020000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000000000000000000004000000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000002" as Hex;
+const ERC20_APPROVE_ABI = [{ type: "function", name: "approve", stateMutability: "nonpayable", inputs: [{ name: "spender", type: "address" }, { name: "amount", type: "uint256" }], outputs: [{ name: "", type: "bool" }] }] as const;
+const JUICEBOX_PAY_ABI = [{ type: "function", name: "pay", stateMutability: "payable", inputs: [{ name: "projectId", type: "uint256" }, { name: "token", type: "address" }, { name: "amount", type: "uint256" }, { name: "beneficiary", type: "address" }, { name: "minReturnedTokens", type: "uint256" }, { name: "memo", type: "string" }, { name: "metadata", type: "bytes" }], outputs: [{ name: "beneficiaryTokenCount", type: "uint256" }] }] as const;
 
 function number(value: unknown): number { const result = Number(value); return Number.isFinite(result) ? result : 0; }
 function text(value: unknown): string { return typeof value === "string" ? value : String(value ?? ""); }
@@ -32,6 +49,90 @@ function nextGameweek(bootstrap: Bootstrap): number {
 }
 function fplBase(env: Env): string { return (env.FPL_API_BASE || "https://fantasy.premierleague.com/api").replace(/\/$/, ""); }
 function cacheTtl(env: Env): number { return Math.max(0, Math.min(900, number(env.FPL_CACHE_TTL_SECONDS) || 120)); }
+
+type ChallengePayload = { wallet: Address; expiresAt: number; nonce: string; assetType: typeof ELIGIBILITY_ASSET_TYPE };
+type AccessPayload = { wallet: Address; expiresAt: number; assetType: typeof ELIGIBILITY_ASSET_TYPE };
+
+function requiredAccessSecret(env: Env): string {
+  if (!env.ACCESS_TOKEN_SECRET || env.ACCESS_TOKEN_SECRET.length < 32) throw new Error("Eligibility is not configured. The Worker owner must set ACCESS_TOKEN_SECRET.");
+  return env.ACCESS_TOKEN_SECRET;
+}
+function base64UrlEncode(value: Uint8Array | string): string {
+  const bytes = typeof value === "string" ? new TextEncoder().encode(value) : value;
+  let binary = "";
+  for (const byte of bytes) binary += String.fromCharCode(byte);
+  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
+}
+function base64UrlDecode(value: string): ArrayBuffer {
+  if (!/^[A-Za-z0-9_-]+$/.test(value)) throw new Error("Invalid encoded access credential.");
+  const padded = value.replace(/-/g, "+").replace(/_/g, "/").padEnd(Math.ceil(value.length / 4) * 4, "=");
+  const binary = atob(padded);
+  return Uint8Array.from(binary, (character) => character.charCodeAt(0)).buffer;
+}
+async function hmacKey(secret: string): Promise<CryptoKey> {
+  return crypto.subtle.importKey("raw", new TextEncoder().encode(secret), { name: "HMAC", hash: "SHA-256" }, false, ["sign", "verify"]);
+}
+async function signPayload<T extends object>(env: Env, payload: T): Promise<string> {
+  const encoded = base64UrlEncode(JSON.stringify(payload));
+  const signature = await crypto.subtle.sign("HMAC", await hmacKey(requiredAccessSecret(env)), new TextEncoder().encode(encoded));
+  return `${encoded}.${base64UrlEncode(new Uint8Array(signature))}`;
+}
+async function verifyPayload<T extends object>(env: Env, token: string): Promise<T> {
+  const [encoded, signature, ...extra] = token.split(".");
+  if (!encoded || !signature || extra.length) throw new Error("Invalid access credential.");
+  const valid = await crypto.subtle.verify("HMAC", await hmacKey(requiredAccessSecret(env)), base64UrlDecode(signature), new TextEncoder().encode(encoded));
+  if (!valid) throw new Error("Invalid access credential.");
+  const parsed: unknown = JSON.parse(new TextDecoder().decode(base64UrlDecode(encoded)));
+  if (!parsed || typeof parsed !== "object") throw new Error("Invalid access credential.");
+  return parsed as T;
+}
+function accessMessage(challenge: string, payload: ChallengePayload): string {
+  return ["FPL Intelligence MCP access request", `Wallet: ${payload.wallet}`, `Chain: eip155:${BASE_CHAIN_ID}`, `Asset: ${payload.assetType}`, `Expires: ${new Date(payload.expiresAt * 1000).toISOString()}`, `Challenge: ${challenge}`].join("\n");
+}
+async function collectionBalance(wallet: Address): Promise<bigint> {
+  const calldata = `0x70a08231${wallet.slice(2).toLowerCase().padStart(64, "0")}` as Hex;
+  let lastError: unknown;
+  for (const rpcUrl of BASE_RPC_URLS) {
+    try {
+      const response = await fetch(rpcUrl, { method: "POST", headers: { "content-type": "application/json" }, signal: AbortSignal.timeout(8_000), body: JSON.stringify({ jsonrpc: "2.0", id: crypto.randomUUID(), method: "eth_call", params: [{ to: ELIGIBILITY_CONTRACT, data: calldata }, "latest"] }) });
+      const result = await response.json() as { result?: Hex; error?: { message?: string } };
+      if (!response.ok || result.error || !result.result) throw new Error(result.error?.message || `Base RPC returned ${response.status}.`);
+      return BigInt(result.result);
+    } catch (error) { lastError = error; }
+  }
+  throw lastError instanceof Error ? lastError : new Error("Could not verify the Base NFT entitlement.");
+}
+async function issueChallenge(env: Env, walletInput: string) {
+  if (!isAddress(walletInput)) throw new Error("Provide a valid EVM wallet address.");
+  requiredAccessSecret(env);
+  const payload: ChallengePayload = { wallet: getAddress(walletInput), expiresAt: Math.floor(Date.now() / 1000) + CHALLENGE_TTL_SECONDS, nonce: crypto.randomUUID(), assetType: ELIGIBILITY_ASSET_TYPE };
+  const challenge = await signPayload(env, payload);
+  return { challenge, message: accessMessage(challenge, payload), expiresAt: new Date(payload.expiresAt * 1000).toISOString(), wallet: payload.wallet, assetType: payload.assetType };
+}
+async function verifyChallengeAndIssueAccess(env: Env, walletInput: string, challenge: string, signature: Hex) {
+  if (!isAddress(walletInput)) throw new Error("Provide a valid EVM wallet address.");
+  const payload = await verifyPayload<ChallengePayload>(env, challenge);
+  const wallet = getAddress(walletInput);
+  if (payload.assetType !== ELIGIBILITY_ASSET_TYPE || payload.wallet.toLowerCase() !== wallet.toLowerCase() || payload.expiresAt <= Math.floor(Date.now() / 1000)) throw new Error("This wallet challenge is invalid or expired. Request a new challenge.");
+  const validSignature = await verifyMessage({ address: wallet, message: accessMessage(challenge, payload), signature });
+  if (!validSignature) throw new Error("Signature does not prove control of this wallet.");
+  const balance = await collectionBalance(wallet);
+  if (balance < 1n) return { eligible: false as const, wallet, balance: balance.toString(), assetType: ELIGIBILITY_ASSET_TYPE };
+  const expiresAt = Math.floor(Date.now() / 1000) + ACCESS_TTL_SECONDS;
+  const accessToken = await signPayload<AccessPayload>(env, { wallet, expiresAt, assetType: ELIGIBILITY_ASSET_TYPE });
+  return { eligible: true as const, wallet, balance: balance.toString(), assetType: ELIGIBILITY_ASSET_TYPE, accessToken, expiresAt: new Date(expiresAt * 1000).toISOString() };
+}
+async function verifyAccessToken(env: Env, token: string): Promise<AccessPayload> {
+  const payload = await verifyPayload<AccessPayload>(env, token);
+  if (!isAddress(payload.wallet) || payload.assetType !== ELIGIBILITY_ASSET_TYPE || payload.expiresAt <= Math.floor(Date.now() / 1000)) throw new Error("Access token is invalid or expired. Verify ownership again.");
+  if (await collectionBalance(getAddress(payload.wallet)) < 1n) throw new Error("The required NFT is no longer held by this wallet.");
+  return payload;
+}
+function purchasePlan(walletInput: string) {
+  if (!isAddress(walletInput)) throw new Error("Provide a valid EVM buyer address.");
+  const buyer = getAddress(walletInput);
+  return { chain: "Base", chainId: BASE_CHAIN_ID, contract: "JBMultiTerminal", address: JUICEBOX_TERMINAL, function: "pay", abi: "pay(uint256 projectId, address token, uint256 amount, address beneficiary, uint256 minReturnedTokens, string memo, bytes metadata) payable returns (uint256)", calldata: encodeFunctionData({ abi: JUICEBOX_PAY_ABI, functionName: "pay", args: [JUICEBOX_PROJECT_ID, PURCHASE_TOKEN, PURCHASE_AMOUNT, buyer, 0n, "", PURCHASE_METADATA] }), value: "0", erc20Approval: { token: PURCHASE_TOKEN, spender: JUICEBOX_TERMINAL, amount: PURCHASE_AMOUNT.toString(), calldata: encodeFunctionData({ abi: ERC20_APPROVE_ABI, functionName: "approve", args: [JUICEBOX_TERMINAL, PURCHASE_AMOUNT] }) }, args: { projectId: JUICEBOX_PROJECT_ID.toString(), token: PURCHASE_TOKEN, amount: `${PURCHASE_AMOUNT} (1000 SLOPSHOP)`, beneficiary: buyer, minReturnedTokens: "0", memo: "", metadata: PURCHASE_METADATA } };
+}
 
 /** Fetches FPL's public API with a small edge cache; no user data is persisted. */
 async function fpl<T>(env: Env, path: string, ttl = cacheTtl(env)): Promise<T> {
@@ -120,6 +221,25 @@ function transferSuggestions(context: Awaited<ReturnType<typeof teamContext>>, l
 
 function createServer(env: Env): McpServer {
   const server = new McpServer({ name: "FPL Intelligence", version: "0.1.0" });
+  server.tool("fpl_access_challenge", "Create the exact message an EVM wallet must sign to prove control before FPL Intelligence access is granted. The required Base ERC-721 collection is identified by CAIP-19 asset type.", { walletAddress: z.string().trim() }, async ({ walletAddress }) => {
+    try {
+      const challenge = await issueChallenge(env, walletAddress);
+      return { content: [{ type: "text", text: "Sign this exact message with the specified wallet, then call fpl_verify_access with the returned challenge and signature. Do not sign a transaction." }], structuredContent: challenge };
+    } catch (error) { return errorResult(error); }
+  });
+  server.tool("fpl_verify_access", "Verify a signed wallet challenge and require the signer to hold at least one NFT from the required Base ERC-721 collection. Returns a one-hour HTTP access token only for eligible holders.", { walletAddress: z.string().trim(), challenge: z.string().trim().min(20), signature: z.string().trim().regex(/^0x[0-9a-fA-F]{130}$/, "Provide a 65-byte EVM signature.") }, async ({ walletAddress, challenge, signature }) => {
+    try {
+      const result = await verifyChallengeAndIssueAccess(env, walletAddress, challenge, signature as Hex);
+      if (!result.eligible) return { content: [{ type: "text", text: "This wallet does not hold the required NFT. Call fpl_purchase_instructions with the buyer wallet address to review the exact Juicebox approval and pay calldata before signing." }], structuredContent: result, isError: true };
+      return { content: [{ type: "text", text: "Ownership verified. Include `Authorization: Bearer <accessToken>` on subsequent MCP HTTP requests. The token expires in one hour and access is rechecked against the collection on every protected tool call." }], structuredContent: result };
+    } catch (error) { return errorResult(error); }
+  });
+  server.tool("fpl_purchase_instructions", "Show the exact Base Juicebox ERC-20 approval and pay transaction calldata required to mint the access NFT to the buyer address. This tool never signs, submits, or simulates a transaction.", { buyerAddress: z.string().trim() }, async ({ buyerAddress }) => {
+    try {
+      const plan = purchasePlan(buyerAddress);
+      return { content: [{ type: "text", text: "This is the exact transaction that will be sent to your wallet. Review it before signing. It spends 1000 SLOPSHOP, first approves JBMultiTerminal, and mints the NFT to the supplied buyer address as beneficiary." }], structuredContent: { requiredAssetType: ELIGIBILITY_ASSET_TYPE, purchase: plan, instructions: ["Review the ERC-20 approval for 1000 SLOPSHOP to JBMultiTerminal.", "Review the Base JBMultiTerminal.pay transaction. Its beneficiary is your buyer wallet address.", "Submit the approval only if your current allowance is insufficient, wait for confirmation, then submit pay.", "After the NFT arrives, request a fresh fpl_access_challenge and verify ownership."] } };
+    } catch (error) { return errorResult(error); }
+  });
   server.tool("captain_pick", "Rank the best FPL captain picks using form, underlying attacking output, penalties, availability, and fixture difficulty.", { gameweek: z.coerce.number().int().min(1).max(38).optional() }, async ({ gameweek }) => {
     try { const app = await core(env); const gw = gameweek ?? app.next; const picks = captainPicks(app.bootstrap, app.fixtures, gw); return { content: [{ type: "text", text: `Top captain picks for GW${gw}: ${picks.map((pick) => pick.name).join(", ")}.` }], structuredContent: { gameweek: gw, picks } }; } catch (error) { return errorResult(error); }
   });
@@ -170,11 +290,26 @@ function allowedOrigin(request: Request, env: Env): string | null {
 }
 function cors(request: Request, env: Env): Headers {
   const origin = allowedOrigin(request, env);
-  const headers = new Headers({ "Access-Control-Allow-Methods": "GET, POST, OPTIONS", "Access-Control-Allow-Headers": "Content-Type, MCP-Protocol-Version, Mcp-Method, Mcp-Name", Vary: "Origin" });
+  const headers = new Headers({ "Access-Control-Allow-Methods": "GET, POST, OPTIONS", "Access-Control-Allow-Headers": "Authorization, X-FPL-Access-Token, Content-Type, MCP-Protocol-Version, Mcp-Method, Mcp-Name", Vary: "Origin" });
   if (origin) headers.set("Access-Control-Allow-Origin", origin);
   return headers;
 }
 function withCors(response: Response, request: Request, env: Env): Response { const headers = new Headers(response.headers); cors(request, env).forEach((value, key) => headers.set(key, value)); return new Response(response.body, { status: response.status, statusText: response.statusText, headers }); }
+
+async function accessGuard(request: Request, env: Env): Promise<Response | null> {
+  if (request.method !== "POST") return null;
+  const contentLength = number(request.headers.get("content-length"));
+  if (contentLength > 64_000) return Response.json({ error: "MCP request body is too large." }, { status: 413 });
+  let payload: { method?: unknown; params?: { name?: unknown } };
+  try { payload = await request.clone().json() as { method?: unknown; params?: { name?: unknown } }; } catch { return Response.json({ error: "MCP request must contain valid JSON." }, { status: 400 }); }
+  if (payload.method !== "tools/call") return null;
+  const toolName = typeof payload.params?.name === "string" ? payload.params.name : "";
+  if (FREE_ACCESS_TOOLS.has(toolName)) return null;
+  const authorization = request.headers.get("authorization") || request.headers.get("x-fpl-access-token") || "";
+  const token = authorization.startsWith("Bearer ") ? authorization.slice("Bearer ".length).trim() : authorization.trim();
+  if (!token) return Response.json({ error: "NFT access required. Call fpl_access_challenge, sign the returned message, call fpl_verify_access, then send Authorization: Bearer <accessToken>." }, { status: 401 });
+  try { await verifyAccessToken(env, token); return null; } catch (error) { return Response.json({ error: error instanceof Error ? error.message : "NFT access verification failed." }, { status: 403 }); }
+}
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
@@ -184,6 +319,8 @@ export default {
     if (url.pathname === "/health") return withCors(Response.json({ ok: true, service: "fpl-intelligence-mcp", payment: "disabled", eligibility: "not_configured" }), request, env);
     if (url.pathname !== "/mcp") return new Response("Not found", { status: 404 });
     if (request.method === "OPTIONS") return new Response(null, { headers: cors(request, env) });
+    const denied = await accessGuard(request, env);
+    if (denied) return withCors(denied, request, env);
     const transport = new WebStandardStreamableHTTPServerTransport({ sessionIdGenerator: undefined, enableJsonResponse: true });
     const server = createServer(env);
     await server.connect(transport);
