@@ -224,53 +224,15 @@ async function rpcRequest<T>(chain: ChainSlug, method: string, params: unknown[]
   throw lastError instanceof Error ? lastError : new Error(`RPC ${method} failed.`);
 }
 
-async function simulateTransaction(chain: ChainSlug, transaction: { from: string; to: string; data: Hex; value: Hex }): Promise<{ ok: boolean; error?: string }> {
-  let lastError: unknown;
-  for (const rpcUrl of CHAINS[chain].rpcUrls) {
-    try {
-      const response = await fetch(rpcUrl, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        signal: AbortSignal.timeout(8_000),
-        body: JSON.stringify({ jsonrpc: "2.0", id: crypto.randomUUID(), method: "eth_call", params: [{ from: transaction.from, to: transaction.to, data: transaction.data, value: transaction.value }, "latest"] }),
-      });
-      const payload = await response.json() as { error?: { message?: string } };
-      if (!response.ok || payload.error) throw new Error(payload.error?.message || `RPC request failed (${response.status}).`);
-      return { ok: true };
-    } catch (error) {
-      lastError = error;
-    }
-  }
-  return { ok: false, error: lastError instanceof Error ? lastError.message : "Simulation failed." };
-}
-
-type SignerTransaction = {
+type CheckoutTransaction = {
   chainId: number;
   from: string;
   to: string;
   data: Hex;
   value: Hex;
-  nonce: Hex;
-  gas: Hex;
-  maxFeePerGas: Hex;
-  maxPriorityFeePerGas: Hex;
   purpose: string;
-  simulation: { ok: boolean; error?: string };
+  hostRpcRequired: true;
 };
-
-async function hydrateTransaction(chain: ChainSlug, transaction: Omit<SignerTransaction, "nonce" | "gas" | "maxFeePerGas" | "maxPriorityFeePerGas">): Promise<SignerTransaction> {
-  const request = { from: transaction.from, to: transaction.to, data: transaction.data, value: transaction.value };
-  const [nonce, gas, priorityFee, block] = await Promise.all([
-    rpcRequest<Hex>(chain, "eth_getTransactionCount", [transaction.from, "pending"]),
-    rpcRequest<Hex>(chain, "eth_estimateGas", [request, "latest"]),
-    rpcRequest<Hex>(chain, "eth_maxPriorityFeePerGas", []),
-    rpcRequest<{ baseFeePerGas?: Hex }>(chain, "eth_getBlockByNumber", ["latest", false]),
-  ]);
-  if (!block.baseFeePerGas) throw new Error("Base RPC did not return an EIP-1559 base fee.");
-  const maxPriorityFeePerGas = priorityFee;
-  const maxFeePerGas = `0x${(BigInt(block.baseFeePerGas) * 2n + BigInt(priorityFee)).toString(16)}` as Hex;
-  return { ...transaction, nonce, gas, maxFeePerGas, maxPriorityFeePerGas };
-}
 
 type ShopTier = { tierId: number; price: bigint; remainingSupply: number; initialSupply: number };
 
@@ -445,7 +407,7 @@ async function appHtml(env: Env): Promise<string> {
 }
 
 function createServer(env: Env): McpServer {
-  const server = new McpServer({ name: "FPL League Shop", version: "0.4.0" });
+  const server = new McpServer({ name: "FPL League Shop", version: "0.5.0" });
   registerAppTool(server, "fpl_shop", {
     title: "Open FPL league shop",
     description: "Use a Juicebox project route to resolve its FPL league from project metadata and show manager standings.",
@@ -495,7 +457,7 @@ function createServer(env: Env): McpServer {
       },
     };
   });
-  server.tool("fpl_create_purchase_transaction", "Build simulated, unsigned, signer-ready Base transactions for a connected wallet, including nonce, gas, and EIP-1559 fee caps. The host agent must ask for approval before a wallet connector submits them.", {
+  server.tool("fpl_create_purchase_transaction", "Build unsigned Base USDC approval and Juicebox pay calldata. The host wallet must check allowance, simulate, estimate gas and fees, then request approval before signing and broadcasting.", {
     projectRoute: projectRouteSchema.optional(),
     entryId: z.coerce.number().int().positive(),
     tierIds: z.array(z.coerce.number().int().min(1).max(65535)).min(1).max(20),
@@ -518,34 +480,26 @@ function createServer(env: Env): McpServer {
     const buyer = buyerAddress as Hex;
     const token = shop.token as Hex;
     const terminal = shop.terminal as Hex;
-    const allowance = decodeFunctionResult({ abi: ERC20_ABI, functionName: "allowance", data: await ethCall(shop.chain, token, encodeFunctionData({ abi: ERC20_ABI, functionName: "allowance", args: [buyer, terminal] })) });
-    const transactions: SignerTransaction[] = [];
-    const approvalRequired = allowance < amount;
-    if (approvalRequired) {
-      const data = encodeFunctionData({ abi: ERC20_ABI, functionName: "approve", args: [terminal, amount] });
-      const simulation = await simulateTransaction(shop.chain, { from: buyerAddress, to: token, data, value: "0x0" as Hex });
-      if (!simulation.ok) return { content: [{ type: "text", text: `The USDC approval did not simulate successfully: ${simulation.error}` }], isError: true };
-      transactions.push(await hydrateTransaction(shop.chain, { chainId: CHAINS[shop.chain].chainId, from: buyerAddress, to: token, data, value: "0x0" as Hex, purpose: "Approve USDC for Juicebox", simulation }));
-    }
-    const data = encodeFunctionData({ abi: PAY_ABI, functionName: "pay", args: [shop.projectId, token, amount, buyer, 0n, memo, v6TierMetadata(shop.idTarget, tierIds)] });
-    const paySimulation = await simulateTransaction(shop.chain, { from: buyerAddress, to: terminal, data, value: "0x0" as Hex });
-    if (!paySimulation.ok && !approvalRequired) return { content: [{ type: "text", text: `The live Juicebox pay call did not simulate successfully: ${paySimulation.error}` }], isError: true };
-    if (!approvalRequired) {
-      transactions.push(await hydrateTransaction(shop.chain, { chainId: CHAINS[shop.chain].chainId, from: buyerAddress, to: terminal, data, value: "0x0" as Hex, purpose: "Buy selected FPL NFT tiers", simulation: paySimulation }));
-    }
+    const approval: CheckoutTransaction = {
+      chainId: CHAINS[shop.chain].chainId, from: buyerAddress, to: token,
+      data: encodeFunctionData({ abi: ERC20_ABI, functionName: "approve", args: [terminal, amount] }),
+      value: "0x0" as Hex, purpose: "Approve USDC for Juicebox", hostRpcRequired: true,
+    };
+    const pay: CheckoutTransaction = {
+      chainId: CHAINS[shop.chain].chainId, from: buyerAddress, to: terminal,
+      data: encodeFunctionData({ abi: PAY_ABI, functionName: "pay", args: [shop.projectId, token, amount, buyer, 0n, memo, v6TierMetadata(shop.idTarget, tierIds)] }),
+      value: "0x0" as Hex, purpose: "Buy selected FPL NFT tiers", hostRpcRequired: true,
+    };
     return {
-      content: [{ type: "text", text: approvalRequired
-        ? "Prepared a hydrated USDC approval transaction. Submit and confirm it first, then call this tool again to receive a freshly hydrated and simulated pay transaction."
-        : "Prepared a simulated unsigned pay transaction. Ask the user to review the USDC amount, selected FPL entry, and memo before submitting." }],
+      content: [{ type: "text", text: "Prepared unsigned approval and pay calldata. The host wallet must use its own Base RPC to check allowance, simulate, estimate gas and fees; only submit approval if needed, wait for it to confirm, then simulate and submit pay after user approval." }],
       structuredContent: {
         ...project, entryId, entryName: manager.entryName, playerName: manager.playerName, buyerAddress, memo,
         amountRaw: amount.toString(), amountUsdc: Number(amount) / 1_000_000, tierIds,
-        transactions,
-        submitRawTransactions: transactions.map(({ chainId, from, to, data, value, nonce, gas, maxFeePerGas, maxPriorityFeePerGas }) => ({ chainId, from, to, data, value, nonce, gas, maxFeePerGas, maxPriorityFeePerGas })),
-        deferredPay: approvalRequired ? { chainId: CHAINS[shop.chain].chainId, to: terminal, data, value: "0x0", purpose: "Rebuild after the approval confirms; its nonce, gas, and fee caps must be current." } : undefined,
-        approvalRequired,
-        nextStep: approvalRequired ? "Submit and confirm the approval transaction, then call fpl_create_purchase_transaction again before submitting pay." : "Submit the simulated pay transaction through the connected wallet after user approval.",
-        warning: "This plan is unsigned. The connected wallet is the signer, and the memo is only a weak claim linking that wallet payment to the selected FPL entry.",
+        approval: { ...approval, optional: true, onlySubmitWhenAllowanceBelow: amount.toString() },
+        pay,
+        requiredHostRpcActions: ["Read USDC allowance for buyerAddress -> terminal.", "Simulate each transaction with eth_call.", "Populate nonce, gas, maxFeePerGas, and maxPriorityFeePerGas immediately before signing.", "Submit approval only when allowance is below amountRaw; wait for its confirmation before simulating and submitting pay."],
+        nextStep: "The connected wallet must simulate and hydrate this plan through its own Base RPC, then ask the user to approve each required transaction.",
+        warning: "This plan is unsigned and not simulated by the FPL Worker. The connected wallet is the signer, and the memo is only a weak claim linking that wallet payment to the selected FPL entry.",
       },
     };
   });

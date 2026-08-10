@@ -1813,6 +1813,12 @@ Direct Juicebox routes use: 1=eth, 11155111=sep, 42161=arb, 421614=arbsep, 8453=
       return managers;
     }
 
+    function rankManagersByTotal(managers) {
+      return [...managers]
+        .sort((a, b) => Number(b.total) - Number(a.total) || Number(a.entryId) - Number(b.entryId))
+        .map((manager, index) => ({ ...manager, rank: index + 1 }));
+    }
+
     function leagueApiUrl(standingsPage, newEntriesPage) {
       let url = state.apiBase.includes('{leagueId}')
         ? state.apiBase.replaceAll('{leagueId}', encodeURIComponent(state.leagueId))
@@ -1851,7 +1857,9 @@ Direct Juicebox routes use: 1=eth, 11155111=sep, 42161=arb, 421614=arbsep, 8453=
         if (standingsHasNext) standingsPage += 1;
         if (newEntriesHasNext) newEntriesPage += 1;
       }
-      state.managers = [...managers.values()];
+      // `new_entries` can repeat while standings continues onto later pages. Rank
+      // the deduplicated league list locally so every displayed position is unique.
+      state.managers = rankManagersByTotal([...managers.values()]);
       if (!state.managers.length) throw new Error('No managers found for this league.');
     }
 

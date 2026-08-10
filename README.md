@@ -4,6 +4,8 @@ This repo contains a Codex skill for preparing signer-reviewable Juicebox deploy
 
 `mcp-worker/` adds a Cloudflare Worker MCP server and MCP App for reading a classic-league manager table and preparing a selected manager's payment memo before handing the buyer to a configured Juicebox shop. See [mcp-worker/README.md](mcp-worker/README.md) for configuration and deployment.
 
+`fpl-intelligence-worker/` is a separate, independently deployable Streamable HTTP MCP Worker for public FPL analysis. It intentionally contains no x402/payment handling; NFT eligibility will be added later as an explicit access-control layer. See [fpl-intelligence-worker/README.md](fpl-intelligence-worker/README.md).
+
 The frontend template is intentionally separate from the skill:
 
 - Skill workflow: generate and validate deploy state, metadata, calldata, simulation, txlinks, tier inventory, and holder queries for agent contest workflows.

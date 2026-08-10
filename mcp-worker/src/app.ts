@@ -15,7 +15,7 @@ type PurchasePlan = { entryId: number; entryName: string; memo: string; warning:
 type AppLaunch = { inputRequired?: boolean; projectRoute?: string };
 type SavedViewState = { projectRoute: string; entryId?: number };
 
-const app = new App({ name: "FPL League Shop", version: "0.4.0" });
+const app = new App({ name: "FPL League Shop", version: "0.5.0" });
 const VIEW_STATE_KEY = "fpl-league-shop-mcp-view-v1";
 const standingsEl = document.querySelector<HTMLTableSectionElement>("#standings")!;
 const statusEl = document.querySelector<HTMLElement>("#status")!;

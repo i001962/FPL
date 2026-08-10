@@ -5,9 +5,9 @@ Cloudflare Worker MCP server and MCP App for the first FPL shop workflow:
 - `fpl_shop`: opens an interactive manager standings table in an MCP Apps-capable host.
 - `fpl_standings`: resolves a Juicebox project route such as `base:9`, then returns its public FPL classic-league standings.
 - `fpl_prepare_buy`: validates a selected manager, builds `fpl:league=<leagueId>;entry=<entryId>`, and returns its live purchasable tier options.
-- `fpl_create_purchase_transaction`: creates simulated, unsigned, signer-ready USDC approval/pay transactions for any connected wallet.
+- `fpl_create_purchase_transaction`: creates unsigned USDC approval/pay calldata for any connected wallet to simulate and submit through its own Base RPC.
 
-The server is intentionally non-custodial. It never signs or submits a payment. It simulates the unsigned transaction plan from the PayBox wallet address, and the payment memo is not proof that a wallet controls an FPL entry.
+The server is intentionally non-custodial. It never signs, simulates, or submits a payment. The wallet host performs wallet-specific RPC work, and the payment memo is not proof that a wallet controls an FPL entry.
 
 ## Configure
 
@@ -25,11 +25,12 @@ The host agent must keep wallet actions explicit:
 
 1. Call `fpl_prepare_buy` to validate the FPL manager and read the live tier IDs.
 2. Get the connected wallet address and call `fpl_create_purchase_transaction` with that address and selected tier IDs.
-3. Show the returned USDC approval (when needed) and `JBMultiTerminal.pay(...)` transactions for review, then have the user's wallet connector submit them.
+3. With the wallet's own Base RPC, read the USDC allowance, simulate the approval/pay transactions, and hydrate nonce, gas and EIP-1559 fee fields.
+4. Submit approval only when needed, wait for confirmation, then simulate and submit `JBMultiTerminal.pay(...)` after user review.
 
 The Worker cannot call a peer wallet MCP server directly. It returns wallet-agnostic raw transaction objects for the host agent to pass to the user's selected wallet connector.
 
-Each sendable transaction includes the connected wallet's pending nonce, estimated gas, and current EIP-1559 fee caps. These fields are short-lived. When an approval is required, submit and confirm it first, then call the tool again to build a fresh pay transaction with the next nonce and current fees.
+The returned transactions deliberately omit nonce, gas, and fee caps because those values are wallet-specific and short-lived. Populate them immediately before signing through the wallet host's Base RPC.
 
 ## Develop and deploy
 
