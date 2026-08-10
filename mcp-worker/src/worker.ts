@@ -397,7 +397,7 @@ async function appHtml(env: Env): Promise<string> {
 }
 
 function createServer(env: Env): McpServer {
-  const server = new McpServer({ name: "FPL League Shop", version: "0.2.0" });
+  const server = new McpServer({ name: "FPL League Shop", version: "0.3.0" });
   registerAppTool(server, "fpl_shop", {
     title: "Open FPL league shop",
     description: "Use a Juicebox project route to resolve its FPL league from project metadata and show manager standings.",
