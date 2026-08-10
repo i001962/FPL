@@ -13,8 +13,10 @@ type Standings = {
 };
 type PurchasePlan = { entryId: number; entryName: string; memo: string; warning: string; tiers?: { tierId: number; amountUsdc: number; remainingSupply: number }[] };
 type AppLaunch = { inputRequired?: boolean; projectRoute?: string };
+type SavedViewState = { projectRoute: string; entryId?: number };
 
 const app = new App({ name: "FPL League Shop", version: "0.2.0" });
+const VIEW_STATE_KEY = "fpl-league-shop-mcp-view-v1";
 const standingsEl = document.querySelector<HTMLTableSectionElement>("#standings")!;
 const statusEl = document.querySelector<HTMLElement>("#status")!;
 const leagueNameEl = document.querySelector<HTMLElement>("#league-name")!;
@@ -26,6 +28,25 @@ const selectedManagerEl = document.querySelector<HTMLElement>("#selected-manager
 const memoEl = document.querySelector<HTMLElement>("#memo")!;
 const purchaseDetailEl = document.querySelector<HTMLElement>("#purchase-detail")!;
 let currentStandings: Standings | null = null;
+
+function readViewState(): SavedViewState | null {
+  try {
+    const value = JSON.parse(localStorage.getItem(VIEW_STATE_KEY) || "null") as Partial<SavedViewState> | null;
+    return value && typeof value.projectRoute === "string" && /^(base|basesep):[1-9]\d*$/.test(value.projectRoute)
+      ? { projectRoute: value.projectRoute, entryId: Number.isInteger(value.entryId) ? value.entryId : undefined }
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+function saveViewState(state: SavedViewState) {
+  try {
+    localStorage.setItem(VIEW_STATE_KEY, JSON.stringify(state));
+  } catch {
+    // Hosts may disable storage for sandboxed Apps.
+  }
+}
 
 function inputProjectRoute(): string | null {
   const value = projectRouteInput.value.trim();
@@ -40,6 +61,7 @@ function showStatus(message: string, isError = false) {
 function renderStandings(data: Standings) {
   currentStandings = data;
   projectRouteInput.value = data.projectRoute;
+  saveViewState({ projectRoute: data.projectRoute, entryId: readViewState()?.projectRoute === data.projectRoute ? readViewState()?.entryId : undefined });
   leagueNameEl.textContent = data.leagueName;
   leagueMetaEl.textContent = `${data.projectRoute} · FPL league ${data.leagueId} from ${data.source}`;
   standingsEl.replaceChildren();
@@ -92,6 +114,7 @@ async function preparePurchase(manager: Manager) {
     purchaseDetailEl.textContent = availableTiers
       ? `Live tiers: ${availableTiers}. Ask the wallet-connected agent to call fpl_create_purchase_transaction with the selected tier IDs and its wallet address.`
       : "No purchasable live NFT tiers are available for this project.";
+    saveViewState({ projectRoute, entryId: plan.entryId });
     showStatus(plan.warning);
   } catch (error) {
     showStatus(error instanceof Error ? error.message : "Could not prepare the purchase.", true);
@@ -112,4 +135,20 @@ app.ontoolresult = (result) => {
 };
 reloadButton.addEventListener("click", loadStandings);
 projectRouteInput.addEventListener("change", loadStandings);
-app.connect();
+projectRouteInput.addEventListener("change", () => {
+  const projectRoute = inputProjectRoute();
+  if (projectRoute) saveViewState({ projectRoute });
+});
+
+async function restoreViewState() {
+  const saved = readViewState();
+  if (!saved || inputProjectRoute()) return;
+  projectRouteInput.value = saved.projectRoute;
+  await loadStandings();
+  const manager = currentStandings?.projectRoute === saved.projectRoute
+    ? currentStandings.managers.find((candidate) => candidate.entry === saved.entryId)
+    : undefined;
+  if (manager) await preparePurchase(manager);
+}
+
+void app.connect().then(() => restoreViewState()).catch(() => undefined);
