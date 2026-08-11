@@ -35,7 +35,7 @@ const ELIGIBILITY_CONTRACT = "0x4669162aa53b9052f73f1ca12e43f4be57cf40bf" as Add
 const CHALLENGE_TTL_SECONDS = 5 * 60;
 const NFT_ACCESS_TTL_SECONDS = 5 * 60;
 const PAYMENT_ACCESS_TTL_SECONDS = 15 * 60;
-const FREE_ACCESS_TOOLS = new Set(["fpl_access_challenge", "fpl_verify_access", "fpl_verify_payment", "fpl_purchase_instructions"]);
+const FREE_ACCESS_TOOLS = new Set(["fpl_access_options", "fpl_access_challenge", "fpl_verify_access", "fpl_verify_payment", "fpl_purchase_instructions"]);
 const X402_ROUTER = "0xe0427f250fdb0379c8e98e884ee4570521208cbc" as Address;
 const X402_PROJECT_ID = 3n;
 const X402_USDC = "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913" as Address;
@@ -285,6 +285,34 @@ function transferSuggestions(context: Awaited<ReturnType<typeof teamContext>>, l
 
 function createServer(env: Env): McpServer {
   const server = new McpServer({ name: "FPL Intelligence", version: "0.1.0" });
+  server.tool("fpl_access_options", "Start here when FPL Intelligence access is required. Explains the NFT-holder route, the $0.05 USDC payment fallback, and how to obtain a token for protected FPL tools. Provide walletAddress to also receive the exact NFT purchase transaction plan.", { walletAddress: z.string().trim().optional() }, async ({ walletAddress }) => {
+    try {
+      const nftPurchase = walletAddress ? purchasePlan(walletAddress) : null;
+      return {
+        content: [{ type: "text", text: "FPL Intelligence has two access routes. Preferred: if the wallet holds the required Base NFT, call fpl_access_challenge, have the wallet sign the returned message, then call fpl_verify_access for a five-minute token. If the wallet does not hold the NFT, pay $0.05 USDC on Base using the included Juicebox quote, then call fpl_access_challenge, sign the message, and call fpl_verify_payment with the mined payment hash for a 15-minute token. Use the resulting accessToken in each protected tool's arguments. The NFT is not automatic: it must be verified through fpl_verify_access." }],
+        structuredContent: {
+          preferredRoute: "nft",
+          nft: {
+            assetType: ELIGIBILITY_ASSET_TYPE,
+            network: "Base",
+            chainId: BASE_CHAIN_ID,
+            contract: ELIGIBILITY_CONTRACT,
+            requirement: "The signed wallet must hold at least one NFT from this ERC-721 collection.",
+            verificationSteps: ["fpl_access_challenge", "Sign the exact returned message", "fpl_verify_access"],
+            accessDurationSeconds: NFT_ACCESS_TTL_SECONDS,
+            purchaseTool: "fpl_purchase_instructions",
+            purchase: nftPurchase,
+          },
+          paymentFallback: {
+            enabled: true,
+            quote: paymentQuote(),
+            verificationSteps: ["Pay the quoted Base USDC transaction", "fpl_access_challenge", "Sign the exact returned message", "fpl_verify_payment"],
+          },
+          protectedCall: { tokenArgument: "accessToken", example: { name: "captain_pick", arguments: { accessToken: "<accessToken>" } } },
+        },
+      };
+    } catch (error) { return errorResult(error); }
+  });
   server.tool("fpl_access_challenge", "Create the exact message an EVM wallet must sign to prove control before FPL Intelligence access is granted. The required Base ERC-721 collection is identified by CAIP-19 asset type.", { walletAddress: z.string().trim() }, async ({ walletAddress }) => {
     try {
       const challenge = await issueChallenge(env, walletAddress);
@@ -379,7 +407,7 @@ async function accessGuard(request: Request, env: Env): Promise<Response | null>
   const headerToken = authorization.startsWith("Bearer ") ? authorization.slice("Bearer ".length).trim() : authorization.trim();
   const argumentToken = typeof payload.params?.arguments?.accessToken === "string" ? payload.params.arguments.accessToken.trim() : typeof payload.params?._meta?.accessToken === "string" ? payload.params._meta.accessToken.trim() : "";
   const token = headerToken || argumentToken;
-  if (!token) return Response.json({ error: "NFT access required or payment needed.", payment: paymentQuote(), access: "Call fpl_access_challenge, sign the returned message, then use fpl_verify_access for NFT holders or fpl_verify_payment with a mined payment transaction hash. Stateless clients may include the resulting accessToken in params.arguments.accessToken on each protected tools/call request." }, { status: 402 });
+  if (!token) return Response.json({ error: "NFT access required or payment needed.", nextTool: "fpl_access_options", payment: paymentQuote(), access: "Payment fallback is enabled. First call fpl_access_options for the NFT and $0.05 USDC payment decision tree. Then use fpl_verify_access for NFT holders, or fpl_verify_payment with a mined Juicebox payment transaction hash. Stateless clients may include the resulting accessToken in params.arguments.accessToken on each protected tools/call request." }, { status: 402 });
   try { await verifyAccessToken(env, token); return null; } catch (error) { return Response.json({ error: error instanceof Error ? error.message : "NFT access verification failed." }, { status: 403 }); }
 }
 

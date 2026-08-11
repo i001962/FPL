@@ -45,6 +45,8 @@ npx wrangler secret put ACCESS_TOKEN_SECRET
 
 HTTP clients should send `Authorization: Bearer <accessToken>`. Stateless MCP clients that cannot persist headers may instead include the token in every protected tool's arguments as `accessToken`; it is listed in each protected tool schema.
 
+Agents should call the free `fpl_access_options` tool before their first protected FPL call. It returns both access routes: the NFT verification flow and the $0.05 USDC Juicebox payment fallback. Passing `walletAddress` also returns the exact NFT purchase transaction plan.
+
 For a non-holder, `fpl_purchase_instructions` returns the exact Base ERC-20 approval and `JBMultiTerminal.pay(...)` calldata. It uses the supplied buyer address as the transaction beneficiary, so a successful mint can satisfy the gate. The Worker does not sign, simulate, or submit either transaction.
 
 ## Paid fallback (x402-style)
