@@ -1,7 +1,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
 import { DurableObject } from "cloudflare:workers";
-import { decodeFunctionData, encodeFunctionData, getAddress, isAddress, verifyMessage, type Address, type Hex } from "viem";
+import { decodeFunctionData, decodeFunctionResult, encodeFunctionData, getAddress, isAddress, verifyMessage, type Address, type Hex } from "viem";
 import { z } from "zod";
 
 export interface Env {
@@ -35,19 +35,21 @@ const ELIGIBILITY_CONTRACT = "0x4669162aa53b9052f73f1ca12e43f4be57cf40bf" as Add
 const CHALLENGE_TTL_SECONDS = 5 * 60;
 const NFT_ACCESS_TTL_SECONDS = 5 * 60;
 const PAYMENT_ACCESS_TTL_SECONDS = 15 * 60;
-const FREE_ACCESS_TOOLS = new Set(["fpl_access_options", "fpl_access_challenge", "fpl_verify_access", "fpl_verify_payment", "fpl_purchase_instructions"]);
+const FREE_ACCESS_TOOLS = new Set(["fpl_access_options", "fpl_access_challenge", "fpl_verify_access", "fpl_verify_payment", "fpl_access_nft_inventory", "fpl_purchase_instructions"]);
 const X402_ROUTER = "0xe0427f250fdb0379c8e98e884ee4570521208cbc" as Address;
 const X402_PROJECT_ID = 3n;
 const X402_USDC = "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913" as Address;
 const X402_MIN_AMOUNT = 50_000n;
 const X402_BENEFICIARY = "0xDf087B724174A3E4eD2338C0798193932E851F1b" as Address;
-const JUICEBOX_TERMINAL = "0x130f5dd2bd8805443cf41755253d778a75a67f53" as Address;
-const JUICEBOX_PROJECT_ID = 10n;
-const PURCHASE_TOKEN = "0x253bA2F6570a90bC3c7C98e4F7f205B081EA9Ba3" as Address;
-const PURCHASE_AMOUNT = 1_000_000_000_000_000_000_000n;
-const PURCHASE_METADATA = "0x00000000000000000000000000000000000000000000000000000000000000005962def1020000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000000000000000000004000000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000002" as Hex;
-const ERC20_APPROVE_ABI = [{ type: "function", name: "approve", stateMutability: "nonpayable", inputs: [{ name: "spender", type: "address" }, { name: "amount", type: "uint256" }], outputs: [{ name: "", type: "bool" }] }] as const;
+const ACCESS_NFT_PROJECT_ID = 10n;
+const JUICEBOX_DIRECTORY = "0x5aff29060e023e6fb87be5596652b33c65af535b" as Address;
 const JUICEBOX_PAY_ABI = [{ type: "function", name: "pay", stateMutability: "payable", inputs: [{ name: "projectId", type: "uint256" }, { name: "token", type: "address" }, { name: "amount", type: "uint256" }, { name: "beneficiary", type: "address" }, { name: "minReturnedTokens", type: "uint256" }, { name: "memo", type: "string" }, { name: "metadata", type: "bytes" }], outputs: [{ name: "beneficiaryTokenCount", type: "uint256" }] }] as const;
+const CONTROLLER_OF_ABI = [{ type: "function", name: "controllerOf", stateMutability: "view", inputs: [{ name: "projectId", type: "uint256" }], outputs: [{ name: "", type: "address" }] }] as const;
+const CURRENT_RULESET_ABI = [{ type: "function", name: "currentRulesetOf", stateMutability: "view", inputs: [{ name: "projectId", type: "uint256" }], outputs: [{ name: "ruleset", type: "tuple", components: [{ name: "cycleNumber", type: "uint256" }, { name: "id", type: "uint256" }, { name: "basedOnId", type: "uint256" }, { name: "start", type: "uint256" }, { name: "duration", type: "uint256" }, { name: "weight", type: "uint256" }, { name: "weightCutPercent", type: "uint256" }, { name: "approvalHook", type: "address" }, { name: "metadata", type: "uint256" }] }, { name: "metadata", type: "tuple", components: [{ name: "reservedPercent", type: "uint256" }, { name: "cashOutTaxRate", type: "uint256" }, { name: "baseCurrency", type: "uint256" }, { name: "pausePay", type: "bool" }, { name: "pauseCreditTransfers", type: "bool" }, { name: "allowOwnerMinting", type: "bool" }, { name: "allowSetCustomToken", type: "bool" }, { name: "allowTerminalMigration", type: "bool" }, { name: "allowSetTerminals", type: "bool" }, { name: "allowSetController", type: "bool" }, { name: "allowAddAccountingContext", type: "bool" }, { name: "allowAddPriceFeed", type: "bool" }, { name: "ownerMustSendPayouts", type: "bool" }, { name: "holdFees", type: "bool" }, { name: "useTotalSurplusForCashOuts", type: "bool" }, { name: "useDataHookForPay", type: "bool" }, { name: "useDataHookForCashOut", type: "bool" }, { name: "dataHook", type: "address" }, { name: "metadata", type: "uint256" }] }] }] as const;
+const HOOK_STORE_ABI = [{ type: "function", name: "STORE", stateMutability: "view", inputs: [], outputs: [{ type: "address" }] }] as const;
+const HOOK_METADATA_ID_TARGET_ABI = [{ type: "function", name: "METADATA_ID_TARGET", stateMutability: "view", inputs: [], outputs: [{ type: "address" }] }] as const;
+const PRICING_CONTEXT_ABI = [{ type: "function", name: "pricingContext", stateMutability: "view", inputs: [], outputs: [{ name: "currency", type: "uint256" }, { name: "decimals", type: "uint256" }] }] as const;
+const TIER_STORE_ABI = [{ type: "function", name: "tiersOf", stateMutability: "view", inputs: [{ type: "address" }, { type: "uint256[]" }, { type: "bool" }, { type: "uint256" }, { type: "uint256" }], outputs: [{ type: "tuple[]", components: [{ name: "id", type: "uint32" }, { name: "price", type: "uint104" }, { name: "remainingSupply", type: "uint32" }, { name: "initialSupply", type: "uint32" }, { name: "votingUnits", type: "uint104" }, { name: "reserveFrequency", type: "uint16" }, { name: "reserveBeneficiary", type: "address" }, { name: "encodedIpfsUri", type: "bytes32" }, { name: "category", type: "uint24" }, { name: "discountPercent", type: "uint8" }, { name: "flags", type: "tuple", components: [{ name: "allowOwnerMint", type: "bool" }, { name: "transfersPausable", type: "bool" }, { name: "cantBeRemoved", type: "bool" }, { name: "cantIncreaseDiscountPercent", type: "bool" }, { name: "cantBuyWithCredits", type: "bool" }] }, { name: "splitPercent", type: "uint32" }, { name: "resolvedUri", type: "string" }] }] }] as const;
 
 function number(value: unknown): number { const result = Number(value); return Number.isFinite(result) ? result : 0; }
 function text(value: unknown): string { return typeof value === "string" ? value : String(value ?? ""); }
@@ -192,10 +194,70 @@ async function verifyAccessToken(env: Env, token: string): Promise<AccessPayload
   if (payload.source === "nft" && await collectionBalance(env, getAddress(payload.wallet)) < 1n) throw new Error("The required NFT is no longer held by this wallet.");
   return payload;
 }
-function purchasePlan(walletInput: string) {
-  if (!isAddress(walletInput)) throw new Error("Provide a valid EVM buyer address.");
-  const buyer = getAddress(walletInput);
-  return { chain: "Base", chainId: BASE_CHAIN_ID, contract: "JBMultiTerminal", address: JUICEBOX_TERMINAL, function: "pay", abi: "pay(uint256 projectId, address token, uint256 amount, address beneficiary, uint256 minReturnedTokens, string memo, bytes metadata) payable returns (uint256)", calldata: encodeFunctionData({ abi: JUICEBOX_PAY_ABI, functionName: "pay", args: [JUICEBOX_PROJECT_ID, PURCHASE_TOKEN, PURCHASE_AMOUNT, buyer, 0n, "", PURCHASE_METADATA] }), value: "0", erc20Approval: { token: PURCHASE_TOKEN, spender: JUICEBOX_TERMINAL, amount: PURCHASE_AMOUNT.toString(), calldata: encodeFunctionData({ abi: ERC20_APPROVE_ABI, functionName: "approve", args: [JUICEBOX_TERMINAL, PURCHASE_AMOUNT] }) }, args: { projectId: JUICEBOX_PROJECT_ID.toString(), token: PURCHASE_TOKEN, amount: `${PURCHASE_AMOUNT} (1000 SLOPSHOP)`, beneficiary: buyer, minReturnedTokens: "0", memo: "", metadata: PURCHASE_METADATA } };
+function isZeroAddress(address: string): boolean { return /^0x0{40}$/i.test(address); }
+function metadataUrls(uri: string): string[] {
+  if (uri.startsWith("ipfs://")) {
+    const path = uri.slice("ipfs://".length);
+    return [`https://gateway.pinata.cloud/ipfs/${path}`, `https://ipfs.io/ipfs/${path}`, `https://cloudflare-ipfs.com/ipfs/${path}`];
+  }
+  return /^https:\/\//i.test(uri) ? [uri] : [];
+}
+const BASE58_ALPHABET = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
+function base58Encode(bytes: Uint8Array): string {
+  const digits = [0];
+  for (const byte of bytes) {
+    let carry = byte;
+    for (let index = 0; index < digits.length; index += 1) {
+      carry += digits[index] * 256;
+      digits[index] = carry % 58;
+      carry = Math.floor(carry / 58);
+    }
+    while (carry) { digits.push(carry % 58); carry = Math.floor(carry / 58); }
+  }
+  for (let index = 0; index < bytes.length - 1 && bytes[index] === 0; index += 1) digits.push(0);
+  return digits.reverse().map((digit) => BASE58_ALPHABET[digit]).join("");
+}
+function encodedIpfsUri(bytes32: Hex): string | null {
+  if (/^0x0+$/i.test(bytes32)) return null;
+  const hex = bytes32.slice(2);
+  const digest = new Uint8Array(hex.match(/.{2}/g)?.map((part) => Number.parseInt(part, 16)) ?? []);
+  return digest.length === 32 ? `ipfs://${base58Encode(new Uint8Array([0x12, 0x20, ...digest]))}` : null;
+}
+async function tierMetadata(uri: string): Promise<{ name: string | null; description: string | null; image: string | null; error?: string }> {
+  if (!uri) return { name: null, description: null, image: null, error: "No resolved metadata URI was returned by the hook." };
+  let lastError: unknown;
+  for (const url of metadataUrls(uri)) {
+    try {
+      const response = await fetch(url, { headers: { Accept: "application/json" }, signal: AbortSignal.timeout(8_000) });
+      if (!response.ok) throw new Error(`Metadata request returned ${response.status}.`);
+      const value = await response.json() as Record<string, unknown>;
+      return { name: typeof value.name === "string" ? value.name : null, description: typeof value.description === "string" ? value.description : null, image: typeof value.image === "string" ? value.image : null };
+    } catch (error) { lastError = error; }
+  }
+  return { name: null, description: null, image: null, error: lastError instanceof Error ? lastError.message : "Tier metadata could not be read." };
+}
+async function accessNftInventory(env: Env) {
+  const controller = decodeFunctionResult({ abi: CONTROLLER_OF_ABI, functionName: "controllerOf", data: await baseRpc<Hex>(env, "eth_call", [{ to: JUICEBOX_DIRECTORY, data: encodeFunctionData({ abi: CONTROLLER_OF_ABI, functionName: "controllerOf", args: [ACCESS_NFT_PROJECT_ID] }) }, "latest"]) });
+  if (isZeroAddress(controller)) throw new Error("Juicebox project base:10 has no active controller.");
+  const ruleset = decodeFunctionResult({ abi: CURRENT_RULESET_ABI, functionName: "currentRulesetOf", data: await baseRpc<Hex>(env, "eth_call", [{ to: controller, data: encodeFunctionData({ abi: CURRENT_RULESET_ABI, functionName: "currentRulesetOf", args: [ACCESS_NFT_PROJECT_ID] }) }, "latest"]) });
+  const metadata = ruleset[1];
+  if (!metadata.useDataHookForPay || isZeroAddress(metadata.dataHook)) throw new Error("Juicebox project base:10 has no active V6 721 pay hook.");
+  const hook = metadata.dataHook;
+  const [store, metadataIdTarget, pricing] = await Promise.all([
+    baseRpc<Hex>(env, "eth_call", [{ to: hook, data: encodeFunctionData({ abi: HOOK_STORE_ABI, functionName: "STORE" }) }, "latest"]),
+    baseRpc<Hex>(env, "eth_call", [{ to: hook, data: encodeFunctionData({ abi: HOOK_METADATA_ID_TARGET_ABI, functionName: "METADATA_ID_TARGET" }) }, "latest"]),
+    baseRpc<Hex>(env, "eth_call", [{ to: hook, data: encodeFunctionData({ abi: PRICING_CONTEXT_ABI, functionName: "pricingContext" }) }, "latest"]),
+  ]);
+  const tierStore = decodeFunctionResult({ abi: HOOK_STORE_ABI, functionName: "STORE", data: store });
+  const idTarget = decodeFunctionResult({ abi: HOOK_METADATA_ID_TARGET_ABI, functionName: "METADATA_ID_TARGET", data: metadataIdTarget });
+  const pricingContext = decodeFunctionResult({ abi: PRICING_CONTEXT_ABI, functionName: "pricingContext", data: pricing });
+  const rawTiers = decodeFunctionResult({ abi: TIER_STORE_ABI, functionName: "tiersOf", data: await baseRpc<Hex>(env, "eth_call", [{ to: tierStore, data: encodeFunctionData({ abi: TIER_STORE_ABI, functionName: "tiersOf", args: [hook, [], true, 0n, 100n] }) }, "latest"]) });
+  const tiers = await Promise.all(rawTiers.filter((tier) => tier.id > 0 && tier.initialSupply > 0).map(async (tier) => {
+    const metadataUri = tier.resolvedUri || encodedIpfsUri(tier.encodedIpfsUri);
+    const tierInfo = { tierId: Number(tier.id), category: Number(tier.category), price: { raw: tier.price.toString(), pricingCurrency: pricingContext[0].toString(), decimals: Number(pricingContext[1]) }, initialSupply: Number(tier.initialSupply), remainingSupply: Number(tier.remainingSupply), buyable: tier.remainingSupply > 0, metadataUri, metadata: await tierMetadata(metadataUri || "") };
+    return { ...tierInfo, eligibleForFplAccess: /\b(?:og|fpl)\b/i.test(tierInfo.metadata.description || "") };
+  }));
+  return { projectRoute: "base:10", chain: "Base", chainId: BASE_CHAIN_ID, requiredAssetType: ELIGIBILITY_ASSET_TYPE, requiredCollection: ELIGIBILITY_CONTRACT, v6: { directory: JUICEBOX_DIRECTORY, controller, hook, metadataIdTarget: idTarget, tierStore }, pricingContext: { currency: pricingContext[0].toString(), decimals: Number(pricingContext[1]) }, tiers, discoveryNotice: "Prices, supply, tier IDs, and descriptions were read from the current Juicebox V6 project state. A tier is an FPL access option when its live metadata description contains OG or FPL. Do not rely on an old fixed quote." };
 }
 
 /** Fetches FPL's public API with a small edge cache; no user data is persisted. */
@@ -285,11 +347,10 @@ function transferSuggestions(context: Awaited<ReturnType<typeof teamContext>>, l
 
 function createServer(env: Env): McpServer {
   const server = new McpServer({ name: "FPL Intelligence", version: "0.1.0" });
-  server.tool("fpl_access_options", "Start here when FPL Intelligence access is required. Explains where to mint the access NFT through Juicebox project base:10, the $0.05 USDC payment fallback, and how to obtain a token for protected FPL tools. Provide walletAddress to also receive the exact NFT purchase transaction plan.", { walletAddress: z.string().trim().optional() }, async ({ walletAddress }) => {
+  server.tool("fpl_access_options", "Start here when FPL Intelligence access is required. Explains the live Juicebox V6 NFT inventory for project base:10, the $0.05 USDC payment fallback, and how to obtain a token for protected FPL tools.", {}, async () => {
     try {
-      const nftPurchase = walletAddress ? purchasePlan(walletAddress) : null;
       return {
-        content: [{ type: "text", text: "FPL Intelligence has two access routes. Preferred: mint or hold the required Base NFT. It is minted by approving 1000 SLOPSHOP to JBMultiTerminal, then calling JBMultiTerminal.pay on Base project 10; the pay beneficiary must be the buyer wallet, and the project’s 721 hook mints one Inference Cell OG Supporter NFT. The exact approval and pay calldata is included below when walletAddress is supplied, or is available from fpl_purchase_instructions. Then call fpl_access_challenge, sign the message, and call fpl_verify_access for a five-minute token. Alternatively, the x402-style fallback is enabled: pay $0.05 USDC on Base using the included Juicebox quote, then call fpl_access_challenge, sign the message, and call fpl_verify_payment with the mined payment hash for a 15-minute token. Use the resulting accessToken in each protected tool's arguments. The NFT is not automatic: it must be verified through fpl_verify_access." }],
+        content: [{ type: "text", text: "FPL Intelligence has two access routes. Preferred: mint or hold the required Base NFT. First call fpl_access_nft_inventory: it reads the current Juicebox V6 project base:10 tiers on-chain and returns each available NFT's live description, supply, and raw price. Choose a tier whose live description offers the access you want, then complete checkout with your own wallet as beneficiary. Do not rely on a fixed SLOPSHOP amount or prebuilt calldata: those are intentionally discovered from current project state. After minting, call fpl_access_challenge, sign the exact message, and call fpl_verify_access for a five-minute token. Alternatively, the x402-style fallback is enabled: pay $0.05 USDC on Base using the included Juicebox quote, then call fpl_access_challenge, sign the message, and call fpl_verify_payment with the mined payment hash for a 15-minute token. Use the resulting accessToken in each protected tool's arguments. NFT access is not automatic: it must be verified through fpl_verify_access." }],
         structuredContent: {
           preferredRoute: "nft",
           nft: {
@@ -300,19 +361,9 @@ function createServer(env: Env): McpServer {
             requirement: "The signed wallet must hold at least one NFT from this ERC-721 collection.",
             verificationSteps: ["fpl_access_challenge", "Sign the exact returned message", "fpl_verify_access"],
             accessDurationSeconds: NFT_ACCESS_TTL_SECONDS,
-            purchaseTool: "fpl_purchase_instructions",
-            mint: {
-              projectRoute: "base:10",
-              item: "Inference Cell OG Supporter ×1",
-              terminal: JUICEBOX_TERMINAL,
-              function: "pay(uint256 projectId, address token, uint256 amount, address beneficiary, uint256 minReturnedTokens, string memo, bytes metadata)",
-              paymentToken: PURCHASE_TOKEN,
-              paymentAmount: `${PURCHASE_AMOUNT} (1000 SLOPSHOP)`,
-              approvalSpender: JUICEBOX_TERMINAL,
-              beneficiary: walletAddress ? getAddress(walletAddress) : "Must be the buyer wallet address; provide walletAddress for exact calldata.",
-              result: "One access NFT is minted by the project 721 hook.",
-            },
-            purchase: nftPurchase,
+            discoveryTool: "fpl_access_nft_inventory",
+            projectRoute: "base:10",
+            discoverySteps: ["Call fpl_access_nft_inventory.", "Read each returned tier metadata.name and metadata.description.", "Choose an available tier with the access option you want and use a Juicebox V6 checkout that resolves the live tier ID, price, payment asset, terminal, and hook metadata target.", "Use your connected buyer wallet as the pay beneficiary.", "After minting, call fpl_access_challenge then fpl_verify_access."],
           },
           paymentFallback: {
             enabled: true,
@@ -343,12 +394,14 @@ function createServer(env: Env): McpServer {
       return { content: [{ type: "text", text: "Payment verified. Include the accessToken in protected tool arguments or use `Authorization: Bearer <accessToken>`; the paid pass expires in 15 minutes." }], structuredContent: result };
     } catch (error) { return errorResult(error); }
   });
-  server.tool("fpl_purchase_instructions", "Show the exact Base Juicebox project base:10 ERC-20 approval and pay transaction calldata required to mint the access NFT to the buyer address. This tool never signs, submits, or simulates a transaction.", { buyerAddress: z.string().trim() }, async ({ buyerAddress }) => {
+  const inventoryHandler = async () => {
     try {
-      const plan = purchasePlan(buyerAddress);
-      return { content: [{ type: "text", text: "Mint the required access NFT through Juicebox project base:10. This is the exact transaction that will be sent to your wallet. Review it before signing. It spends 1000 SLOPSHOP, first approves JBMultiTerminal, then its 721 hook mints one Inference Cell OG Supporter NFT to the supplied buyer address as beneficiary." }], structuredContent: { requiredAssetType: ELIGIBILITY_ASSET_TYPE, mint: { projectRoute: "base:10", item: "Inference Cell OG Supporter ×1", result: "One access NFT minted by the 721 hook." }, purchase: plan, instructions: ["Review the ERC-20 approval for 1000 SLOPSHOP to JBMultiTerminal.", "Review the Base JBMultiTerminal.pay transaction for project 10. Its beneficiary is your buyer wallet address.", "Submit the approval only if your current allowance is insufficient, wait for confirmation, then submit pay.", "After the NFT arrives, request a fresh fpl_access_challenge and verify ownership."] } };
+      const inventory = await accessNftInventory(env);
+      return { content: [{ type: "text" as const, text: "This is the live Base Juicebox V6 inventory for project base:10. Read every tier's metadata description to understand its access option. Prices and supply are on-chain values returned at request time; this MCP deliberately does not issue a static SLOPSHOP quote or stale purchase calldata. After choosing an available tier, use a V6-aware Juicebox checkout with your buyer wallet as beneficiary, then verify the minted NFT with fpl_access_challenge and fpl_verify_access." }], structuredContent: inventory };
     } catch (error) { return errorResult(error); }
-  });
+  };
+  server.tool("fpl_access_nft_inventory", "Discover the current Base Juicebox V6 NFT tiers for project base:10. Reads the active controller, 721 hook, tier store, on-chain price/supply, and each tier's metadata description. Use this before choosing an NFT access option.", {}, inventoryHandler);
+  server.tool("fpl_purchase_instructions", "Legacy alias for fpl_access_nft_inventory. Discovers the live Base Juicebox V6 access-NFT tiers and their descriptions; it intentionally does not return a fixed SLOPSHOP amount or stale calldata.", {}, inventoryHandler);
   server.tool("captain_pick", "Rank the best FPL captain picks using form, underlying attacking output, penalties, availability, and fixture difficulty. Stateless clients can provide the short-lived accessToken returned by fpl_verify_payment directly in this tool's arguments.", protectedToolInput({ gameweek: z.coerce.number().int().min(1).max(38).optional() }), async ({ gameweek }) => {
     try { const app = await core(env); const gw = gameweek ?? app.next; const picks = captainPicks(app.bootstrap, app.fixtures, gw); return { content: [{ type: "text", text: `Top captain picks for GW${gw}: ${picks.map((pick) => pick.name).join(", ")}.` }], structuredContent: { gameweek: gw, picks } }; } catch (error) { return errorResult(error); }
   });

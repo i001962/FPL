@@ -30,7 +30,7 @@ All FPL analysis tools require a current access token. The gated collection is t
 eip155:8453/erc721:0x4669162aa53b9052f73f1ca12e43f4be57cf40bf
 ```
 
-This is a collection-level gate: the verified signer must have `balanceOf(wallet) > 0`. CAIP-19 supports an asset type without a token ID; add a token ID only when the policy should permit a specific NFT rather than any NFT in the collection.
+This is a collection-level gate: the verified signer must have `balanceOf(wallet) > 0`. The linked Juicebox project is `base:10`; its live V6 tier inventory marks a tier as an FPL access option when its metadata description contains `OG` or `FPL`. CAIP-19 supports an asset type without a token ID; add a token ID only when the policy should permit a specific NFT rather than any NFT in the collection.
 
 1. Call `fpl_access_challenge` with the EVM wallet address.
 2. Sign the exact returned message with that wallet—this is a message signature, not a transaction.
@@ -45,9 +45,9 @@ npx wrangler secret put ACCESS_TOKEN_SECRET
 
 HTTP clients should send `Authorization: Bearer <accessToken>`. Stateless MCP clients that cannot persist headers may instead include the token in every protected tool's arguments as `accessToken`; it is listed in each protected tool schema.
 
-Agents should call the free `fpl_access_options` tool before their first protected FPL call. It returns both access routes: the NFT verification flow and the $0.05 USDC Juicebox payment fallback. Passing `walletAddress` also returns the exact NFT purchase transaction plan.
+Agents should call the free `fpl_access_options` tool before their first protected FPL call. It returns both access routes: the NFT verification flow and the $0.05 USDC Juicebox payment fallback.
 
-For a non-holder, `fpl_purchase_instructions` returns the exact Base ERC-20 approval and `JBMultiTerminal.pay(...)` calldata. It uses the supplied buyer address as the transaction beneficiary, so a successful mint can satisfy the gate. The Worker does not sign, simulate, or submit either transaction.
+For a non-holder, `fpl_access_nft_inventory` (also available under the legacy `fpl_purchase_instructions` name) resolves the active Juicebox V6 controller, 721 hook, tier store, current prices/supply, and IPFS metadata for project `base:10`. Read the returned tier descriptions and choose a currently available tier marked `eligibleForFplAccess`. The Worker deliberately does not quote a fixed SLOPSHOP amount or return stale checkout calldata; a V6-aware checkout must use the current tier, payment asset, terminal, and buyer wallet as beneficiary.
 
 ## Paid fallback (x402-style)
 
