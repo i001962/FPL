@@ -53,15 +53,29 @@ const TIER_STORE_ABI = [{ type: "function", name: "tiersOf", stateMutability: "v
 
 function number(value: unknown): number { const result = Number(value); return Number.isFinite(result) ? result : 0; }
 function text(value: unknown): string { return typeof value === "string" ? value : String(value ?? ""); }
-function currentGameweek(bootstrap: Bootstrap): number {
-  const current = bootstrap.events.find((event) => event.is_current === true) ?? bootstrap.events.find((event) => event.is_next === true);
-  return number(current?.id) || 1;
+function currentGameweek(bootstrap: Bootstrap): number | null {
+  const current = bootstrap.events.find((event) => event.is_current === true);
+  return current ? number(current.id) || null : null;
 }
 function nextGameweek(bootstrap: Bootstrap): number {
-  return number(bootstrap.events.find((event) => event.is_next === true)?.id) || currentGameweek(bootstrap);
+  return number(bootstrap.events.find((event) => event.is_next === true)?.id) || currentGameweek(bootstrap) || 1;
 }
 function fplBase(env: Env): string { return (env.FPL_API_BASE || "https://fantasy.premierleague.com/api").replace(/\/$/, ""); }
 function cacheTtl(env: Env): number { return Math.max(0, Math.min(900, number(env.FPL_CACHE_TTL_SECONDS) || 120)); }
+
+class FplHttpError extends Error {
+  constructor(readonly status: number, readonly path: string) {
+    super(`FPL API returned ${status}.`);
+  }
+}
+
+class FplGameweekDataUnavailable extends Error {
+  readonly code = "fpl_gameweek_data_unpublished";
+
+  constructor(readonly teamId: number, readonly gameweek: number | null, readonly currentGameweek: number | null, readonly nextGameweek: number) {
+    super("FPL gameweek squad data is not published yet.");
+  }
+}
 
 type ChallengePayload = { wallet: Address; expiresAt: number; nonce: string; assetType: typeof ELIGIBILITY_ASSET_TYPE };
 type AccessPayload = { wallet: Address; expiresAt: number; assetType: typeof ELIGIBILITY_ASSET_TYPE; source: "nft" | "payment" };
@@ -275,7 +289,7 @@ async function fpl<T>(env: Env, path: string, ttl = cacheTtl(env)): Promise<T> {
     try {
       response = await fetch(url, { headers: { Accept: "application/json", "User-Agent": USER_AGENT }, signal: AbortSignal.timeout(10_000) });
       if (response.ok) break;
-      lastError = new Error(`FPL API returned ${response.status}.`);
+      lastError = new FplHttpError(response.status, path);
     } catch (error) { lastError = error; }
   }
   if (!response?.ok) throw lastError instanceof Error ? lastError : new Error("FPL API request failed.");
@@ -287,7 +301,7 @@ async function fpl<T>(env: Env, path: string, ttl = cacheTtl(env)): Promise<T> {
   return data;
 }
 
-async function core(env: Env): Promise<{ bootstrap: Bootstrap; fixtures: Fixture[]; current: number; next: number }> {
+async function core(env: Env): Promise<{ bootstrap: Bootstrap; fixtures: Fixture[]; current: number | null; next: number }> {
   const [bootstrap, fixtures] = await Promise.all([fpl<Bootstrap>(env, "/bootstrap-static/"), fpl<Fixture[]>(env, "/fixtures/")]);
   return { bootstrap, fixtures, current: currentGameweek(bootstrap), next: nextGameweek(bootstrap) };
 }
@@ -322,11 +336,44 @@ function playerView(player: Player, bootstrap: Bootstrap, fixtures: Fixture[], g
   return { playerId: player.id, name: player.web_name, team: teams.get(player.team)?.short_name || "?", position: playerPosition(player), price: number(player.now_cost) / 10, form: number(player.form), pointsPerGame: number(player.points_per_game), totalPoints: number(player.total_points), minutes: number(player.minutes), selectedByPercent: number(player.selected_by_percent), expectedGoalsPer90: number(player.expected_goals_per_90), expectedAssistsPer90: number(player.expected_assists_per_90), status: text(player.status || "a"), chanceOfPlayingNextRound: player.chance_of_playing_next_round ?? null, nextFixtures: next.map((fixture) => ({ gameweek: fixture.gameweek, opponent: teams.get(fixture.opponent)?.short_name || "?", home: fixture.home, difficulty: fixture.difficulty })) };
 }
 
-function errorResult(error: unknown) { return { content: [{ type: "text" as const, text: error instanceof Error ? error.message : "Unexpected FPL service error." }], isError: true }; }
+function errorResult(error: unknown) {
+  if (error instanceof FplGameweekDataUnavailable) return gameweekDataUnavailableResult(error);
+  return { content: [{ type: "text" as const, text: error instanceof Error ? error.message : "Unexpected FPL service error." }], isError: true };
+}
+
+function gameweekDataUnavailableResult(error: FplGameweekDataUnavailable) {
+  const gameweekText = error.gameweek ? `GW${error.gameweek}` : "the current gameweek";
+  return {
+    content: [{ type: "text" as const, text: `${gameweekText} squad/picks data is not published by FPL yet. Access was accepted; this is a preseason or gameweek-availability state, not an NFT/auth failure.` }],
+    structuredContent: {
+      status: error.code,
+      access: "accepted",
+      teamId: error.teamId,
+      requestedGameweek: error.gameweek,
+      currentGameweek: error.currentGameweek,
+      nextGameweek: error.nextGameweek,
+      reason: "FPL has not exposed manager squad/picks data for this gameweek yet.",
+      retryWhen: "Retry after the gameweek starts or FPL publishes entry picks.",
+      safeFallbackTools: ["captain_pick", "player_comparison", "differential_finder", "fixture_outlook", "price_predictions", "rival_tracker", "league_analyzer"],
+    },
+  };
+}
+
+async function managerPicks(env: Env, teamId: number, gameweek: number | null, app: Awaited<ReturnType<typeof core>>, ttl = 60): Promise<Json> {
+  if (gameweek === null) throw new FplGameweekDataUnavailable(teamId, null, app.current, app.next);
+  try {
+    return await fpl<Json>(env, `/entry/${teamId}/event/${gameweek}/picks/`, ttl);
+  } catch (error) {
+    if (error instanceof FplHttpError && error.status === 404) {
+      throw new FplGameweekDataUnavailable(teamId, gameweek, app.current, app.next);
+    }
+    throw error;
+  }
+}
 
 async function teamContext(env: Env, teamId: number, data?: Awaited<ReturnType<typeof core>>) {
   const app = data ?? await core(env);
-  const [picks, history, profile] = await Promise.all([fpl<Json>(env, `/entry/${teamId}/event/${app.current}/picks/`, 60), fpl<Json>(env, `/entry/${teamId}/history/`, 120), fpl<Json>(env, `/entry/${teamId}/`, 120)]);
+  const [picks, history, profile] = await Promise.all([managerPicks(env, teamId, app.current, app, 60), fpl<Json>(env, `/entry/${teamId}/history/`, 120), fpl<Json>(env, `/entry/${teamId}/`, 120)]);
   return { ...app, picks, history, profile };
 }
 
@@ -418,7 +465,7 @@ function createServer(env: Env): McpServer {
     try { const app = await core(env); const ranked = app.bootstrap.elements.map((player) => ({ player, netTransfers: number(player.transfers_in_event) - number(player.transfers_out_event) })); const view = (item: typeof ranked[number]) => ({ ...playerView(item.player, app.bootstrap, app.fixtures, app.next), netTransfers: item.netTransfers }); const risers = [...ranked].sort((a, b) => b.netTransfers - a.netTransfers).slice(0, 15).map(view); const fallers = [...ranked].sort((a, b) => a.netTransfers - b.netTransfers).slice(0, 15).map(view); return { content: [{ type: "text", text: "Price-change heuristic based on current event transfer flow." }], structuredContent: { gameweek: app.next, disclaimer: "FPL does not publish price-change thresholds; treat this as a signal, not a guarantee.", likelyRisers: risers, likelyFallers: fallers } }; } catch (error) { return errorResult(error); }
   });
   server.tool("live_points", "Return live points, bonus and auto-sub-relevant details for an FPL team in a gameweek.", protectedToolInput({ teamId: TEAM_ID, gameweek: z.coerce.number().int().min(1).max(38).optional() }), async ({ teamId, gameweek }) => {
-    try { const app = await core(env); const gw = gameweek ?? app.current; const [live, picks] = await Promise.all([fpl<Json>(env, `/event/${gw}/live/`, 30), fpl<Json>(env, `/entry/${teamId}/event/${gw}/picks/`, 30)]); const liveById = new Map((live.elements as Json[] || []).map((item) => [number(item.id), item])); const players = (picks.picks as Json[] || []).map((pick) => { const player = app.bootstrap.elements.find((candidate) => candidate.id === number(pick.element)); const stats = liveById.get(number(pick.element))?.stats as Json | undefined; return { playerId: number(pick.element), name: player?.web_name || "Unknown", starter: number(pick.position) <= 11, captain: pick.is_captain === true, viceCaptain: pick.is_vice_captain === true, points: number(stats?.total_points) * (pick.is_captain === true ? 2 : 1), minutes: number(stats?.minutes), bonus: number(stats?.bonus), autoSub: Boolean(pick.autosub) }; }); return { content: [{ type: "text", text: `Live points for team ${teamId}, GW${gw}.` }], structuredContent: { teamId, gameweek: gw, players, eventStatus: await fpl<Json>(env, "/event-status/", 60) } }; } catch (error) { return errorResult(error); }
+    try { const app = await core(env); const gw = gameweek ?? app.current; const [live, picks] = await Promise.all([gw === null ? Promise.resolve<Json>({ elements: [] }) : fpl<Json>(env, `/event/${gw}/live/`, 30), managerPicks(env, teamId, gw, app, 30)]); const liveById = new Map((live.elements as Json[] || []).map((item) => [number(item.id), item])); const players = (picks.picks as Json[] || []).map((pick) => { const player = app.bootstrap.elements.find((candidate) => candidate.id === number(pick.element)); const stats = liveById.get(number(pick.element))?.stats as Json | undefined; return { playerId: number(pick.element), name: player?.web_name || "Unknown", starter: number(pick.position) <= 11, captain: pick.is_captain === true, viceCaptain: pick.is_vice_captain === true, points: number(stats?.total_points) * (pick.is_captain === true ? 2 : 1), minutes: number(stats?.minutes), bonus: number(stats?.bonus), autoSub: Boolean(pick.autosub) }; }); return { content: [{ type: "text", text: `Live points for team ${teamId}, GW${gw}.` }], structuredContent: { teamId, gameweek: gw, players, eventStatus: await fpl<Json>(env, "/event-status/", 60) } }; } catch (error) { return errorResult(error); }
   });
   server.tool("transfer_suggestions", "Suggest like-for-like FPL transfers from a manager's current public squad and bank.", protectedToolInput({ teamId: TEAM_ID, limit: z.coerce.number().int().min(1).max(10).default(5) }), async ({ teamId, limit }) => {
     try { const context = await teamContext(env, teamId); const suggestions = transferSuggestions(context, limit); return { content: [{ type: "text", text: `Transfer suggestions for ${text(context.profile.name) || `team ${teamId}`}.` }], structuredContent: { teamId, gameweek: context.next, bank: number((context.picks.entry_history as Json | undefined)?.bank) / 10, suggestions, disclaimer: "Check availability, position limits, and your exact free-transfer count before acting." } }; } catch (error) { return errorResult(error); }

@@ -86,5 +86,6 @@ Wallet signatures prove wallet control; the collection read proves current entit
 
 - FPL API data is cached at the edge for 120 seconds by default. Set `FPL_CACHE_TTL_SECONDS` in `wrangler.jsonc` (0–900) to adjust it.
 - `live_points` uses a 30-second cache.
+- During preseason or before FPL publishes gameweek picks, squad-dependent tools return `status: "fpl_gameweek_data_unpublished"` with `access: "accepted"` instead of treating FPL `404` responses as NFT/auth failures.
 - FPL may block requests from certain networks. The Worker sends a browser-like `User-Agent`; test `/health` and a tool call after deployment.
 - `/health` confirms the service state and whether an authenticated Base RPC URL is configured.
