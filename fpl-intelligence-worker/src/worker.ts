@@ -285,11 +285,11 @@ function transferSuggestions(context: Awaited<ReturnType<typeof teamContext>>, l
 
 function createServer(env: Env): McpServer {
   const server = new McpServer({ name: "FPL Intelligence", version: "0.1.0" });
-  server.tool("fpl_access_options", "Start here when FPL Intelligence access is required. Explains the NFT-holder route, the $0.05 USDC payment fallback, and how to obtain a token for protected FPL tools. Provide walletAddress to also receive the exact NFT purchase transaction plan.", { walletAddress: z.string().trim().optional() }, async ({ walletAddress }) => {
+  server.tool("fpl_access_options", "Start here when FPL Intelligence access is required. Explains where to mint the access NFT through Juicebox project base:10, the $0.05 USDC payment fallback, and how to obtain a token for protected FPL tools. Provide walletAddress to also receive the exact NFT purchase transaction plan.", { walletAddress: z.string().trim().optional() }, async ({ walletAddress }) => {
     try {
       const nftPurchase = walletAddress ? purchasePlan(walletAddress) : null;
       return {
-        content: [{ type: "text", text: "FPL Intelligence has two access routes. Preferred: if the wallet holds the required Base NFT, call fpl_access_challenge, have the wallet sign the returned message, then call fpl_verify_access for a five-minute token. If the wallet does not hold the NFT, pay $0.05 USDC on Base using the included Juicebox quote, then call fpl_access_challenge, sign the message, and call fpl_verify_payment with the mined payment hash for a 15-minute token. Use the resulting accessToken in each protected tool's arguments. The NFT is not automatic: it must be verified through fpl_verify_access." }],
+        content: [{ type: "text", text: "FPL Intelligence has two access routes. Preferred: mint or hold the required Base NFT. It is minted by approving 1000 SLOPSHOP to JBMultiTerminal, then calling JBMultiTerminal.pay on Base project 10; the pay beneficiary must be the buyer wallet, and the project’s 721 hook mints one Inference Cell OG Supporter NFT. The exact approval and pay calldata is included below when walletAddress is supplied, or is available from fpl_purchase_instructions. Then call fpl_access_challenge, sign the message, and call fpl_verify_access for a five-minute token. Alternatively, the x402-style fallback is enabled: pay $0.05 USDC on Base using the included Juicebox quote, then call fpl_access_challenge, sign the message, and call fpl_verify_payment with the mined payment hash for a 15-minute token. Use the resulting accessToken in each protected tool's arguments. The NFT is not automatic: it must be verified through fpl_verify_access." }],
         structuredContent: {
           preferredRoute: "nft",
           nft: {
@@ -301,6 +301,17 @@ function createServer(env: Env): McpServer {
             verificationSteps: ["fpl_access_challenge", "Sign the exact returned message", "fpl_verify_access"],
             accessDurationSeconds: NFT_ACCESS_TTL_SECONDS,
             purchaseTool: "fpl_purchase_instructions",
+            mint: {
+              projectRoute: "base:10",
+              item: "Inference Cell OG Supporter ×1",
+              terminal: JUICEBOX_TERMINAL,
+              function: "pay(uint256 projectId, address token, uint256 amount, address beneficiary, uint256 minReturnedTokens, string memo, bytes metadata)",
+              paymentToken: PURCHASE_TOKEN,
+              paymentAmount: `${PURCHASE_AMOUNT} (1000 SLOPSHOP)`,
+              approvalSpender: JUICEBOX_TERMINAL,
+              beneficiary: walletAddress ? getAddress(walletAddress) : "Must be the buyer wallet address; provide walletAddress for exact calldata.",
+              result: "One access NFT is minted by the project 721 hook.",
+            },
             purchase: nftPurchase,
           },
           paymentFallback: {
@@ -332,10 +343,10 @@ function createServer(env: Env): McpServer {
       return { content: [{ type: "text", text: "Payment verified. Include the accessToken in protected tool arguments or use `Authorization: Bearer <accessToken>`; the paid pass expires in 15 minutes." }], structuredContent: result };
     } catch (error) { return errorResult(error); }
   });
-  server.tool("fpl_purchase_instructions", "Show the exact Base Juicebox ERC-20 approval and pay transaction calldata required to mint the access NFT to the buyer address. This tool never signs, submits, or simulates a transaction.", { buyerAddress: z.string().trim() }, async ({ buyerAddress }) => {
+  server.tool("fpl_purchase_instructions", "Show the exact Base Juicebox project base:10 ERC-20 approval and pay transaction calldata required to mint the access NFT to the buyer address. This tool never signs, submits, or simulates a transaction.", { buyerAddress: z.string().trim() }, async ({ buyerAddress }) => {
     try {
       const plan = purchasePlan(buyerAddress);
-      return { content: [{ type: "text", text: "This is the exact transaction that will be sent to your wallet. Review it before signing. It spends 1000 SLOPSHOP, first approves JBMultiTerminal, and mints the NFT to the supplied buyer address as beneficiary." }], structuredContent: { requiredAssetType: ELIGIBILITY_ASSET_TYPE, purchase: plan, instructions: ["Review the ERC-20 approval for 1000 SLOPSHOP to JBMultiTerminal.", "Review the Base JBMultiTerminal.pay transaction. Its beneficiary is your buyer wallet address.", "Submit the approval only if your current allowance is insufficient, wait for confirmation, then submit pay.", "After the NFT arrives, request a fresh fpl_access_challenge and verify ownership."] } };
+      return { content: [{ type: "text", text: "Mint the required access NFT through Juicebox project base:10. This is the exact transaction that will be sent to your wallet. Review it before signing. It spends 1000 SLOPSHOP, first approves JBMultiTerminal, then its 721 hook mints one Inference Cell OG Supporter NFT to the supplied buyer address as beneficiary." }], structuredContent: { requiredAssetType: ELIGIBILITY_ASSET_TYPE, mint: { projectRoute: "base:10", item: "Inference Cell OG Supporter ×1", result: "One access NFT minted by the 721 hook." }, purchase: plan, instructions: ["Review the ERC-20 approval for 1000 SLOPSHOP to JBMultiTerminal.", "Review the Base JBMultiTerminal.pay transaction for project 10. Its beneficiary is your buyer wallet address.", "Submit the approval only if your current allowance is insufficient, wait for confirmation, then submit pay.", "After the NFT arrives, request a fresh fpl_access_challenge and verify ownership."] } };
     } catch (error) { return errorResult(error); }
   });
   server.tool("captain_pick", "Rank the best FPL captain picks using form, underlying attacking output, penalties, availability, and fixture difficulty. Stateless clients can provide the short-lived accessToken returned by fpl_verify_payment directly in this tool's arguments.", protectedToolInput({ gameweek: z.coerce.number().int().min(1).max(38).optional() }), async ({ gameweek }) => {
