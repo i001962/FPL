@@ -30,8 +30,12 @@ const ACCESS_TOKEN_ARGUMENT = z.string().trim().min(1).optional().describe("Shor
 function protectedToolInput<T extends z.ZodRawShape>(shape: T) { return { ...shape, accessToken: ACCESS_TOKEN_ARGUMENT }; }
 const POSITION = ["GKP", "DEF", "MID", "FWD"] as const;
 const BASE_CHAIN_ID = 8453;
-const ELIGIBILITY_ASSET_TYPE = "eip155:8453/erc721:0x4669162aa53b9052f73f1ca12e43f4be57cf40bf";
-const ELIGIBILITY_CONTRACT = "0x4669162aa53b9052f73f1ca12e43f4be57cf40bf" as Address;
+const ELIGIBILITY_COLLECTIONS = [
+  { assetType: "eip155:8453/erc721:0x4669162aa53b9052f73f1ca12e43f4be57cf40bf", contract: "0x4669162aa53b9052f73f1ca12e43f4be57cf40bf" as Address },
+  { assetType: "eip155:8453/erc721:0x70935a3594d2e287cfc6bdfdaea7de209e4636d8", contract: "0x70935A3594d2E287CfC6BDFDAEA7de209E4636D8" as Address },
+] as const;
+const ELIGIBILITY_ASSET_TYPE = ELIGIBILITY_COLLECTIONS[0].assetType;
+type EligibilityAssetType = (typeof ELIGIBILITY_COLLECTIONS)[number]["assetType"];
 const CHALLENGE_TTL_SECONDS = 5 * 60;
 const NFT_ACCESS_TTL_SECONDS = 5 * 60;
 const PAYMENT_ACCESS_TTL_SECONDS = 15 * 60;
@@ -78,7 +82,7 @@ class FplGameweekDataUnavailable extends Error {
 }
 
 type ChallengePayload = { wallet: Address; expiresAt: number; nonce: string; assetType: typeof ELIGIBILITY_ASSET_TYPE };
-type AccessPayload = { wallet: Address; expiresAt: number; assetType: typeof ELIGIBILITY_ASSET_TYPE; source: "nft" | "payment" };
+type AccessPayload = { wallet: Address; expiresAt: number; assetType: EligibilityAssetType; source: "nft" | "payment" };
 
 function requiredAccessSecret(env: Env): string {
   if (!env.ACCESS_TOKEN_SECRET || env.ACCESS_TOKEN_SECRET.length < 32) throw new Error("Eligibility is not configured. The Worker owner must set ACCESS_TOKEN_SECRET.");
@@ -121,12 +125,15 @@ function baseRpcUrls(env: Env): string[] {
   if (!configured) throw new Error("Base RPC is not configured. Set the BASE_RPC_URL secret to the Dwellir Base Mainnet archive endpoint.");
   return [configured];
 }
-async function collectionBalance(env: Env, wallet: Address): Promise<bigint> {
+function eligibilityCollection(assetType: string) {
+  return ELIGIBILITY_COLLECTIONS.find((collection) => collection.assetType === assetType);
+}
+async function collectionBalance(env: Env, wallet: Address, contract: Address): Promise<bigint> {
   const calldata = `0x70a08231${wallet.slice(2).toLowerCase().padStart(64, "0")}` as Hex;
   let lastError: unknown;
   for (const rpcUrl of baseRpcUrls(env)) {
     try {
-      const response = await fetch(rpcUrl, { method: "POST", headers: { "content-type": "application/json" }, signal: AbortSignal.timeout(8_000), body: JSON.stringify({ jsonrpc: "2.0", id: crypto.randomUUID(), method: "eth_call", params: [{ to: ELIGIBILITY_CONTRACT, data: calldata }, "latest"] }) });
+      const response = await fetch(rpcUrl, { method: "POST", headers: { "content-type": "application/json" }, signal: AbortSignal.timeout(8_000), body: JSON.stringify({ jsonrpc: "2.0", id: crypto.randomUUID(), method: "eth_call", params: [{ to: contract, data: calldata }, "latest"] }) });
       const result = await response.json() as { result?: Hex; error?: { message?: string } };
       if (!response.ok || result.error || !result.result) throw new Error(result.error?.message || `Base RPC returned ${response.status}.`);
       return BigInt(result.result);
@@ -152,11 +159,12 @@ async function verifyWalletChallenge(env: Env, walletInput: string, challenge: s
 }
 async function verifyChallengeAndIssueAccess(env: Env, walletInput: string, challenge: string, signature: Hex) {
   const wallet = await verifyWalletChallenge(env, walletInput, challenge, signature);
-  const balance = await collectionBalance(env, wallet);
-  if (balance < 1n) return { eligible: false as const, wallet, balance: balance.toString(), assetType: ELIGIBILITY_ASSET_TYPE };
+  const balances = await Promise.all(ELIGIBILITY_COLLECTIONS.map(async (collection) => ({ ...collection, balance: await collectionBalance(env, wallet, collection.contract) })));
+  const eligibleCollection = balances.find((collection) => collection.balance > 0n);
+  if (!eligibleCollection) return { eligible: false as const, wallet, balances: balances.map(({ assetType, contract, balance }) => ({ assetType, contract, balance: balance.toString() })) };
   const expiresAt = Math.floor(Date.now() / 1000) + NFT_ACCESS_TTL_SECONDS;
-  const accessToken = await signPayload<AccessPayload>(env, { wallet, expiresAt, assetType: ELIGIBILITY_ASSET_TYPE, source: "nft" });
-  return { eligible: true as const, wallet, balance: balance.toString(), assetType: ELIGIBILITY_ASSET_TYPE, accessToken, expiresAt: new Date(expiresAt * 1000).toISOString() };
+  const accessToken = await signPayload<AccessPayload>(env, { wallet, expiresAt, assetType: eligibleCollection.assetType, source: "nft" });
+  return { eligible: true as const, wallet, balance: eligibleCollection.balance.toString(), assetType: eligibleCollection.assetType, contract: eligibleCollection.contract, accessToken, expiresAt: new Date(expiresAt * 1000).toISOString() };
 }
 function paymentQuote() {
   return { x402: true, network: "base", chainId: BASE_CHAIN_ID, router: X402_ROUTER, function: "pay", projectId: X402_PROJECT_ID.toString(), token: X402_USDC, amount: X402_MIN_AMOUNT.toString(), amountDisplay: "$0.05 USDC", beneficiary: X402_BENEFICIARY, accessDurationSeconds: PAYMENT_ACCESS_TTL_SECONDS, instructions: "Pay at least 0.05 Base USDC through JBRouterTerminalRegistry.pay for project 3, then prove control of the transaction sender with fpl_access_challenge and call fpl_verify_payment with the mined transaction hash." };
@@ -204,8 +212,9 @@ async function verifyPaymentAndIssueAccess(env: Env, walletInput: string, challe
 }
 async function verifyAccessToken(env: Env, token: string): Promise<AccessPayload> {
   const payload = await verifyPayload<AccessPayload>(env, token);
-  if (!isAddress(payload.wallet) || payload.assetType !== ELIGIBILITY_ASSET_TYPE || (payload.source !== "nft" && payload.source !== "payment") || payload.expiresAt <= Math.floor(Date.now() / 1000)) throw new Error("Access token is invalid or expired. Verify ownership or payment again.");
-  if (payload.source === "nft" && await collectionBalance(env, getAddress(payload.wallet)) < 1n) throw new Error("The required NFT is no longer held by this wallet.");
+  const collection = eligibilityCollection(payload.assetType);
+  if (!isAddress(payload.wallet) || !collection || (payload.source !== "nft" && payload.source !== "payment") || payload.expiresAt <= Math.floor(Date.now() / 1000)) throw new Error("Access token is invalid or expired. Verify ownership or payment again.");
+  if (payload.source === "nft" && await collectionBalance(env, getAddress(payload.wallet), collection.contract) < 1n) throw new Error("The required NFT is no longer held by this wallet.");
   return payload;
 }
 function isZeroAddress(address: string): boolean { return /^0x0{40}$/i.test(address); }
@@ -271,7 +280,7 @@ async function accessNftInventory(env: Env) {
     const tierInfo = { tierId: Number(tier.id), category: Number(tier.category), price: { raw: tier.price.toString(), pricingCurrency: pricingContext[0].toString(), decimals: Number(pricingContext[1]) }, initialSupply: Number(tier.initialSupply), remainingSupply: Number(tier.remainingSupply), buyable: tier.remainingSupply > 0, metadataUri, metadata: await tierMetadata(metadataUri || "") };
     return { ...tierInfo, eligibleForFplAccess: /\b(?:og|fpl)\b/i.test(tierInfo.metadata.description || "") };
   }));
-  return { projectRoute: "base:10", chain: "Base", chainId: BASE_CHAIN_ID, requiredAssetType: ELIGIBILITY_ASSET_TYPE, requiredCollection: ELIGIBILITY_CONTRACT, v6: { directory: JUICEBOX_DIRECTORY, controller, hook, metadataIdTarget: idTarget, tierStore }, pricingContext: { currency: pricingContext[0].toString(), decimals: Number(pricingContext[1]) }, tiers, discoveryNotice: "Prices, supply, tier IDs, and descriptions were read from the current Juicebox V6 project state. A tier is an FPL access option when its live metadata description contains OG or FPL. Do not rely on an old fixed quote." };
+  return { projectRoute: "base:10", chain: "Base", chainId: BASE_CHAIN_ID, requiredAssetType: ELIGIBILITY_ASSET_TYPE, requiredCollection: ELIGIBILITY_COLLECTIONS[0].contract, acceptedCollections: ELIGIBILITY_COLLECTIONS, v6: { directory: JUICEBOX_DIRECTORY, controller, hook, metadataIdTarget: idTarget, tierStore }, pricingContext: { currency: pricingContext[0].toString(), decimals: Number(pricingContext[1]) }, tiers, discoveryNotice: "Prices, supply, tier IDs, and descriptions were read from the current Juicebox V6 project state. A tier is an FPL access option when its live metadata description contains OG or FPL. Do not rely on an old fixed quote." };
 }
 
 /** Fetches FPL's public API with a small edge cache; no user data is persisted. */
@@ -404,14 +413,15 @@ function createServer(env: Env): McpServer {
             assetType: ELIGIBILITY_ASSET_TYPE,
             network: "Base",
             chainId: BASE_CHAIN_ID,
-            contract: ELIGIBILITY_CONTRACT,
-            requirement: "The signed wallet must hold at least one NFT from this ERC-721 collection.",
+            contract: ELIGIBILITY_COLLECTIONS[0].contract,
+            requirement: "The signed wallet must hold at least one NFT from either accepted ERC-721 collection.",
             verificationSteps: ["fpl_access_challenge", "Sign the exact returned message", "fpl_verify_access"],
             accessDurationSeconds: NFT_ACCESS_TTL_SECONDS,
             discoveryTool: "fpl_access_nft_inventory",
             projectRoute: "base:10",
             discoverySteps: ["Call fpl_access_nft_inventory.", "Read each returned tier metadata.name and metadata.description.", "Choose an available tier with the access option you want and use a Juicebox V6 checkout that resolves the live tier ID, price, payment asset, terminal, and hook metadata target.", "Use your connected buyer wallet as the pay beneficiary.", "After minting, call fpl_access_challenge then fpl_verify_access."],
           },
+          acceptedNftCollections: ELIGIBILITY_COLLECTIONS,
           paymentFallback: {
             enabled: true,
             quote: paymentQuote(),

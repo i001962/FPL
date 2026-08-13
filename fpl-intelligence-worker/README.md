@@ -24,13 +24,14 @@ Connect an MCP client to `https://<worker>.<account>.workers.dev/mcp` using Stre
 
 ## NFT eligibility and authentication
 
-All FPL analysis tools require a current access token. The gated collection is the CAIP-19 asset type:
+All FPL analysis tools require a current access token. Holding an NFT from either accepted Base ERC-721 collection grants access:
 
 ```text
 eip155:8453/erc721:0x4669162aa53b9052f73f1ca12e43f4be57cf40bf
+eip155:8453/erc721:0x70935a3594d2e287cfc6bdfdaea7de209e4636d8
 ```
 
-This is a collection-level gate: the verified signer must have `balanceOf(wallet) > 0`. The linked Juicebox project is `base:10`; its live V6 tier inventory marks a tier as an FPL access option when its metadata description contains `OG` or `FPL`. CAIP-19 supports an asset type without a token ID; add a token ID only when the policy should permit a specific NFT rather than any NFT in the collection.
+This is a collection-level gate: the verified signer must have `balanceOf(wallet) > 0` for at least one accepted collection. The linked Juicebox project is `base:10`; its live V6 tier inventory marks a tier as an FPL access option when its metadata description contains `OG` or `FPL`. CAIP-19 supports an asset type without a token ID; add a token ID only when the policy should permit a specific NFT rather than any NFT in the collection.
 
 1. Call `fpl_access_challenge` with the EVM wallet address.
 2. Sign the exact returned message with that wallet—this is a message signature, not a transaction.
