@@ -101,7 +101,7 @@ Access-Control-Allow-Origin: *
 ## Behavior
 
 - Resolves known test project IDs locally. The bundled test mapping is `basesep:19 -> 143466`.
-- Loads and merges every FPL standings and new-entry page from `https://fpl-league-shop-mcp.i001962.workers.dev/api/fpl-league` by default, or from the `apiBase` query parameter.
+- Loads and merges every FPL standings and new-entry page from `https://fpl-shop.d33m.com/api/fpl-league` by default, or from the `apiBase` query parameter.
 - Renders each manager's compact club badge when the configured FPL proxy provides `club_badge_src`. The static app never calls the FPL entry endpoint directly.
 - Reads the active Juicebox V6 721 shop from `JBDirectory -> controllerOf -> currentRulesetOf -> dataHook`, then loads all tiers with `tiersOf(...)`.
 - Resolves tier thumbnails from the hook's `tokenUriResolverOf(...)`, `resolvedUri`, or encoded IPFS metadata.
