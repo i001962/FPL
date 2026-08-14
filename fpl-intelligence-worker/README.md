@@ -2,7 +2,7 @@
 
 An independently deployable Cloudflare Worker that exposes public Fantasy Premier League analysis through MCP Streamable HTTP at `/mcp`.
 
-It ports the useful FPL-facing surface of [`dohyung1/x402-fpl-api`](https://github.com/dohyung1/x402-fpl-api) to TypeScript/Workers. Access is gated by verified ownership of a Base ERC-721 collection, with a $0.05 USDC, 15-minute payment fallback. The Worker never signs or submits wallet transactions.
+It ports the useful FPL-facing surface of [`dohyung1/x402-fpl-api`](https://github.com/dohyung1/x402-fpl-api) to TypeScript/Workers. It supports walletless access passes via OAuth, as well as verified ownership of a Base ERC-721 collection and a $0.05 USDC payment fallback. The Worker never signs or submits wallet transactions.
 
 ## Included tools
 
@@ -21,6 +21,39 @@ npm run deploy
 ```
 
 Connect an MCP client to `https://<worker>.<account>.workers.dev/mcp` using Streamable HTTP.
+
+## Walletless access passes (no email or wallet)
+
+The Worker includes its own OAuth authorization server and pass store. It uses the existing Durable Object SQLite storage, so there is no Docker container, email provider, or separate database to operate.
+
+An access pass is a private bearer credential. The Worker stores only a SHA-256 hash, expiry, and revocation state—not an email address, name, wallet, or pass plaintext. On first connection, an OAuth-capable MCP host redirects the user to `/authorize`; they enter their pass on that page and the host receives a one-hour `fpl:read` token plus a rotating refresh token. The token is checked against the pass store on every protected MCP call, so revocation takes effect immediately.
+
+Before deploying, configure the signing key and a strong issuer secret:
+
+```bash
+npx wrangler secret put ACCESS_TOKEN_SECRET
+npx wrangler secret put ACCESS_PASS_ISSUER_SECRET
+```
+
+The host must use Authorization Code + PKCE (`S256`). The Worker uses dynamic client registration, so ChatGPT can register its own exact callback URL during setup. It advertises `fpl:read` and `offline_access`, and supports refresh-token rotation. Its discovery endpoints are `/.well-known/oauth-protected-resource` and `/.well-known/oauth-authorization-server`.
+
+Create a pass through the administrator endpoint; it returns the plaintext only once, so deliver it privately to the recipient:
+
+```bash
+curl -X POST https://mcp.fpl.d33m.com/admin/access-passes \
+  -H "Authorization: Bearer <ACCESS_PASS_ISSUER_SECRET>" \
+  -H "Content-Type: application/json" \
+  --data '{"expiresInDays":30}'
+```
+
+Revoke a lost or shared pass immediately:
+
+```bash
+curl -X DELETE https://mcp.fpl.d33m.com/admin/access-passes/<passId> \
+  -H "Authorization: Bearer <ACCESS_PASS_ISSUER_SECRET>"
+```
+
+Do not ask users to paste passes into their chat prompts. They should enter them only on the Worker-hosted OAuth page. Restrict the admin endpoint at the Cloudflare edge and add rate limiting before broad distribution; it is intentionally an operator-only endpoint.
 
 ## NFT eligibility and authentication
 

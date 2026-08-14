@@ -13,7 +13,10 @@ export interface Env {
   ACCESS_TOKEN_SECRET?: string;
   /** Wrangler secret. Authenticated, archive-capable Base JSON-RPC endpoint for payment receipt checks. */
   BASE_RPC_URL?: string;
+  /** Wrangler secret. Required to create walletless access passes through the admin endpoint. */
+  ACCESS_PASS_ISSUER_SECRET?: string;
   PAYMENT_RECEIPTS: DurableObjectNamespace<PaymentReceipt>;
+  ACCESS_PASSES: DurableObjectNamespace<AccessPassStore>;
 }
 
 type Json = Record<string, unknown>;
@@ -82,7 +85,12 @@ class FplGameweekDataUnavailable extends Error {
 }
 
 type ChallengePayload = { wallet: Address; expiresAt: number; nonce: string; assetType: typeof ELIGIBILITY_ASSET_TYPE };
-type AccessPayload = { wallet: Address; expiresAt: number; assetType: EligibilityAssetType; source: "nft" | "payment" };
+type WalletAccessPayload = { wallet: Address; expiresAt: number; assetType: EligibilityAssetType; source: "nft" | "payment" };
+type PassAccessPayload = { subject: string; expiresAt: number; source: "pass"; scope: "fpl:read" };
+type AccessPayload = WalletAccessPayload | PassAccessPayload;
+type OAuthAuthorization = { clientId: string; redirectUri: string; codeChallenge: string; passId: string; passExpiresAt: number; expiresAt: number };
+type OAuthRefresh = { clientId: string; passId: string; expiresAt: number };
+type OAuthClient = { redirectUris: string[] };
 
 function requiredAccessSecret(env: Env): string {
   if (!env.ACCESS_TOKEN_SECRET || env.ACCESS_TOKEN_SECRET.length < 32) throw new Error("Eligibility is not configured. The Worker owner must set ACCESS_TOKEN_SECRET.");
@@ -102,6 +110,10 @@ function base64UrlDecode(value: string): ArrayBuffer {
 }
 async function hmacKey(secret: string): Promise<CryptoKey> {
   return crypto.subtle.importKey("raw", new TextEncoder().encode(secret), { name: "HMAC", hash: "SHA-256" }, false, ["sign", "verify"]);
+}
+async function sha256(value: string): Promise<string> {
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value));
+  return base64UrlEncode(new Uint8Array(digest));
 }
 async function signPayload<T extends object>(env: Env, payload: T): Promise<string> {
   const encoded = base64UrlEncode(JSON.stringify(payload));
@@ -163,7 +175,7 @@ async function verifyChallengeAndIssueAccess(env: Env, walletInput: string, chal
   const eligibleCollection = balances.find((collection) => collection.balance > 0n);
   if (!eligibleCollection) return { eligible: false as const, wallet, balances: balances.map(({ assetType, contract, balance }) => ({ assetType, contract, balance: balance.toString() })) };
   const expiresAt = Math.floor(Date.now() / 1000) + NFT_ACCESS_TTL_SECONDS;
-  const accessToken = await signPayload<AccessPayload>(env, { wallet, expiresAt, assetType: eligibleCollection.assetType, source: "nft" });
+  const accessToken = await signPayload<WalletAccessPayload>(env, { wallet, expiresAt, assetType: eligibleCollection.assetType, source: "nft" });
   return { eligible: true as const, wallet, balance: eligibleCollection.balance.toString(), assetType: eligibleCollection.assetType, contract: eligibleCollection.contract, accessToken, expiresAt: new Date(expiresAt * 1000).toISOString() };
 }
 function paymentQuote() {
@@ -201,17 +213,80 @@ export class PaymentReceipt extends DurableObject<Env> {
     return true;
   }
 }
+export class AccessPassStore extends DurableObject<Env> {
+  async create(passId: string, passHash: string, expiresAt: number): Promise<void> {
+    await this.ctx.storage.put(`pass:${passId}`, { passHash, expiresAt, revoked: false });
+  }
+
+  async redeem(passHash: string): Promise<{ passId: string; expiresAt: number } | null> {
+    const records = await this.ctx.storage.list<{ passHash: string; expiresAt: number; revoked: boolean }>({ prefix: "pass:" });
+    const now = Math.floor(Date.now() / 1000);
+    for (const [key, pass] of records) {
+      if (!pass.revoked && pass.expiresAt > now && pass.passHash === passHash) return { passId: key.slice("pass:".length), expiresAt: pass.expiresAt };
+    }
+    return null;
+  }
+
+  async active(passId: string): Promise<boolean> {
+    const pass = await this.ctx.storage.get<{ expiresAt: number; revoked: boolean }>(`pass:${passId}`);
+    return Boolean(pass && !pass.revoked && pass.expiresAt > Math.floor(Date.now() / 1000));
+  }
+
+  async revoke(passId: string): Promise<boolean> {
+    const key = `pass:${passId}`;
+    const pass = await this.ctx.storage.get<{ passHash: string; expiresAt: number; revoked: boolean }>(key);
+    if (!pass) return false;
+    await this.ctx.storage.put(key, { ...pass, revoked: true });
+    return true;
+  }
+
+  async saveAuthorizationCode(code: string, authorization: OAuthAuthorization): Promise<void> {
+    await this.ctx.storage.put(`oauth:${code}`, authorization);
+  }
+
+  async consumeAuthorizationCode(code: string): Promise<OAuthAuthorization | null> {
+    const key = `oauth:${code}`;
+    const authorization = await this.ctx.storage.get<OAuthAuthorization>(key);
+    await this.ctx.storage.delete(key);
+    return authorization && authorization.expiresAt > Math.floor(Date.now() / 1000) ? authorization : null;
+  }
+
+  async registerClient(redirectUris: string[]): Promise<string> {
+    const clientId = `fpl_${randomToken(18)}`;
+    await this.ctx.storage.put(`client:${clientId}`, { redirectUris });
+    return clientId;
+  }
+
+  async client(clientId: string): Promise<OAuthClient | null> { return await this.ctx.storage.get<OAuthClient>(`client:${clientId}`) || null; }
+
+  async saveRefreshToken(token: string, refresh: OAuthRefresh): Promise<void> {
+    await this.ctx.storage.put(`refresh:${token}`, refresh);
+  }
+
+  async consumeRefreshToken(token: string): Promise<OAuthRefresh | null> {
+    const key = `refresh:${token}`;
+    const refresh = await this.ctx.storage.get<OAuthRefresh>(key);
+    await this.ctx.storage.delete(key);
+    return refresh && refresh.expiresAt > Math.floor(Date.now() / 1000) ? refresh : null;
+  }
+}
 async function verifyPaymentAndIssueAccess(env: Env, walletInput: string, challenge: string, signature: Hex, txHash: string) {
   const wallet = await verifyWalletChallenge(env, walletInput, challenge, signature);
   await verifyJuiceboxPayment(env, txHash, wallet);
   const receipt = env.PAYMENT_RECEIPTS.getByName(txHash.toLowerCase());
   if (!await receipt.consume(txHash)) throw new Error("This payment transaction has already been used for access.");
   const expiresAt = Math.floor(Date.now() / 1000) + PAYMENT_ACCESS_TTL_SECONDS;
-  const accessToken = await signPayload<AccessPayload>(env, { wallet, expiresAt, assetType: ELIGIBILITY_ASSET_TYPE, source: "payment" });
+  const accessToken = await signPayload<WalletAccessPayload>(env, { wallet, expiresAt, assetType: ELIGIBILITY_ASSET_TYPE, source: "payment" });
   return { eligible: false, paid: true, wallet, paymentTxHash: txHash, accessToken, expiresAt: new Date(expiresAt * 1000).toISOString(), quote: paymentQuote() };
 }
 async function verifyAccessToken(env: Env, token: string): Promise<AccessPayload> {
   const payload = await verifyPayload<AccessPayload>(env, token);
+  if (payload.source === "pass") {
+    if (!payload.subject || payload.scope !== "fpl:read" || payload.expiresAt <= Math.floor(Date.now() / 1000)) throw new Error("Pass access token is invalid or expired. Reconnect with an active access pass.");
+    const store = env.ACCESS_PASSES.getByName("walletless-access");
+    if (!await store.active(payload.subject)) throw new Error("This access pass has expired or was revoked.");
+    return payload;
+  }
   const collection = eligibilityCollection(payload.assetType);
   if (!isAddress(payload.wallet) || !collection || (payload.source !== "nft" && payload.source !== "payment") || payload.expiresAt <= Math.floor(Date.now() / 1000)) throw new Error("Access token is invalid or expired. Verify ownership or payment again.");
   if (payload.source === "nft" && await collectionBalance(env, getAddress(payload.wallet), collection.contract) < 1n) throw new Error("The required NFT is no longer held by this wallet.");
@@ -403,12 +478,17 @@ function transferSuggestions(context: Awaited<ReturnType<typeof teamContext>>, l
 
 function createServer(env: Env): McpServer {
   const server = new McpServer({ name: "FPL Intelligence", version: "0.1.0" });
-  server.tool("fpl_access_options", "Start here when FPL Intelligence access is required. Explains the live Juicebox V6 NFT inventory for project base:10, the $0.05 USDC payment fallback, and how to obtain a token for protected FPL tools.", {}, async () => {
+  server.tool("fpl_access_options", "Start here when FPL Intelligence access is required. Explains walletless access passes through OAuth, the live Juicebox V6 NFT inventory, and the $0.05 USDC payment fallback.", {}, async () => {
     try {
       return {
-        content: [{ type: "text", text: "FPL Intelligence has two access routes. Preferred: mint or hold the required Base NFT. First call fpl_access_nft_inventory: it reads the current Juicebox V6 project base:10 tiers on-chain and returns each available NFT's live description, supply, and raw price. Choose a tier whose live description offers the access you want, then complete checkout with your own wallet as beneficiary. Do not rely on a fixed SLOPSHOP amount or prebuilt calldata: those are intentionally discovered from current project state. After minting, call fpl_access_challenge, sign the exact message, and call fpl_verify_access for a five-minute token. Alternatively, the x402-style fallback is enabled: pay $0.05 USDC on Base using the included Juicebox quote, then call fpl_access_challenge, sign the message, and call fpl_verify_payment with the mined payment hash for a 15-minute token. Use the resulting accessToken in each protected tool's arguments. NFT access is not automatic: it must be verified through fpl_verify_access." }],
+        content: [{ type: "text", text: "FPL Intelligence has a walletless route: connect through OAuth and enter an active FPL access pass on the Worker-hosted page. The pass is a private bearer credential; no email, wallet, or personal profile is required. Wallet alternatives remain available: mint/hold the required Base NFT and verify it with fpl_access_challenge plus fpl_verify_access, or pay the $0.05 USDC fallback and verify the transaction with fpl_verify_payment." }],
         structuredContent: {
-          preferredRoute: "nft",
+          preferredRoute: "walletless_access_pass",
+          walletlessAccessPass: {
+            requirement: "Connect this MCP through OAuth and enter an active access pass at the Worker-hosted authorization page.",
+            identityCollected: "none",
+            scope: "fpl:read",
+          },
           nft: {
             assetType: ELIGIBILITY_ASSET_TYPE,
             network: "Base",
@@ -515,6 +595,104 @@ function cors(request: Request, env: Env): Headers {
 }
 function withCors(response: Response, request: Request, env: Env): Response { const headers = new Headers(response.headers); cors(request, env).forEach((value, key) => headers.set(key, value)); return new Response(response.body, { status: response.status, statusText: response.statusText, headers }); }
 
+function randomToken(bytes = 32): string {
+  const value = new Uint8Array(bytes);
+  crypto.getRandomValues(value);
+  return base64UrlEncode(value);
+}
+function html(value: string): string { return value.replace(/[&<>"']/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#39;" })[character] || character); }
+function formValues(form: FormData): Record<string, string> {
+  const values: Record<string, string> = {};
+  form.forEach((value, key) => { if (typeof value === "string") values[key] = value; });
+  return values;
+}
+async function authorizationRequest(values: Record<string, string>, env: Env): Promise<{ clientId: string; redirectUri: string; state: string; codeChallenge: string }> {
+  if (values.response_type !== "code") throw new Error("Only OAuth authorization-code flow is supported.");
+  const client = await env.ACCESS_PASSES.getByName("walletless-access").client(values.client_id || "");
+  if (!client || !client.redirectUris.includes(values.redirect_uri || "")) throw new Error("Unknown OAuth client or redirect URI.");
+  if (!values.state || !/^[A-Za-z0-9._~-]{1,1024}$/.test(values.state)) throw new Error("OAuth state is required.");
+  if (values.code_challenge_method !== "S256" || !/^[A-Za-z0-9_-]{43,128}$/.test(values.code_challenge || "")) throw new Error("OAuth PKCE S256 is required.");
+  return { clientId: values.client_id, redirectUri: values.redirect_uri, state: values.state, codeChallenge: values.code_challenge };
+}
+function authorizePage(values: Record<string, string>, message = ""): Response {
+  const inputs = ["response_type", "client_id", "redirect_uri", "state", "code_challenge", "code_challenge_method", "scope"]
+    .map((name) => `<input type="hidden" name="${name}" value="${html(values[name] || "")}">`).join("");
+  return new Response(`<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Unlock FPL Intelligence</title><style>body{font:16px system-ui;max-width:38rem;margin:10vh auto;padding:1.5rem;color:#17212b}input{box-sizing:border-box;width:100%;padding:.8rem;margin:.5rem 0 1rem}button{padding:.8rem 1.1rem;background:#147a47;color:#fff;border:0;border-radius:.35rem;font-weight:700}.error{color:#a61b1b}</style><h1>Unlock FPL Intelligence</h1><p>Enter your access pass. No email address, wallet, or personal profile is collected.</p>${message ? `<p class="error">${html(message)}</p>` : ""}<form method="post">${inputs}<label>Access pass<input name="access_pass" autocomplete="off" required autofocus></label><button>Continue to ChatGPT</button></form><p><small>Keep this pass private: it grants access to anyone who has it.</small></p>`, { headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store", "referrer-policy": "no-referrer" } });
+}
+async function handleAuthorize(request: Request, env: Env): Promise<Response> {
+  const values: Record<string, string> = request.method === "GET" ? Object.fromEntries(new URL(request.url).searchParams) : formValues(await request.formData());
+  let auth: { clientId: string; redirectUri: string; state: string; codeChallenge: string };
+  try { auth = await authorizationRequest(values, env); } catch (error) { return authorizePage(values, error instanceof Error ? error.message : "Invalid authorization request."); }
+  if (request.method === "GET") return authorizePage(values);
+  if (request.method !== "POST") return new Response("Method not allowed", { status: 405, headers: { Allow: "GET, POST" } });
+  const pass = await env.ACCESS_PASSES.getByName("walletless-access").redeem(await sha256(values.access_pass || ""));
+  if (!pass) return authorizePage(values, "That access pass is invalid, expired, or revoked.");
+  const code = randomToken();
+  await env.ACCESS_PASSES.getByName("walletless-access").saveAuthorizationCode(code, { clientId: auth.clientId, redirectUri: auth.redirectUri, codeChallenge: auth.codeChallenge, passId: pass.passId, passExpiresAt: pass.expiresAt, expiresAt: Math.floor(Date.now() / 1000) + 5 * 60 });
+  const callback = new URL(auth.redirectUri);
+  callback.searchParams.set("code", code);
+  callback.searchParams.set("state", auth.state);
+  return Response.redirect(callback.toString(), 302);
+}
+async function handleToken(request: Request, env: Env): Promise<Response> {
+  if (request.method !== "POST") return new Response("Method not allowed", { status: 405, headers: { Allow: "POST" } });
+  const values = formValues(await request.formData());
+  try {
+    const store = env.ACCESS_PASSES.getByName("walletless-access");
+    const client = await store.client(values.client_id || "");
+    if (!client) throw new Error("invalid_grant");
+    let passId: string;
+    let passExpiry: number;
+    if (values.grant_type === "authorization_code") {
+      if (!client.redirectUris.includes(values.redirect_uri || "")) throw new Error("invalid_grant");
+      const authorization = await store.consumeAuthorizationCode(values.code || "");
+      if (!authorization || authorization.clientId !== values.client_id || authorization.redirectUri !== values.redirect_uri || authorization.codeChallenge !== await sha256(values.code_verifier || "")) throw new Error("invalid_grant");
+      passId = authorization.passId;
+      passExpiry = authorization.passExpiresAt;
+    } else if (values.grant_type === "refresh_token") {
+      const refresh = await store.consumeRefreshToken(values.refresh_token || "");
+      if (!refresh || refresh.clientId !== values.client_id) throw new Error("invalid_grant");
+      passId = refresh.passId;
+      passExpiry = refresh.expiresAt;
+    } else throw new Error("unsupported_grant_type");
+    if (!await store.active(passId)) throw new Error("invalid_grant");
+    const expiresIn = 60 * 60;
+    const token = await signPayload<PassAccessPayload>(env, { subject: passId, source: "pass", scope: "fpl:read", expiresAt: Math.floor(Date.now() / 1000) + expiresIn });
+    const refreshToken = randomToken();
+    await store.saveRefreshToken(refreshToken, { clientId: values.client_id, passId, expiresAt: passExpiry });
+    return Response.json({ access_token: token, refresh_token: refreshToken, token_type: "Bearer", expires_in: expiresIn, scope: "fpl:read offline_access" }, { headers: { "cache-control": "no-store", pragma: "no-cache" } });
+  } catch {
+    return Response.json({ error: "invalid_grant" }, { status: 400, headers: { "cache-control": "no-store" } });
+  }
+}
+async function handleRegistration(request: Request, env: Env): Promise<Response> {
+  if (request.method !== "POST") return new Response("Method not allowed", { status: 405, headers: { Allow: "POST" } });
+  const body = await request.json().catch(() => ({})) as { redirect_uris?: unknown };
+  const redirectUris = Array.isArray(body.redirect_uris) ? body.redirect_uris.filter((uri): uri is string => typeof uri === "string" && /^https:\/\//.test(uri)) : [];
+  if (!redirectUris.length) return Response.json({ error: "invalid_client_metadata" }, { status: 400 });
+  const clientId = await env.ACCESS_PASSES.getByName("walletless-access").registerClient(redirectUris);
+  return Response.json({ client_id: clientId, redirect_uris: redirectUris, token_endpoint_auth_method: "none", grant_types: ["authorization_code", "refresh_token"], response_types: ["code"] });
+}
+async function requirePassIssuer(request: Request, env: Env): Promise<boolean> {
+  const expected = env.ACCESS_PASS_ISSUER_SECRET;
+  const supplied = request.headers.get("authorization")?.replace(/^Bearer\s+/i, "") || "";
+  return Boolean(expected && supplied && expected === supplied);
+}
+async function handlePassAdmin(request: Request, env: Env, url: URL): Promise<Response> {
+  if (!await requirePassIssuer(request, env)) return Response.json({ error: "Unauthorized." }, { status: 401 });
+  const store = env.ACCESS_PASSES.getByName("walletless-access");
+  const passId = url.pathname.split("/").at(-1) || "";
+  if (request.method === "DELETE" && passId !== "access-passes") return Response.json({ passId, revoked: await store.revoke(passId) });
+  if (request.method !== "POST" || url.pathname !== "/admin/access-passes") return new Response("Method not allowed", { status: 405, headers: { Allow: "POST, DELETE" } });
+  const body = await request.json().catch(() => ({})) as { expiresInDays?: unknown };
+  const days = Math.max(1, Math.min(3650, Number(body.expiresInDays) || 30));
+  const accessPass = `fpl_${randomToken(24)}`;
+  const id = crypto.randomUUID();
+  const expiresAt = Math.floor(Date.now() / 1000) + Math.floor(days * 86400);
+  await store.create(id, await sha256(accessPass), expiresAt);
+  return Response.json({ passId: id, accessPass, expiresAt: new Date(expiresAt * 1000).toISOString(), warning: "Show this access pass only to its recipient. It cannot be retrieved later." }, { headers: { "cache-control": "no-store" } });
+}
+
 async function accessGuard(request: Request, env: Env): Promise<Response | null> {
   if (request.method !== "POST") return null;
   const contentLength = number(request.headers.get("content-length"));
@@ -535,9 +713,18 @@ async function accessGuard(request: Request, env: Env): Promise<Response | null>
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
+    const rawPath = new URL(request.url).pathname;
     const origin = allowedOrigin(request, env);
-    if (request.headers.has("Origin") && !origin) return Response.json({ error: "Origin is not allowed." }, { status: 403 });
-    if (url.pathname === "/health") return withCors(Response.json({ ok: true, service: "fpl-intelligence-mcp", payment: "enabled", eligibility: "enabled", baseRpcConfigured: Boolean(env.BASE_RPC_URL) }), request, env);
+    // OAuth authorization is a top-level browser navigation initiated by an MCP host.
+    // It must not inherit the API's browser-origin allow-list.
+    if (request.headers.has("Origin") && !origin && url.pathname !== "/authorize") return Response.json({ error: "Origin is not allowed." }, { status: 403 });
+    if (rawPath.endsWith("/.well-known/oauth-protected-resource")) return Response.json({ resource: `${url.origin}/mcp`, authorization_servers: [`${url.origin}/oauth`], scopes_supported: ["fpl:read"] });
+    if (rawPath.endsWith("/.well-known/oauth-authorization-server")) return Response.json({ issuer: `${url.origin}/oauth`, authorization_endpoint: `${url.origin}/authorize`, token_endpoint: `${url.origin}/token`, registration_endpoint: `${url.origin}/register`, response_types_supported: ["code"], grant_types_supported: ["authorization_code", "refresh_token"], code_challenge_methods_supported: ["S256"], scopes_supported: ["fpl:read", "offline_access"] });
+    if (url.pathname === "/register") return handleRegistration(request, env);
+    if (url.pathname === "/authorize") return handleAuthorize(request, env);
+    if (url.pathname === "/token") return handleToken(request, env);
+    if (url.pathname === "/admin/access-passes" || url.pathname.startsWith("/admin/access-passes/")) return handlePassAdmin(request, env, url);
+    if (url.pathname === "/health") return withCors(Response.json({ ok: true, service: "fpl-intelligence-mcp", payment: "enabled", eligibility: "enabled", walletlessPassOAuthConfigured: Boolean(env.ACCESS_PASS_ISSUER_SECRET), baseRpcConfigured: Boolean(env.BASE_RPC_URL) }), request, env);
     if (url.pathname !== "/mcp") return new Response("Not found", { status: 404 });
     if (request.method === "OPTIONS") return new Response(null, { headers: cors(request, env) });
     const denied = await accessGuard(request, env);
