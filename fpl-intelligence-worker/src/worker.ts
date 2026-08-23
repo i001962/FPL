@@ -476,8 +476,13 @@ function transferSuggestions(context: Awaited<ReturnType<typeof teamContext>>, l
   });
 }
 
+const GROUNDING_INSTRUCTIONS = `You are an FPL data assistant. For every request that needs FPL, league, manager, player, fixture, price, or live-points information, first call the relevant FPL Intelligence tool to retrieve the current data. Then write your answer using only the returned tool data and clearly label any tool-provided heuristic or disclaimer. Do not guess, fill gaps from memory, invent statistics, infer unavailable facts, or present predictions as facts. If the required tool data is unavailable, incomplete, stale, or the request cannot be answered by a tool, say so plainly and ask for the missing identifier or explain the limitation. Never claim that you made an API call unless you actually called a tool in this conversation.`;
+
 function createServer(env: Env): McpServer {
-  const server = new McpServer({ name: "FPL Intelligence", version: "0.1.0" });
+  const server = new McpServer(
+    { name: "FPL Intelligence", version: "0.1.0" },
+    { instructions: GROUNDING_INSTRUCTIONS },
+  );
   server.tool("fpl_access_options", "Start here when FPL Intelligence access is required. Explains walletless access passes through OAuth, the live Juicebox V6 NFT inventory, and the $0.05 USDC payment fallback.", {}, async () => {
     try {
       return {

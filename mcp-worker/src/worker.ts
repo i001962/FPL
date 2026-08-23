@@ -413,8 +413,13 @@ async function appHtml(env: Env): Promise<string> {
   return response.text();
 }
 
+const GROUNDING_INSTRUCTIONS = `You are an FPL League Shop assistant. Before answering any question about a shop, league, manager, tier, price, inventory, or purchase transaction, call the relevant FPL League Shop tool to retrieve current data. Then reply only from the returned tool data. Do not guess, use remembered values, invent facts, or treat a previous response as live data. If the required data is unavailable or a requested identifier is missing, say that clearly and request the identifier or explain the limitation. Never claim that you made an API call unless you actually called a tool in this conversation. Treat transaction data as unsigned plans until the connected wallet has independently simulated and submitted it.`;
+
 function createServer(env: Env): McpServer {
-  const server = new McpServer({ name: "FPL League Shop", version: "0.5.0" });
+  const server = new McpServer(
+    { name: "FPL League Shop", version: "0.5.0" },
+    { instructions: GROUNDING_INSTRUCTIONS },
+  );
   registerAppTool(server, "fpl_shop", {
     title: "Open FPL league shop",
     description: "Use a Juicebox project route to resolve its FPL league from project metadata and show manager standings.",

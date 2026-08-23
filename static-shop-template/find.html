@@ -366,19 +366,6 @@
       gap: 6px;
     }
 
-    .tier-detail-toggle {
-      border: 0;
-      background: transparent;
-      color: var(--accent-dark);
-      cursor: pointer;
-      font: inherit;
-      font-size: 0.78rem;
-      font-weight: 800;
-      padding: 0;
-      text-decoration: underline;
-      text-underline-offset: 2px;
-    }
-
     .tier-description {
       grid-column: 2 / -1;
       margin-top: -4px;
@@ -1663,7 +1650,6 @@ Direct Juicebox routes use: 1=eth, 11155111=sep, 42161=arb, 421614=arbsep, 8453=
       managerConfirmed: false,
       tiers: [],
       cart: {},
-      expandedTiers: new Set(),
       walletAccount: '',
       walletChainId: '',
       activeProvider: window.ethereum || null,
@@ -2133,11 +2119,10 @@ Direct Juicebox routes use: 1=eth, 11155111=sep, 42161=arb, 421614=arbsep, 8453=
             <strong>${escapeHtml(tier.name)}</strong>
             <span class="tier-meta">
               ${tier.remaining === 0 ? '<span>Sold out</span>' : ''}
-              ${tier.description ? `<button class="tier-detail-toggle" type="button" data-tier-detail="${escapeHtml(tier.id)}" aria-expanded="${state.expandedTiers.has(tier.id) ? 'true' : 'false'}">${state.expandedTiers.has(tier.id) ? 'Hide details' : 'Details'}</button>` : ''}
             </span>
           </span>
           <span class="price">${escapeHtml(displayTierPrice(tier))} ${escapeHtml(tier.currency)}</span>
-          ${tier.description && state.expandedTiers.has(tier.id) ? `<div class="tier-description">${escapeHtml(tier.description)}</div>` : ''}
+          ${tier.description ? `<div class="tier-description">${escapeHtml(tier.description)}</div>` : ''}
           <div class="qty" aria-label="${escapeHtml(tier.name)} quantity">
             <button type="button" data-cart-action="dec" data-tier-id="${escapeHtml(tier.id)}" ${cartQty(tier) <= 0 ? 'disabled' : ''}>-</button>
             <span>${escapeHtml(cartQty(tier))}</span>
@@ -3124,14 +3109,6 @@ Direct Juicebox routes use: 1=eth, 11155111=sep, 42161=arb, 421614=arbsep, 8453=
     els.search.addEventListener('input', renderManagers);
     els.sort.addEventListener('change', renderManagers);
     els.tiers.addEventListener('click', (event) => {
-      const detailButton = event.target.closest('button[data-tier-detail]');
-      if (detailButton) {
-        const tierId = detailButton.dataset.tierDetail;
-        if (state.expandedTiers.has(tierId)) state.expandedTiers.delete(tierId);
-        else state.expandedTiers.add(tierId);
-        renderTiers();
-        return;
-      }
       const button = event.target.closest('button[data-cart-action]');
       if (!button) return;
       const tier = state.tiers.find((item) => item.id === button.dataset.tierId);
