@@ -1,3 +1,4 @@
+import { RESOURCE_MIME_TYPE, registerAppResource, registerAppTool } from "@modelcontextprotocol/ext-apps/server";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
 import { DurableObject } from "cloudflare:workers";
@@ -5,6 +6,7 @@ import { decodeFunctionData, decodeFunctionResult, encodeFunctionData, getAddres
 import { z } from "zod";
 
 export interface Env {
+  ASSETS: Fetcher;
   FPL_API_BASE?: string;
   FPL_CACHE_TTL_SECONDS?: string;
   /** Comma-separated browser origins allowed to call this remote MCP endpoint. */
@@ -42,7 +44,18 @@ type EligibilityAssetType = (typeof ELIGIBILITY_COLLECTIONS)[number]["assetType"
 const CHALLENGE_TTL_SECONDS = 5 * 60;
 const NFT_ACCESS_TTL_SECONDS = 5 * 60;
 const PAYMENT_ACCESS_TTL_SECONDS = 15 * 60;
-const FREE_ACCESS_TOOLS = new Set(["fpl_access_options", "fpl_access_challenge", "fpl_verify_access", "fpl_verify_payment", "fpl_access_nft_inventory", "fpl_purchase_instructions"]);
+const PLAYER_CARD_RESOURCE_URI = "ui://fpl-intelligence/player-cards-v1.html";
+const MANAGER_CARD_RESOURCE_URI = "ui://fpl-intelligence/manager-card-v1.html";
+const LIVE_LEAGUE_CARD_RESOURCE_URI = "ui://fpl-intelligence/live-league-card-v1.html";
+const CARD_RESOURCE_URIS = [PLAYER_CARD_RESOURCE_URI, MANAGER_CARD_RESOURCE_URI, LIVE_LEAGUE_CARD_RESOURCE_URI] as const;
+const PLAYER_CARD_SOURCE = z.enum(["captain_pick", "player_comparison", "differential_finder", "transfer_suggestions", "is_hit_worth_it"]);
+const MANAGER_CARD_SOURCE = z.enum(["fpl_manager_hub", "squad_scout", "chip_strategy", "price_predictions"]);
+const LIVE_LEAGUE_CARD_SOURCE = z.enum(["live_points", "rival_tracker", "league_analyzer"]);
+const CARD_DATA = z.record(z.unknown()).describe("Pass the selected source tool's structuredContent object unchanged.");
+const FREE_ACCESS_TOOLS = new Set([
+  "fpl_access_options", "fpl_access_challenge", "fpl_verify_access", "fpl_verify_payment", "fpl_access_nft_inventory", "fpl_purchase_instructions",
+  "render_player_decision_card", "render_manager_gameweek_card", "render_live_league_card",
+]);
 const X402_ROUTER = "0xe0427f250fdb0379c8e98e884ee4570521208cbc" as Address;
 const X402_PROJECT_ID = 3n;
 const X402_USDC = "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913" as Address;
@@ -392,6 +405,10 @@ async function core(env: Env): Promise<{ bootstrap: Bootstrap; fixtures: Fixture
 
 function teamsById(bootstrap: Bootstrap): Map<number, Team> { return new Map(bootstrap.teams.map((team) => [team.id, team])); }
 function playerPosition(player: Player): string { return POSITION[player.element_type - 1] || "UNK"; }
+function playerImageUrl(player: Player): string | null {
+  const code = number(player.code);
+  return code > 0 ? `https://resources.premierleague.com/premierleague/photos/players/250x250/p${code}.png` : null;
+}
 function fixturesFor(fixtures: Fixture[], team: number, gameweek: number, count = 1): { opponent: number; home: boolean; difficulty: number; gameweek: number }[] {
   return fixtures.filter((fixture) => fixture.event !== null && fixture.event >= gameweek && fixture.event < gameweek + count && (fixture.team_h === team || fixture.team_a === team))
     .map((fixture) => fixture.team_h === team
@@ -410,14 +427,20 @@ function captainPicks(bootstrap: Bootstrap, fixtures: Fixture[], gameweek: numbe
   return bootstrap.elements.filter((player) => number(player.minutes) >= 180 && text(player.status || "a") === "a")
     .map((player) => {
       const next = fixturesFor(fixtures, player.team, gameweek, 1);
-      return { playerId: player.id, name: player.web_name, team: teams.get(player.team)?.short_name || "?", position: playerPosition(player), score: Number(captainScore(player, fixtures, gameweek).toFixed(2)), form: number(player.form), expectedGoalsPer90: number(player.expected_goals_per_90), expectedAssistsPer90: number(player.expected_assists_per_90), fixture: next.map((fixture) => `${teams.get(fixture.opponent)?.short_name || "?"} (${fixture.home ? "H" : "A"})`).join(", ") || "TBC", fixtureDifficulty: next[0]?.difficulty ?? null };
+      return { playerId: player.id, name: player.web_name, imageUrl: playerImageUrl(player), team: teams.get(player.team)?.short_name || "?", position: playerPosition(player), score: Number(captainScore(player, fixtures, gameweek).toFixed(2)), form: number(player.form), expectedGoalsPer90: number(player.expected_goals_per_90), expectedAssistsPer90: number(player.expected_assists_per_90), fixture: next.map((fixture) => `${teams.get(fixture.opponent)?.short_name || "?"} (${fixture.home ? "H" : "A"})`).join(", ") || "TBC", fixtureDifficulty: next[0]?.difficulty ?? null };
     }).sort((a, b) => b.score - a.score).slice(0, limit);
 }
 
 function playerView(player: Player, bootstrap: Bootstrap, fixtures: Fixture[], gameweek: number) {
   const teams = teamsById(bootstrap);
   const next = fixturesFor(fixtures, player.team, gameweek, 5);
-  return { playerId: player.id, name: player.web_name, team: teams.get(player.team)?.short_name || "?", position: playerPosition(player), price: number(player.now_cost) / 10, form: number(player.form), pointsPerGame: number(player.points_per_game), totalPoints: number(player.total_points), minutes: number(player.minutes), selectedByPercent: number(player.selected_by_percent), expectedGoalsPer90: number(player.expected_goals_per_90), expectedAssistsPer90: number(player.expected_assists_per_90), status: text(player.status || "a"), chanceOfPlayingNextRound: player.chance_of_playing_next_round ?? null, nextFixtures: next.map((fixture) => ({ gameweek: fixture.gameweek, opponent: teams.get(fixture.opponent)?.short_name || "?", home: fixture.home, difficulty: fixture.difficulty })) };
+  return { playerId: player.id, name: player.web_name, imageUrl: playerImageUrl(player), team: teams.get(player.team)?.short_name || "?", position: playerPosition(player), price: number(player.now_cost) / 10, form: number(player.form), pointsPerGame: number(player.points_per_game), totalPoints: number(player.total_points), minutes: number(player.minutes), selectedByPercent: number(player.selected_by_percent), expectedGoalsPer90: number(player.expected_goals_per_90), expectedAssistsPer90: number(player.expected_assists_per_90), status: text(player.status || "a"), chanceOfPlayingNextRound: player.chance_of_playing_next_round ?? null, nextFixtures: next.map((fixture) => ({ gameweek: fixture.gameweek, opponent: teams.get(fixture.opponent)?.short_name || "?", home: fixture.home, difficulty: fixture.difficulty })) };
+}
+
+async function cardAppHtml(env: Env): Promise<string> {
+  const response = await env.ASSETS.fetch("https://assets.invalid/card-app.html");
+  if (!response.ok) throw new Error("FPL card UI is unavailable. Run npm run build before deploying.");
+  return await response.text();
 }
 
 function errorResult(error: unknown) {
@@ -560,7 +583,7 @@ function createServer(env: Env): McpServer {
     try { const app = await core(env); const ranked = app.bootstrap.elements.map((player) => ({ player, netTransfers: number(player.transfers_in_event) - number(player.transfers_out_event) })); const view = (item: typeof ranked[number]) => ({ ...playerView(item.player, app.bootstrap, app.fixtures, app.next), netTransfers: item.netTransfers }); const risers = [...ranked].sort((a, b) => b.netTransfers - a.netTransfers).slice(0, 15).map(view); const fallers = [...ranked].sort((a, b) => a.netTransfers - b.netTransfers).slice(0, 15).map(view); return { content: [{ type: "text", text: "Price-change heuristic based on current event transfer flow." }], structuredContent: { gameweek: app.next, disclaimer: "FPL does not publish price-change thresholds; treat this as a signal, not a guarantee.", likelyRisers: risers, likelyFallers: fallers } }; } catch (error) { return errorResult(error); }
   });
   server.tool("live_points", "Return live points, bonus and auto-sub-relevant details for an FPL team in a gameweek.", protectedToolInput({ teamId: TEAM_ID, gameweek: z.coerce.number().int().min(1).max(38).optional() }), async ({ teamId, gameweek }) => {
-    try { const app = await core(env); const gw = gameweek ?? app.current; const [live, picks] = await Promise.all([gw === null ? Promise.resolve<Json>({ elements: [] }) : fpl<Json>(env, `/event/${gw}/live/`, 30), managerPicks(env, teamId, gw, app, 30)]); const liveById = new Map((live.elements as Json[] || []).map((item) => [number(item.id), item])); const players = (picks.picks as Json[] || []).map((pick) => { const player = app.bootstrap.elements.find((candidate) => candidate.id === number(pick.element)); const stats = liveById.get(number(pick.element))?.stats as Json | undefined; return { playerId: number(pick.element), name: player?.web_name || "Unknown", starter: number(pick.position) <= 11, captain: pick.is_captain === true, viceCaptain: pick.is_vice_captain === true, points: number(stats?.total_points) * (pick.is_captain === true ? 2 : 1), minutes: number(stats?.minutes), bonus: number(stats?.bonus), autoSub: Boolean(pick.autosub) }; }); return { content: [{ type: "text", text: `Live points for team ${teamId}, GW${gw}.` }], structuredContent: { teamId, gameweek: gw, players, eventStatus: await fpl<Json>(env, "/event-status/", 60) } }; } catch (error) { return errorResult(error); }
+    try { const app = await core(env); const teams = teamsById(app.bootstrap); const gw = gameweek ?? app.current; const [live, picks] = await Promise.all([gw === null ? Promise.resolve<Json>({ elements: [] }) : fpl<Json>(env, `/event/${gw}/live/`, 30), managerPicks(env, teamId, gw, app, 30)]); const liveById = new Map((live.elements as Json[] || []).map((item) => [number(item.id), item])); const players = (picks.picks as Json[] || []).map((pick) => { const player = app.bootstrap.elements.find((candidate) => candidate.id === number(pick.element)); const stats = liveById.get(number(pick.element))?.stats as Json | undefined; return { playerId: number(pick.element), name: player?.web_name || "Unknown", imageUrl: player ? playerImageUrl(player) : null, team: player ? teams.get(player.team)?.short_name || "?" : "?", starter: number(pick.position) <= 11, captain: pick.is_captain === true, viceCaptain: pick.is_vice_captain === true, points: number(stats?.total_points) * (pick.is_captain === true ? 2 : 1), minutes: number(stats?.minutes), bonus: number(stats?.bonus), autoSub: Boolean(pick.autosub) }; }); return { content: [{ type: "text", text: `Live points for team ${teamId}, GW${gw}.` }], structuredContent: { teamId, gameweek: gw, players, eventStatus: await fpl<Json>(env, "/event-status/", 60) } }; } catch (error) { return errorResult(error); }
   });
   server.tool("transfer_suggestions", "Suggest like-for-like FPL transfers from a manager's current public squad and bank.", protectedToolInput({ teamId: TEAM_ID, limit: z.coerce.number().int().min(1).max(10).default(5) }), async ({ teamId, limit }) => {
     try { const context = await teamContext(env, teamId); const suggestions = transferSuggestions(context, limit); return { content: [{ type: "text", text: `Transfer suggestions for ${text(context.profile.name) || `team ${teamId}`}.` }], structuredContent: { teamId, gameweek: context.next, bank: number((context.picks.entry_history as Json | undefined)?.bank) / 10, suggestions, disclaimer: "Check availability, position limits, and your exact free-transfer count before acting." } }; } catch (error) { return errorResult(error); }
@@ -583,6 +606,55 @@ function createServer(env: Env): McpServer {
   server.tool("fpl_manager_hub", "Run a combined public FPL team report: captain, transfer, differential, fixture, price-risk, and squad-health signals.", protectedToolInput({ teamId: TEAM_ID, gameweeksAhead: z.coerce.number().int().min(1).max(10).default(5) }), async ({ teamId, gameweeksAhead }) => {
     try { const context = await teamContext(env, teamId); const ids = new Set((context.picks.picks as Json[] || []).map((pick) => number(pick.element))); const squad = context.bootstrap.elements.filter((player) => ids.has(player.id)); const captains = captainPicks(context.bootstrap, context.fixtures, context.next); const poorForm = squad.filter((player) => number(player.form) <= 2 && number(player.minutes) > 180).map((player) => player.web_name); const unavailable = squad.filter((player) => text(player.status || "a") !== "a").map((player) => ({ name: player.web_name, status: text(player.status), news: text(player.news) })); const priceRisks = squad.map((player) => ({ name: player.web_name, netTransfers: number(player.transfers_in_event) - number(player.transfers_out_event) })).filter((player) => player.netTransfers < -50_000).sort((a, b) => a.netTransfers - b.netTransfers); return { content: [{ type: "text", text: `FPL manager hub report for team ${teamId}.` }], structuredContent: { teamId, teamName: text(context.profile.name), currentGameweek: context.current, nextGameweek: context.next, gameweeksAhead, captainRecommendation: captains, transferSuggestions: transferSuggestions(context, 5), squadHealth: { unavailable, poorForm }, priceDropRisks: priceRisks, fixtureOutlook: "Use fixture_outlook for a full league-wide fixture table.", disclaimer: "All advice is derived from public FPL data and simple, inspectable heuristics." } }; } catch (error) { return errorResult(error); }
   });
+
+  registerAppTool(server, "render_player_decision_card", {
+    title: "Render FPL player cards",
+    description: "Render collectible player cards from one completed player-analysis tool result. First call captain_pick, player_comparison, differential_finder, transfer_suggestions, or is_hit_worth_it, then pass its structuredContent unchanged as data.",
+    inputSchema: { sourceTool: PLAYER_CARD_SOURCE, data: CARD_DATA },
+    annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false },
+    _meta: { ui: { resourceUri: PLAYER_CARD_RESOURCE_URI } },
+  }, async ({ sourceTool, data }) => ({
+    content: [{ type: "text", text: `Rendered the ${sourceTool} result as collectible FPL player cards.` }],
+    structuredContent: { cardKind: "player_decision", sourceTool, data },
+  }));
+
+  registerAppTool(server, "render_manager_gameweek_card", {
+    title: "Render FPL manager card",
+    description: "Render a collectible manager gameweek card from one completed manager-analysis result. First call fpl_manager_hub, squad_scout, chip_strategy, or price_predictions, then pass its structuredContent unchanged as data.",
+    inputSchema: { sourceTool: MANAGER_CARD_SOURCE, data: CARD_DATA },
+    annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false },
+    _meta: { ui: { resourceUri: MANAGER_CARD_RESOURCE_URI } },
+  }, async ({ sourceTool, data }) => ({
+    content: [{ type: "text", text: `Rendered the ${sourceTool} result as an FPL manager gameweek card.` }],
+    structuredContent: { cardKind: "manager_gameweek", sourceTool, data },
+  }));
+
+  registerAppTool(server, "render_live_league_card", {
+    title: "Render FPL live league cards",
+    description: "Render collectible manager and live-score cards from one completed competition result. First call live_points, rival_tracker, or league_analyzer, then pass its structuredContent unchanged as data.",
+    inputSchema: { sourceTool: LIVE_LEAGUE_CARD_SOURCE, data: CARD_DATA },
+    annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false },
+    _meta: { ui: { resourceUri: LIVE_LEAGUE_CARD_RESOURCE_URI } },
+  }, async ({ sourceTool, data }) => ({
+    content: [{ type: "text", text: `Rendered the ${sourceTool} result as collectible FPL league cards.` }],
+    structuredContent: { cardKind: "live_league", sourceTool, data },
+  }));
+
+  for (const resourceUri of CARD_RESOURCE_URIS) {
+    registerAppResource(server, resourceUri, resourceUri, { mimeType: RESOURCE_MIME_TYPE }, async () => ({
+      contents: [{
+        uri: resourceUri,
+        mimeType: RESOURCE_MIME_TYPE,
+        text: await cardAppHtml(env),
+        _meta: {
+          ui: {
+            prefersBorder: false,
+            csp: { resourceDomains: ["https://resources.premierleague.com"] },
+          },
+        },
+      }],
+    }));
+  }
   return server;
 }
 

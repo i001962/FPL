@@ -10,6 +10,18 @@ It ports the useful FPL-facing surface of [`dohyung1/x402-fpl-api`](https://gith
 
 The analysis uses public FPL data and transparent heuristics. It is not a claim of proprietary expected-points modelling or guaranteed price changes.
 
+## MCP Apps cards
+
+The Worker includes three optional, decoupled MCP Apps renderers:
+
+- `render_player_decision_card` renders results from `captain_pick`, `player_comparison`, `differential_finder`, `transfer_suggestions`, or `is_hit_worth_it`.
+- `render_manager_gameweek_card` renders results from `fpl_manager_hub`, `squad_scout`, `chip_strategy`, or `price_predictions`.
+- `render_live_league_card` renders results from `live_points`, `rival_tracker`, or `league_analyzer`.
+
+Call the analysis tool first, then pass its `structuredContent` object unchanged to the matching renderer as `data`, together with the analysis tool name as `sourceTool`. Analysis tools remain fully useful in hosts that do not support MCP Apps.
+
+Player-producing tools include an `imageUrl` sourced from the public Premier League player-photo CDN. The component validates that host before rendering and falls back to a monogram when a photo is missing. FPL does not publish manager headshots, so manager cards intentionally use team-name monograms.
+
 ## Install and deploy
 
 ```bash

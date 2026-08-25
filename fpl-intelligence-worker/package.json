@@ -4,18 +4,23 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "build": "vite build",
     "check": "tsc --noEmit",
-    "dev": "wrangler dev",
-    "deploy": "wrangler deploy",
+    "dev": "npm run build && wrangler dev",
+    "deploy": "npm run build && wrangler deploy",
     "types": "wrangler types"
   },
   "dependencies": {
+    "@modelcontextprotocol/ext-apps": "^1.7.5",
     "@modelcontextprotocol/sdk": "^1.29.0",
     "viem": "^2.55.13",
     "zod": "^3.24.2"
   },
   "devDependencies": {
+    "@cloudflare/workers-types": "^5.20260825.1",
     "typescript": "^5.8.2",
+    "vite": "^6.4.3",
+    "vite-plugin-singlefile": "^2.3.3",
     "wrangler": "^4.13.2"
   }
 }
